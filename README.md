@@ -190,9 +190,14 @@ Wikidata:
    (Wikidata property *industry*, P452) na kategorii a odhad NACE – funguje
    nezávisle na jazyce, protože se srovnávají číselné identifikátory (QID),
    ne text.
-3. Když ani jedno nedá obor, poslední záchranou jsou **klíčová slova v
-   názvu firmy** (`taxonomie.py`) – rozpoznávají i němčinu, francouzštinu,
-   polštinu, maďarštinu, turečtinu a další jazyky zadaných zemí.
+
+Když ani jedno nedá obor, firma skončí v `XXX-00 Nezařazeno` k ruční
+kontrole. Nástroj záměrně **nehádá kategorii z klíčových slov v názvu
+firmy** – shoda slova v názvu není fakt o oboru činnosti a dřív vedla
+i k vyloženě špatným zařazením (např. "Deutsche Akkreditierungsstelle"
+– akreditační orgán – dřív skončila jako "Leasing, úvěry a financování",
+protože "kredit" sedělo jako podřetězec). Radši prázdná kategorie
+k doplnění než nejistý odhad.
 
 **Pro USA** se místo NACE dohledává NAICS (americká obdoba) přes SIC kód ze
 SEC EDGAR – je ve sloupci **Klasifikace (US NAICS)**, NACE se u amerických
@@ -261,9 +266,13 @@ Zařazení probíhá v tomto pořadí:
    RES (pole `czNacePrevazujici2008`). Seznam všech NACE, který ARES vrací,
    je řazen vzestupně podle kódu, ne podle významu, takže se na jeho pořadí
    nedá spolehnout – proto ten druhý dotaz.
-2. **podle klíčových slov** v názvu firmy a v oboru z Wikidat – když NACE není.
+2. **podle oboru z Wikidat** (strukturovaný QID) – když NACE není.
 3. `XXX-00 Nezařazeno` – vyžaduje ruční doplnění. Sloupec **Zařazeno podle**
    říká, která z cest se uplatnila.
+
+Kategorie se záměrně nehádá z klíčových slov v názvu firmy — jen ze
+skutečných údajů (NACE nebo strukturovaný obor), viz vysvětlení výše
+u zahraničních dodavatelů.
 
 ### Úprava taxonomie
 
@@ -273,8 +282,9 @@ python3 dodavatele.py --dump-taxonomy taxonomie.json    # export
 python3 dodavatele.py vstup.csv --taxonomy taxonomie.json
 ```
 
-JSON obsahuje číselník kategorií, mapu NACE → kategorie, klíčová slova
-i převod SIC → NACE. Alternativně lze upravit přímo `taxonomie.py`.
+JSON obsahuje číselník kategorií, mapu NACE → kategorie, mapu oborů
+z Wikidat i převod SIC → NACE/NAICS. Alternativně lze upravit přímo
+`taxonomie.py`.
 
 ### Číselník kategorií
 

@@ -14,9 +14,6 @@ Mapa NACE -> kategorie se prohledava od nejdelsiho prefixu, takze zaznam
 pro "6201" ma prednost pred obecnym "62".
 """
 
-import re
-from functools import lru_cache
-
 # ---------------------------------------------------------------------------
 # Ciselnik kategorii:  kod -> (skupina, nazev kategorie)
 # ---------------------------------------------------------------------------
@@ -240,170 +237,6 @@ NACE_MAPA = {
 }
 
 
-# ---------------------------------------------------------------------------
-# Zalozni zarazeni podle klicovych slov v nazvu firmy.
-# Pouzije se, kdyz NACE nezname (dodavatele mimo CR).
-# Poradi rozhoduje - prvni shoda vyhrava, proto jdou specificka slova driv.
-# ---------------------------------------------------------------------------
-
-KLICOVA_SLOVA = [
-    # --- ICT ---------------------------------------------------------------
-    (("cloud comput", "hyperscale", "hosting", "datacent", "data cent", "rechenzentrum",
-      "colocation", "colokace", "saas", "webhost", "serverhousing"), "ICT-03"),
-    (("cyber", "kyber", "siber", "security software", "infosec", "pentest", "soc as a service",
-      "threat intelligence", "antivir"), "ICT-06"),
-    (("consumer electronics", "computer hardware", "spotrebni elektronika",
-      "unterhaltungselektronik"), "ICT-07"),
-    (("software house", "computer software", "software industry", "oprogramowanie",
-      "szoftver", "yazilim", "programvara", "logiciel"), "ICT-01"),
-    (("telecom", "telekom", "telco", "telefon", "mobile network", "vodafone", "t-mobile",
-      "connectivity", "telecomunicaz", "telecomunica", "telekomunik"), "ICT-09"),
-    (("software", "systems", "solutions", "it services", "it-service", "informatik",
-      "informatica", "informatique", "informacni systemy", "devops", "sap ", " erp",
-      "digital", "technologies", "technologie", "teknoloji", "yazilim"), "ICT-01"),
-    (("computer", "pocitac", "hardware", "notebook", "print solutions", "bilgisayar"), "ICT-07"),
-    (("network", "networks", "sitove", "netzwerk", "netwerk"), "ICT-08"),
-    (("outsourcing", "shared service", " bpo", "call center", "contact center",
-      "kontaktni centrum", "back office"), "ICT-10"),
-    (("portal", "e-commerce", "ecommerce", "marketplace", "online platform", "webshop"), "ICT-12"),
-
-    # --- Finance -----------------------------------------------------------
-    (("bank", "banka", "banca", "banco", "banque", "bankasi", "bankası", "banking",
-      "sparkasse", "kreditanstalt"), "FIN-01"),
-    (("payment", "platebni", "acquiring", "card services", "paiement", "zahlungs",
-      "fintech"), "FIN-02"),
-    (("insurance", "pojist", "poist", "versicherung", "assurance", "assicuraz", "seguros",
-      "ubezpiecz", "biztosit", "forsakring", "sigorta", "asigurar"), "FIN-03"),
-    (("leasing", "credit", "kredit", "uverov", "factoring", "financing", "finansman"), "FIN-04"),
-    (("inkaso", "debt collection", "pohledavek", "vymahani"), "FIN-06"),
-
-    # --- Profesni sluzby ---------------------------------------------------
-    (("audit", "assurance", "wirtschaftspruf", "revision"), "PRO-03"),
-    (("ucetni", "uctov", "accounting", "bookkeeping", "tax advis", " tax ", "danov",
-      "steuerber", "payroll", "mzdov", "fiscal"), "PRO-02"),
-    (("advokat", "legal", "law firm", "rechtsanw", "notar", "kanzlei", "pravni", "avocat",
-      "avvocat", "abogad", "kancelaria prawna"), "PRO-01"),
-    (("consult", "poraden", "advisory", "beratung", "management consult", "conseil",
-      "consulen", "consultor", "doradztwo", "danismanlik"), "PRO-04"),
-    (("certifik", "inspection", " tuv", "dekra", "bureau veritas", "zkusebn", "testing",
-      "prufung", "notified body", "sgs "), "PRO-06"),
-    (("research", "vyzkum", "forschung", "recherche", "innovation", "r&d", " institut"), "PRO-07"),
-    (("translat", "preklad", "ubersetz", "localization", "lokalizace", "tlumoc"), "PRO-08"),
-    (("engineering", "inzenyr", "inzinier", "projekce", "projektov", "design office",
-      "architek", "ingenieur", "ingegneria", "ingenieria", "muhendislik"), "PRO-05"),
-
-    # --- Lidske zdroje -----------------------------------------------------
-    (("recruit", "staffing", "personalberatung", "human resources", "agentura prace",
-      "zeitarbeit", "headhunt", "personalagentur", "job", "kariera", "career"), "HR-01"),
-    (("agenturni zamestnav", "temporary work", "interim", "leiharbeit"), "HR-02"),
-    (("training", "skoleni", "vzdelav", "education", "academy", "akadem", "learning",
-      "bildung", "formation", "szkolen"), "HR-04"),
-    (("benefit", "stravenk", "sodexo", "edenred", "cafeteria"), "HR-05"),
-
-    # --- Energie -----------------------------------------------------------
-    (("petroleum", "oil and gas", "ropn", "rafin", "refinery", "raffiner", "petrol",
-      "naft", "petrom", "orlen"), "ENE-03"),
-    (("electric power", "electricity", "elektrarens", "elektrarna", "powerplant",
-      "power plant", "energetyka", "enerji", "elektrik"), "ENE-01"),
-    (("energy", "energie", "energet", "energia", "energi ", "teplarna", "heating",
-      "fernwarme", "district heat"), "ENE-01"),
-    (("gas", "plyn", "gaz", "fuel", "paliva", "benzina", "tankstelle"), "ENE-03"),
-    (("vodarn", "waterworks", "wasserwerk", "vodovod", "water utility", "kanalizac"), "ENE-04"),
-
-    # --- Bezpecnost --------------------------------------------------------
-    (("security", "ostrah", "sicherheit", "guard", "protection service", "securitas",
-      "bezpecnostni sluzb", "ochrona"), "SEC-01"),
-    (("ezs", "cctv", "access control", "pristupove systemy", "alarm"), "SEC-02"),
-
-    # --- Sprava objektu a provoz -------------------------------------------
-    (("facility", "cleaning", "uklid", "reinigung", "nettoyage", "pulizia", "sprava budov",
-      "sprava nemovit", "hausmeister", "sprzatan"), "FAC-02"),
-    (("catering", "restaur", "stravov", "kantyn", "gastro", "canteen", "mensa"), "FAC-04"),
-    (("hotel", "travel", "cestovn", "reise", "tour ", "tourism", "turizm", "airline",
-      "airways", "aerolinie", "ryanair"), "FAC-08"),
-    (("nabytek", "furniture", "mobel", "meble", "interier", "interior"), "FAC-07"),
-    (("papirnictvi", "office supplies", "kancelarsk", "burobedarf"), "FAC-06"),
-    (("real estate", "reality", "immobil", "nemovit", "properties", "estate", "nieruchomo"),
-     "FAC-05"),
-
-    # --- Odpady ------------------------------------------------------------
-    (("shred", "skartac", "likvidace dat", "data destruction", "aktenvernicht"), "ODP-02"),
-    (("recycl", "recykl", "waste", "odpad", "entsorgung", "ekolog", "environment",
-      "smieci", "atik", "dechet"), "ODP-01"),
-
-    # --- Logistika ---------------------------------------------------------
-    (("logistic", "logistik", "logistyka", "spedice", "spedition", "forwarding", "freight",
-      "shipping", "transport", "doprava", "cargo", "nakliyat", "lojistik"), "LOG-03"),
-    (("kurier", "courier", "express", " post", "posta", "parcel", "zasilkovna", "dhl",
-      "kargo"), "LOG-05"),
-    (("warehouse", "sklad", "fulfillment", "lager"), "LOG-04"),
-    (("shipyard", "maritime", "namorni", "reederei", "denizcilik"), "LOG-02"),
-
-    # --- Zdravotnictvi -----------------------------------------------------
-    (("pharma", "farmac", "farmaceut", "ilac", "leki", "gyogyszer", "sopharma",
-      "richter gedeon"), "ZDR-03"),
-    (("medical", "medizin", "medica", "zdravot", "health", "medyczn", "saglik",
-      "medizintechnik", "klinik", "hospital", "nemocnic"), "ZDR-01"),
-    (("laborat", "labor ", "diagnost", "analytik"), "ZDR-02"),
-    (("veterin",), "ZDR-05"),
-
-    # --- Technologie a stroje ----------------------------------------------
-    (("automation", "automatizace", "control system", "ridici system", "scada", " plc",
-      "measurement", "mereni", "messtechnik", "regeltechnik", "robotik", "robotics"), "TEC-02"),
-    (("machin", "stroj", "maschin", "equipment", "zarizeni", "werkzeug", "maszyn",
-      "macchine", "maquinaria", "makina"), "TEC-01"),
-    (("automotive", "motors", "vehicle", "vozidl", "auto ", "fahrzeug", "otomotiv",
-      "samochod", "aerospace", "aviation", "aircraft", "letecky prumysl"), "TEC-05"),
-    (("electric", "elektro", "elektrotech", "elektryk", "elettric", "elektrik"), "TEC-04"),
-    (("service", "servis", "opravy", "wartung", "maintenance", "instandhalt"), "TEC-03"),
-    (("rental", "pronajem", "rent ", "miet", "verleih", "wynajem", "kiralama"), "TEC-06"),
-
-    # --- Material ----------------------------------------------------------
-    (("steel", "ocel", "metal", "kovo", "hut ", "hutn", "aluminium", "hlinik", "slevarn",
-      "foundry", "stahl", "acciai", "celik", "stal ", "huta"), "MAT-01"),
-    (("chemic", "chemie", "chemical", "chemi", "kimya", "chemia", "petrochem"), "MAT-02"),
-    (("plast", "polymer", "rubber", "kaucuk", "pryz", "gummi", "kunststoff"), "MAT-03"),
-    (("packaging", "obal", "verpackung", "papir", "paper", "karton", "opakowan",
-      "ambalaj", "papier"), "MAT-04"),
-    (("beton", "cement", "stavebni hmoty", "kamenolom", "ziegel", "baustoff"), "MAT-05"),
-    (("textil", "odev", "clothing", "workwear", "ochranne pomucky", "bekleidung",
-      "tekstil", "apparel", "confectii"), "MAT-06"),
-    (("semiconduct", "electronic", "elektronik", "components", "komponenty", "bauelemente",
-      "microchip", "wafer"), "MAT-07"),
-    (("food", "potravin", "napoj", "beverage", "lebensmittel", "pivovar", "brewery",
-      "brauerei", "mlekarna", "dairy", "alimentar", "gida", "zywnos"), "MAT-08"),
-    (("agro", "zemedel", "farm", "landwirt", "rolnic", "tarim"), "MAT-09"),
-    (("mining", "tezba", "bergbau", "kopalnia", "madencilik", "quarry"), "MAT-10"),
-    (("drevo", "timber", "holz", "lumber", "sawmill", "pila "), "MAT-11"),
-
-    # --- Stavebnictvi ------------------------------------------------------
-    (("bau", "stavb", "stavebni", "construction", "building", "sanace", "budowl",
-      "insaat", "costruzion", "construccion", "epito"), "STA-01"),
-    (("elektroinstalac", "slaboproud", "electrical installation"), "STA-04"),
-
-    # --- Marketing ---------------------------------------------------------
-    (("marketing", "reklam", "advertis", "werbung", "media", "agency", "agentura",
-      "kreativ", "publicit", "pubblicit", "reklamcilik"), "MKT-01"),
-    (("research market", "pruzkum trhu", "survey", "marktforschung"), "MKT-02"),
-    (("print", "tisk", "druck", "polygraf", "tiskarna", "drukarnia", "matbaa"), "MKT-03"),
-    (("event", "kongres", "veletrh", "conference", "expo", "messe", "targi"), "MKT-04"),
-    (("broadcast", "television", "televiz", "rundfunk", "film", "studio", "publishing",
-      "vydavatel", "verlag", "wydawnictwo"), "MKT-05"),
-
-    # --- Obchod ------------------------------------------------------------
-    (("wholesale", "velkoobchod", "distribut", "trading", "trade", "supply", "handel",
-      "hurtown", "grosist", "commerciale"), "OBC-01"),
-    (("retail", "maloobchod", "shop", "store", "market", "detal", "perakende"), "OBC-02"),
-    (("dealership", "autosalon", "autohaus"), "OBC-03"),
-
-    # --- Verejny sektor ----------------------------------------------------
-    (("univerzit", "university", "vysoka skola", "college", "gymnaz", "skola", "schule",
-      "universita", "uniwersytet", "universite"), "VER-03"),
-    (("mesto ", "obec ", "kraj ", "ministerstvo", "urad", "statni", "ministry", "agency of",
-      "bundesamt", "gemeinde"), "VER-01"),
-    (("spolek", "asociace", "association", "verband", "nadace", "obecne prospesn",
-      "foundation", "stiftung", "fundacja", "dernek", "vakfi"), "VER-02"),
-]
 
 
 # ---------------------------------------------------------------------------
@@ -821,46 +654,30 @@ def nazev_nace(kod):
     return NACE_DIVIZE.get(cislice[:2], "")
 
 
-@lru_cache(maxsize=4096)
-def _klicovy_vzor(slovo):
-    return re.compile(r"(?<![^\W\d_])%s" % re.escape(slovo))
-
-
-def _obsahuje_klicove_slovo(nazev_lower, slovo):
-    """
-    True, kdyz `slovo` v nazvu zacina na hranici slova - ne kdekoli uvnitr
-    jineho slova. Bez teto kontroly by napr. kratke klicove slovo "kredit"
-    chybne sedelo i uprostred nemecke slozeniny "akkreditierungsstelle"
-    (akreditacni organ, ne uverova firma).
-
-    Hlida se jen leva hranice, ne prava - hodne klicovych slov je zamerne
-    jen zacatek slova ("semiconduct" ma chytit i "semiconductor",
-    "telecom" i "telecommunications"), takze na prave strane muzou
-    pokracovat dalsi pismena.
-    """
-    return _klicovy_vzor(slovo).search(nazev_lower) is not None
-
-
-def zarad(nace=None, nazev=None, mapa=None, klicova_slova=None, kategorie=None,
-          obory=None, mapa_oboru=None):
+def zarad(nace=None, mapa=None, kategorie=None, obory=None, mapa_oboru=None):
     """
     Zaradi dodavatele do vlastni taxonomie.
 
     Poradi duveryhodnosti podkladu:
-        1. NACE z rejstriku (CZ, FR, ...)  - nejpresnejsi
-        2. obor cinnosti z Wikidat (QID)   - jazykove nezavisly, funguje i pro
-                                             korejskou nebo tureckou firmu
-        3. klicova slova v nazvu firmy     - posledni zachrana
+        1. NACE z rejstriku (CZ, FR, ...)  - nejpresnejsi, skutecny udaj
+        2. obor cinnosti z Wikidat (QID)   - strukturovany udaj, ne odhad z
+                                             textu; jazykove nezavisly, funguje
+                                             i pro korejskou nebo tureckou firmu
+
+    Zamerne se NEODHADUJE kategorie z klicovych slov v nazvu firmy - shoda
+    slova v nazvu neni fakt o oboru cinnosti a muze byt vylozene mylna
+    (napr. "Deutsche Akkreditierungsstelle" nema nic spolecneho s uverem,
+    i kdyz "kredit" jako podretezec sedi). Bez NACE nebo oboru z Wikidat
+    jde zaznam do XXX-00 k rucnimu dohledani, misto nejisteho odhadu.
 
     Vrati dict:
         kod       - kod kategorie, napr. "ICT-03"
         kategorie - nazev kategorie
         skupina   - nadrazena skupina
-        zdroj     - 'nace' | 'obor' | 'nazev' | 'vychozi'
+        zdroj     - 'nace' | 'obor' | 'vychozi'
         nace      - odhad NACE z oboru, pokud zadny NACE na vstupu nebyl
     """
     mapa = mapa if mapa is not None else NACE_MAPA
-    klicova_slova = klicova_slova if klicova_slova is not None else KLICOVA_SLOVA
     kategorie = kategorie if kategorie is not None else KATEGORIE
 
     kod, zdroj, nace_odhad = None, "vychozi", ""
@@ -872,12 +689,6 @@ def zarad(nace=None, nazev=None, mapa=None, klicova_slova=None, kategorie=None,
         kod, nace_odhad = obor_na_kategorii(obory, mapa_oboru)
         if kod:
             zdroj = "obor"
-    if not kod and nazev:
-        n = nazev.lower()
-        for slova, k in klicova_slova:
-            if any(_obsahuje_klicove_slovo(n, s) for s in slova):
-                kod, zdroj = k, "nazev"
-                break
     if not kod:
         kod = VYCHOZI_KOD
 
@@ -895,7 +706,6 @@ def jako_json():
     return {
         "kategorie": {k: list(v) for k, v in KATEGORIE.items()},
         "nace_mapa": NACE_MAPA,
-        "klicova_slova": [[list(s), k] for s, k in KLICOVA_SLOVA],
         "vychozi_kod": VYCHOZI_KOD,
         "sic_na_nace": SIC_NA_NACE,
         "sic_na_naics": SIC_NA_NAICS,
@@ -904,10 +714,9 @@ def jako_json():
 
 
 def z_json(data):
-    """Vrati (mapa, klicova_slova, kategorie, mapa_oboru) z JSON podoby taxonomie."""
+    """Vrati (mapa, kategorie, mapa_oboru) z JSON podoby taxonomie."""
     kat = {k: tuple(v) for k, v in data.get("kategorie", {}).items()} or KATEGORIE
     mapa = data.get("nace_mapa") or NACE_MAPA
-    klic = [(tuple(s), k) for s, k in data.get("klicova_slova", [])] or KLICOVA_SLOVA
     oboru = ({k: tuple(v) for k, v in data.get("wikidata_obory", {}).items()}
              or WIKIDATA_OBORY)
-    return mapa, klic, kat, oboru
+    return mapa, kat, oboru

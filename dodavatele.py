@@ -1566,11 +1566,11 @@ def zpracuj_radek(vstup, klient, n):
             except Exception:
                 pass
 
-        # 7) vlastni taxonomie - NACE/obor z rejstriku ma prednost, pak obor
-        # z Wikidat (jazykove nezavisly), az naposled klicova slova v nazvu
-        podklad_nazev = " ".join(x for x in (z.jmeno or nazev, z.poznamka) if x)
-        k = taxonomie.zarad(nace=z.nace, nazev=podklad_nazev, mapa=n["mapa"],
-                            klicova_slova=n["klicova_slova"], kategorie=n["kategorie_ciselnik"],
+        # 7) vlastni taxonomie - jen z fakticke podkladu: NACE z rejstriku ma
+        # prednost, pak obor z Wikidat (strukturovany QID, ne odhad z textu).
+        # Bez ani jednoho jde zaznam do XXX-00 - kategorie se z nazvu firmy
+        # nehada (hrozi false positive, viz README)
+        k = taxonomie.zarad(nace=z.nace, mapa=n["mapa"], kategorie=n["kategorie_ciselnik"],
                             obory=z.obory, mapa_oboru=n["mapa_oboru"])
         z.kod_kategorie = k["kod"]
         z.kategorie = k["kategorie"]
@@ -1852,10 +1852,10 @@ def main(argv=None):
     if not a.vstup:
         p.error("chybi vstupni soubor (nebo pouzijte --dump-taxonomy)")
 
-    mapa, klicova, ciselnik, mapa_oboru = None, None, None, None
+    mapa, ciselnik, mapa_oboru = None, None, None
     if a.taxonomy:
         with open(a.taxonomy, encoding="utf-8") as f:
-            mapa, klicova, ciselnik, mapa_oboru = taxonomie.z_json(json.load(f))
+            mapa, ciselnik, mapa_oboru = taxonomie.z_json(json.load(f))
 
     radky = nacti_vstup(a.vstup, a.sloupec)
     if not radky:
@@ -1868,8 +1868,7 @@ def main(argv=None):
          "bez_fr": a.bez_fr, "bez_sg": a.bez_sg, "bez_tw": a.bez_tw,
          "bez_gleif": a.bez_gleif, "bez_gleif_popisy": a.bez_gleif_popisy,
          "bez_edgar": a.bez_edgar, "bez_wikidata": a.bez_wikidata,
-         "mapa": mapa, "klicova_slova": klicova, "kategorie_ciselnik": ciselnik,
-         "mapa_oboru": mapa_oboru}
+         "mapa": mapa, "kategorie_ciselnik": ciselnik, "mapa_oboru": mapa_oboru}
 
     hotovo = [0]
     zamek = threading.Lock()
