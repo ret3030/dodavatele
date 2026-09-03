@@ -129,6 +129,29 @@ už neexistuje, takže nemá smysl vyplňovat aktuální adresu/NACE. Pokud ani 
 nic nenajde, ověřte IČO ručně např. v insolvenčním rejstříku nebo Obchodním
 věstníku.
 
+#### Firma má v ARES víc oborů podnikání a kategorie nesedí
+
+U českých firem se kategorie určuje z pole **převažující činnost** (RES),
+které ARES vede jako oficiální označení hlavního oboru napříč všemi
+zapsanými NACE kódy — u firem s víc obory (typicky OSVČ s víc živnostmi)
+tak nejde o náhodný výběr, ale o údaj, který přímo rejstřík označuje jako
+hlavní.
+
+Dvě situace, kdy to přesto nesedí:
+
+* **Firma nemá převažující činnost formálně nastavenou.** RES pak vrací
+  kód `00` ("neurčeno") — nástroj ho ignoruje (jinak by přepsal i dobře
+  určený obor nepoužitelnou hodnotou) a spadne zpět na první nepodpůrný kód
+  ze seznamu všech zapsaných NACE. Pokud i to selže, zůstává `XXX-00` —
+  firma opravdu žádný použitelný kód nemá.
+* **Převažující činnost je obecný/podpůrný kód** (např. `6820` pronájem
+  nemovitostí — mnoho firem ho má zapsaný jen jako formální rezervu při
+  založení, ne jako skutečnou náplň podnikání). Nástroj takový kód
+  nepřehazuje za jiný ze seznamu (bylo by to hádání), ale doplní do
+  **Poznámky** upozornění „převažující NACE je obecný kód… zkontrolujte
+  NACE (všechny)“ — v tom sloupci najdete i ostatní zapsané obory
+  k ručnímu porovnání se skutečnou činností firmy.
+
 #### Firma se nenajde v zemi bez napojeného rejstříku
 
 U zemí bez vlastního připojení (DE, NL, AT, BE, CH, IT, ES, HU, PL, RO, BG,

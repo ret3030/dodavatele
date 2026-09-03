@@ -492,12 +492,18 @@ def ares_prevazujici_nace(klient, ico):
     """
     Seznam czNace2008 je v ARES serazeny vzestupne, ne podle vyznamu. Zdroj RES
     ale vede prevazujici (hlavni) cinnost subjektu - tu pouzijeme prednostne.
+
+    "00"/"0000" znamena u RES "neurceno" (subjekt nema prevazujici cinnost
+    formalne nastavenou - typicky OSVC s vice zivnostmi bez oznacene hlavni)
+    a neni to skutecny NACE kod - takovy zaznam se ignoruje, jinak by prepsal
+    i dobre urcenou cinnost z vyber_hlavni_nace nepouzitelnou hodnotou.
     """
     ico = re.sub(r"\D", "", str(ico)).zfill(8)
     data = json.loads(klient.ziskej(ARES_RES.format(ico=ico), ocisti=_ares_ocisti))
     for zaznam in data.get("zaznamy", []):
         nace = zaznam.get("czNacePrevazujici2008") or zaznam.get("czNacePrevazujici")
-        if nace:
+        cislice = re.sub(r"\D", "", str(nace or ""))
+        if cislice and cislice.strip("0"):
             return str(nace)
     return ""
 
@@ -1623,6 +1629,19 @@ def zpracuj_radek(vstup, klient, n):
         # 3) upresneni oboru cinnosti
         if z.stav != STAV_NENALEZENO and not n["bez_ares"]:
             doplr_prevazujici_nace(klient, z)
+            # RES uvadi jako prevazujici cinnost obecny/podpurny kod (napr.
+            # pronajem nemovitosti, 6820) - u male casti firem jde skutecne
+            # o hlavni predmet podnikani, u vetsiny jde spis o formalni
+            # registraci "pro jistotu" pri zalozeni firmy. Zaznam se nepreklada
+            # jinam (bylo by to hadani), jen se upozorni na kontrolu ostatnich
+            # zapsanych cinnosti.
+            zakladni_kod = re.sub(r"\D", "", str(z.nace or ""))
+            if (zakladni_kod and zakladni_kod in PODPURNE_NACE
+                    and len(set(z.nace_vse.split(","))) > 1):
+                poznamky.append(
+                    "prevazujici NACE %s je obecny kod (napr. pronajem/spravni "
+                    "cinnosti) - zkontrolujte NACE (vsechny), skutecny obor muze "
+                    "byt jiny" % z.nace)
         if (z.stav not in (STAV_NENALEZENO, STAV_CHYBA) and not z.nace and not z.obory
                 and z.zdroj != "Wikidata" and not n["bez_wikidata"]):
             try:
