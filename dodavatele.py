@@ -47,6 +47,7 @@ UA = "supplier-lookup/1.0 (kontakt: nakup@example.com)"
 ARES_HLEDAT = "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/vyhledat"
 ARES_DETAIL = "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty/{ico}"
 ARES_RES = "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty-res/{ico}"
+ARES_VR = "https://ares.gov.cz/ekonomicke-subjekty-v-be/rest/ekonomicke-subjekty-vr/{ico}"
 RPO_SK = "https://api.statistics.sk/rpo/v1/search"
 GLEIF_API = "https://api.gleif.org/api/v1/lei-records"
 GLEIF_AUTO = "https://api.gleif.org/api/v1/autocompletions"
@@ -472,6 +473,34 @@ def doplr_prevazujici_nace(klient, z):
     if nace:
         z.nace = nace
         z.nace_popis = taxonomie.nazev_nace(nace)
+
+
+def _ares_vr_ocisti(data):
+    """Z odpovedi Verejneho rejstriku (VR) nechá jen pole k dohledani vymazu."""
+    def zmensi(z):
+        return {k: v for k, v in z.items()
+                if k in ("stavSubjektu", "datumVymazu", "pravniDuvodVymazu")}
+    return {"zaznamy": [zmensi(z) for z in data.get("zaznamy", [])]}
+
+
+def ares_vr_vymaz(klient, ico):
+    """
+    Doplnkovy dotaz do Verejneho rejstriku (zdroj VR). Narozdil od hlavniho
+    ARES indexu (ekonomicke-subjekty), ktery jiz vymazane subjekty neobsahuje,
+    VR drzi historii i po vymazu - vc. data a pravniho duvodu vymazu (napr.
+    "z duvodu likvidace", "fuze se spolecnosti..."). Vraci None, pokud subjekt
+    ve VR neni vubec veden, nebo pokud (zatim) vymazan neni.
+    """
+    ico = re.sub(r"\D", "", str(ico)).zfill(8)
+    data = json.loads(klient.ziskej(ARES_VR.format(ico=ico), ocisti=_ares_vr_ocisti))
+    for zaznam in data.get("zaznamy", []):
+        datum = zaznam.get("datumVymazu")
+        if not datum:
+            continue
+        duvody = [d.get("hodnota") for d in (zaznam.get("pravniDuvodVymazu") or [])
+                  if d.get("hodnota")]
+        return {"datum": datum, "duvod": "; ".join(duvody)}
+    return None
 
 
 def ares_podle_nazvu(klient, nazev, pocet=30):
@@ -1119,6 +1148,16 @@ def zpracuj_radek(vstup, klient, n):
                 z.stav = STAV_OK
             except Exception as e:
                 poznamky.append("ARES podle ICO: %s" % e)
+                # subjekt jiz neni v hlavnim indexu ARES - zkusit Verejny
+                # rejstrik, ktery drzi historii i po vymazu (datum a duvod)
+                try:
+                    vymaz = ares_vr_vymaz(klient, ico)
+                    if vymaz:
+                        poznamky.append("vymazan z rejstriku %s%s" % (
+                            vymaz["datum"],
+                            (", duvod: %s" % vymaz["duvod"]) if vymaz["duvod"] else ""))
+                except Exception:
+                    pass
 
         # 2) hledani podle nazvu
         if z.stav != STAV_OK and nazev:

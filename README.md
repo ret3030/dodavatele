@@ -88,18 +88,22 @@ zkontrolovat ručně.
 
 #### Firma se nenajde v ARES (`NENALEZENO` u české firmy)
 
-ARES vede i zaniklé subjekty, ale u některých starších výmazů (typicky po
-likvidaci nebo zániku bez likvidace) v registru chybí i historický záznam.
-Takový řádek skončí jako `NENALEZENO` s prázdnými datovými sloupci. Ověřte
-IČO ručně např. v insolvenčním rejstříku nebo Obchodním věstníku — pokud
-firma skutečně zanikla, prázdný záznam je správně (nechcete data neexistující
-firmy), jen ho v Poznámce/sloupci Jméno uvidíte i tak.
+Když zadané IČO není v hlavním rejstříku ARES (firma z něj vypadla), nástroj
+automaticky zkusí ještě **Veřejný rejstřík (VR)** — ten na rozdíl od
+hlavního indexu drží historii i po výmazu. Pokud tam záznam o výmazu je,
+doplní se do **Poznámky** datum a právní důvod výmazu (např. „vymazan z
+rejstriku 2019-06-30, duvod: Výmaz z důvodu likvidace“).
+
+Řádek přesto zůstane `NENALEZENO` s prázdnými datovými sloupci — firma
+už neexistuje, takže nemá smysl vyplňovat aktuální adresu/NACE. Pokud ani VR
+nic nenajde, ověřte IČO ručně např. v insolvenčním rejstříku nebo Obchodním
+věstníku.
 
 ## Zdroje dat
 
 | zdroj | pokrytí | co dodá |
 |---|---|---|
-| **ARES** (ares.gov.cz) | ČR, kompletní | název, adresa, IČO, DIČ, NACE včetně *převažující činnosti* |
+| **ARES** (ares.gov.cz) | ČR, kompletní | název, adresa, IČO, DIČ, NACE včetně *převažující činnosti*; u vymazaných firem datum a důvod výmazu (zdroj VR) |
 | **RPO SR** (statistics.sk) | SR | název, adresa, IČO |
 | **INSEE/INPI** (recherche-entreprises.api.gouv.fr) | Francie, kompletní | název, adresa, SIREN, NAF → NACE, DIČ (dopočteno) |
 | **GLEIF** (api.gleif.org) | svět, firmy s LEI (většina větších/kotovaných firem) | název (i v původním jazyce), adresa, národní registrační číslo, právní forma |
