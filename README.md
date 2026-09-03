@@ -71,13 +71,14 @@ Jiné chování přepínačem `--stnr2 registrace|ico|dic|zadne`.
 | `OK` | jednoznačná shoda názvu, data lze převzít |
 | `VYBRANO` | více srovnatelně podobných firem – nástroj automaticky vybral tu nejlepší (viz níže), ostatní kandidáty najdete v Poznámce |
 | `OVERIT` | shoda pod prahem, nebo shoda s výhradou (např. jiná země sídla, než jste zadali) – data převzata, ale zkontrolujte je |
-| `NENALEZENO` | nic dost podobného; **datové sloupce (adresa, IČO, DIČ, NACE…) zůstávají prázdné**, v Poznámce jsou nejbližší kandidáti |
+| `NENALEZENO` | nic dost podobného; sloupce, které by musely přijít z rejstříku (adresa, NACE…), **zůstávají prázdné**, v Poznámce jsou nejbližší kandidáti |
 | `CHYBA` | prázdný řádek nebo výpadek všech zdrojů |
 
-Záznam s nízkou shodou se nikdy nepropíše do datových sloupců — raději prázdno
-než údaje cizí firmy. **Sloupec Jméno je ale vyplněný vždy** — u `NENALEZENO`
-a `CHYBA` obsahuje hledaný název ze vstupu, aby firma v exportu "nezmizela" a
-šlo ji dohledat i bez otevření vstupního souboru.
+Údaje nalezeného kandidáta se do výstupu propíšou jen při dostatečné shodě —
+u nízké shody radši prázdno než data cizí firmy. To se ale týká jen toho, co
+by muselo přijít z rejstříku. **Co jste zadali na vstupu (Jméno, IČO, DIČ,
+Země), se do výstupu propíše vždy** — i u `NENALEZENO`, protože to už vaše
+data jsou a nemá smysl je zahazovat jen proto, že se firma nedohledala.
 
 #### Automatický výběr při více shodách
 
