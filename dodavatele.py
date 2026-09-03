@@ -27,6 +27,7 @@ import gzip
 import json
 import os
 import re
+import ssl
 import sys
 import threading
 import time
@@ -55,6 +56,28 @@ VIES_API = "https://ec.europa.eu/taxation_customs/vies/rest-api/ms/{cc}/vat/{num
 EDGAR_API = "https://www.sec.gov/cgi-bin/browse-edgar"
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 INSEE_FR = "https://recherche-entreprises.api.gouv.fr/search"
+SG_ACRA = "https://data.gov.sg/api/action/datastore_search"
+SG_ACRA_ZDROJ = "d_3f960c10fed6145404ca7b821f263b87"
+TW_GCIS = "https://data.gcis.nat.gov.tw/od/data/api/6BBA2268-1367-4B42-9CCA-BC17499EBE8C"
+
+_TW_SSL_KONTEXT = None
+
+
+def tw_ssl_kontext():
+    """
+    Certifikat data.gcis.nat.gov.tw postrada rozsireni Subject Key Identifier,
+    ktere novejsi OpenSSL/Python defaultne vyzaduje (VERIFY_X509_STRICT).
+    Overeni retezce duvery a jmena hostitele zustava aktivni - vypina se jen
+    tato jedna nadstandardni RFC 5280 kontrola, ktera zpusobuje, ze pripojeni
+    ze standardniho urllib kontextu vzdy selze, i kdyz je server v poradku
+    (napr. curl tuto kontrolu vubec neprovadi, proto tam problem videt neni).
+    """
+    global _TW_SSL_KONTEXT
+    if _TW_SSL_KONTEXT is None:
+        ctx = ssl.create_default_context()
+        ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
+        _TW_SSL_KONTEXT = ctx
+    return _TW_SSL_KONTEXT
 
 EU_STATY = {"AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "EL", "GR", "ES", "FI", "FR",
             "HR", "HU", "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PL", "PT", "RO", "SE",
@@ -138,10 +161,12 @@ class Klient:
         if spat > 0:
             time.sleep(spat)
 
-    def ziskej(self, url, hlavicky=None, json_body=None, ocisti=None):
+    def ziskej(self, url, hlavicky=None, json_body=None, ocisti=None, kontext=None):
         """
         Vrati telo odpovedi. `ocisti` je funkce nad rozparsovanym JSON, ktera
         z odpovedi vyhodi nepouzivane casti - kes pak neroste do stovek MB.
+        `kontext` je volitelny ssl.SSLContext pro servery s neobvyklym
+        certifikatem (viz TW_SSL_KONTEXT).
         """
         klic = url
         if json_body is not None:
@@ -163,7 +188,7 @@ class Klient:
             self._cekej(url)
             try:
                 req = urllib.request.Request(url, data=telo, headers=h)
-                with urllib.request.urlopen(req, timeout=self.timeout) as odp:
+                with urllib.request.urlopen(req, timeout=self.timeout, context=kontext) as odp:
                     text = odp.read().decode("utf-8", errors="replace")
                 if ocisti is not None:
                     try:
@@ -980,6 +1005,99 @@ def fr_podle_nazvu(klient, nazev, pocet=15):
 
 
 # ---------------------------------------------------------------------------
+# Singapur - ACRA (data.gov.sg, otevrena data)
+# ---------------------------------------------------------------------------
+
+SG_ACRA_POLE = ("uen", "entity_name", "entity_type_desc", "uen_status_desc",
+               "reg_street_name", "reg_postal_code")
+
+
+def _sg_ocisti(d):
+    return {"result": {"records": [{k: v for k, v in r.items() if k in SG_ACRA_POLE}
+                                   for r in d.get("result", {}).get("records", [])]}}
+
+
+def _sg_na_zaznam(r):
+    uen = r.get("uen") or ""
+    aktivni = (r.get("uen_status_desc") or "").strip().lower() == "registered"
+    return Zaznam(
+        jmeno=r.get("entity_name") or "",
+        ulice=r.get("reg_street_name") or "",
+        psc=r.get("reg_postal_code") or "",
+        mesto="Singapore" if r.get("reg_street_name") else "",
+        zeme="SG",
+        reg_cislo=uen,
+        reg_rejstrik="UEN (ACRA)",
+        pravni_forma=r.get("entity_type_desc") or "",
+        aktivni=aktivni,
+        zdroj="ACRA (data.gov.sg)",
+        odkaz="https://www.uen.gov.sg/ueninternet/faces/pages/uenResults.jspx?uen=%s" % uen
+              if uen else "",
+        poznamka="stav v ACRA: %s" % r["uen_status_desc"]
+                 if r.get("uen_status_desc") and not aktivni else "",
+    )
+
+
+def sg_podle_nazvu(klient, nazev, pocet=15):
+    url = SG_ACRA + "?" + urllib.parse.urlencode({
+        "resource_id": SG_ACRA_ZDROJ, "q": nazev, "limit": min(pocet, 30)})
+    data = json.loads(klient.ziskej(url, ocisti=_sg_ocisti))
+    return [_sg_na_zaznam(r) for r in data.get("result", {}).get("records", [])]
+
+
+def sg_podle_uen(klient, uen):
+    """Presny dotaz na jeden UEN - spolehlivejsi nez fulltextove hledani jmenem."""
+    url = SG_ACRA + "?" + urllib.parse.urlencode({
+        "resource_id": SG_ACRA_ZDROJ, "filters": json.dumps({"uen": uen}), "limit": 1})
+    data = json.loads(klient.ziskej(url, ocisti=_sg_ocisti))
+    zaznamy = data.get("result", {}).get("records", [])
+    return _sg_na_zaznam(zaznamy[0]) if zaznamy else None
+
+
+# ---------------------------------------------------------------------------
+# Tchaj-wan - GCIS (data.gcis.nat.gov.tw, otevrena data)
+# ---------------------------------------------------------------------------
+
+def tw_podle_nazvu(klient, nazev, pocet=15):
+    """
+    GCIS bez filtru na stav vraci prazdno i pro bezne existujici firmy - proto
+    je "Company_Status eq 01" (aktivni/schvalene zalozeni) soucasti dotazu,
+    ne dodatecny filtr az na strane klienta.
+    """
+    url = TW_GCIS + "?" + urllib.parse.urlencode({
+        "$format": "json",
+        "$filter": "Company_Name like %s and Company_Status eq 01" % nazev,
+        "$skip": 0, "$top": min(pocet, 30),
+    })
+    data = klient.ziskej(url, kontext=tw_ssl_kontext(), ocisti=lambda d: [
+        {k: v for k, v in r.items() if k in (
+            "Business_Accounting_NO", "Company_Name", "Company_Status_Desc",
+            "Company_Location", "Company_Setup_Date")}
+        for r in d] if isinstance(d, list) else d)
+    zaznamy = json.loads(data)
+    if not isinstance(zaznamy, list):
+        return []
+    vysledky = []
+    for r in zaznamy:
+        cislo = r.get("Business_Accounting_NO") or ""
+        datum = r.get("Company_Setup_Date") or ""
+        # tchajwanske datum je v minguo kalendari (rok - 1911), napr. "0760221"
+        # = 1976-02-21 - pro cteni ve vystupu neni potreba prevadet, jen orezat
+        vysledky.append(Zaznam(
+            jmeno=r.get("Company_Name") or "",
+            ulice=r.get("Company_Location") or "",
+            zeme="TW",
+            reg_cislo=cislo,
+            reg_rejstrik="統一編號 (GCIS)",
+            datum_vzniku=datum,
+            zdroj="GCIS",
+            odkaz="https://data.gcis.nat.gov.tw/od/detail?oid=6BBA2268-1367-4B42-9CCA-BC17499EBE8C",
+            poznamka="",
+        ))
+    return vysledky
+
+
+# ---------------------------------------------------------------------------
 # Wikidata - zalozni zdroj pro velke zahranicni firmy
 # ---------------------------------------------------------------------------
 
@@ -1239,6 +1357,9 @@ def zpracuj_radek(vstup, klient, n):
                 elif zeme == "US" and not n["bez_edgar"]:
                     nalezeny = edgar_podle_cik(klient, ico)
                     kandidati = [nalezeny] if nalezeny else []
+                elif zeme == "SG" and not n["bez_sg"]:
+                    nalezeny = sg_podle_uen(klient, ico.upper())
+                    kandidati = [nalezeny] if nalezeny else []
                 if not kandidati and not n["bez_gleif"]:
                     if re.fullmatch(r"[A-Za-z0-9]{20}", ico):
                         nalezeny = gleif_podle_lei(klient, ico.upper())
@@ -1305,6 +1426,10 @@ def zpracuj_radek(vstup, klient, n):
                 zkus(rpo_sk_podle_nazvu, nazev, min(n["pocet"], 20))
             if zeme == "FR" and not n["bez_fr"]:
                 zkus(fr_podle_nazvu, nazev, n["pocet"])
+            if zeme == "SG" and not n["bez_sg"]:
+                zkus(sg_podle_nazvu, nazev, n["pocet"])
+            if zeme == "TW" and not n["bez_tw"]:
+                zkus(tw_podle_nazvu, nazev, n["pocet"])
             if zeme in ("", "US") and not n["bez_edgar"]:
                 zkus(edgar_podle_nazvu, nazev, n["pocet"])
             if zeme != "CZ" and not n["bez_gleif"]:
@@ -1647,6 +1772,8 @@ def main(argv=None):
     p.add_argument("--bez-ares", action="store_true")
     p.add_argument("--bez-sk", action="store_true")
     p.add_argument("--bez-fr", action="store_true")
+    p.add_argument("--bez-sg", action="store_true")
+    p.add_argument("--bez-tw", action="store_true")
     p.add_argument("--bez-gleif", action="store_true")
     p.add_argument("--bez-gleif-popisy", action="store_true",
                    help="nepřekládat kódy GLEIF (rejstřík, právní forma) na text - rychlejší")
@@ -1682,7 +1809,8 @@ def main(argv=None):
     klient = Klient(cache_soubor=a.cache or None, prodleva=a.prodleva, ua=a.ua)
     n = {"pocet": a.pocet, "prah_ok": a.prah_ok, "prah_overit": a.prah_overit,
          "vies": a.vies, "bez_ares": a.bez_ares, "bez_sk": a.bez_sk,
-         "bez_fr": a.bez_fr, "bez_gleif": a.bez_gleif, "bez_gleif_popisy": a.bez_gleif_popisy,
+         "bez_fr": a.bez_fr, "bez_sg": a.bez_sg, "bez_tw": a.bez_tw,
+         "bez_gleif": a.bez_gleif, "bez_gleif_popisy": a.bez_gleif_popisy,
          "bez_edgar": a.bez_edgar, "bez_wikidata": a.bez_wikidata,
          "mapa": mapa, "klicova_slova": klicova, "kategorie_ciselnik": ciselnik,
          "mapa_oboru": mapa_oboru}

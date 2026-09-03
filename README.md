@@ -152,6 +152,8 @@ rozhodnout, která firma je ta správná.
 | **ARES** (ares.gov.cz) | ČR, kompletní | název, adresa, IČO, DIČ, NACE včetně *převažující činnosti*; u vymazaných firem datum a důvod výmazu (zdroj VR) |
 | **RPO SR** (statistics.sk) | SR | název, adresa, IČO |
 | **INSEE/INPI** (recherche-entreprises.api.gouv.fr) | Francie, kompletní | název, adresa, SIREN, NAF → NACE, DIČ (dopočteno) |
+| **ACRA** (data.gov.sg) | Singapur, kompletní | název, adresa, UEN, stav (aktivní/vymazáno) |
+| **GCIS** (data.gcis.nat.gov.tw) | Tchaj-wan, kompletní | název, adresa, daňové číslo, datum vzniku |
 | **GLEIF** (api.gleif.org) | svět, firmy s LEI (většina větších/kotovaných firem) | název (i v původním jazyce), adresa, národní registrační číslo, právní forma |
 | **SEC EDGAR** (sec.gov) | USA, firmy registrované u SEC | název, adresa, SIC → NACE i NAICS, CIK |
 | **Wikidata** | velké nadnárodní firmy | obor činnosti (viz níže), EU DIČ, LEI, sídlo |
@@ -159,7 +161,12 @@ rozhodnout, která firma je ta správná.
 
 Vše bez API klíče a bez registrace.
 
-### Jak nástroj hledá dodavatele mimo ČR/SR/FR
+**Poznámka k Tchaj-wanu:** certifikát `data.gcis.nat.gov.tw` neobsahuje rozšíření
+Subject Key Identifier, které novější Python/OpenSSL standardně vyžaduje –
+nástroj proto pro tento jeden zdroj vypíná právě tuto jednu nadstandardní
+kontrolu (ověření řetězce důvěry a jména serveru zůstává aktivní).
+
+### Jak nástroj hledá dodavatele mimo ČR/SR/FR/SG/TW
 
 Země bez přímo napojeného rejstříku (viz tabulka výše) se hledají přes GLEIF a
 Wikidata:
@@ -203,14 +210,34 @@ odvětvími, 34 z 37 reálných firem se dohledalo a zařadilo do kategorie):
 | CZ | ARES | – |
 | SK | RPO SR | – |
 | FR | INSEE/INPI | – |
+| SG | ACRA | – |
+| TW | GCIS | – |
 | US | SEC EDGAR (jen firmy registrované u SEC) | GLEIF + Wikidata |
 | DE, NL, AT, BE, GB, IT, ES, HU, IE, SE, BG, PL, RO | – | GLEIF + Wikidata |
-| KR, CH, HK, JP, SG, MY, CA, TW, CN, TR | – | GLEIF + Wikidata |
+| KR, CH, HK, JP, MY, CA, CN, TR | – | GLEIF + Wikidata |
 
-U zemí bez přímého rejstříku (vše kromě CZ/SK/FR/US) závisí přesnost adresy a
-NACE na tom, jestli má firma LEI (GLEIF) a/nebo je vedená na Wikidatech –
-u velkých a kotovaných firem to funguje spolehlivě, u menších dodavatelů
-počítejte s `OVERIT`/`NENALEZENO` a doplňte IČO/VAT do vstupu.
+U zemí bez přímého rejstříku (vše kromě CZ/SK/FR/SG/TW/US) závisí přesnost
+adresy a NACE na tom, jestli má firma LEI (GLEIF) a/nebo je vedená na
+Wikidatech – u velkých a kotovaných firem to funguje spolehlivě, u menších
+dodavatelů počítejte s `OVERIT`/`NENALEZENO` a doplňte IČO/VAT do vstupu.
+
+**Zkoumali jsme, jestli existuje volně dostupný rejstřík i pro ostatní země
+(DE, NL, AT, BE, GB, IE, CH, IT, ES, HU, PL, RO, BG, SE, TR, KR, JP, CN, MY,
+HK, CA)** – žádný z nich dnes nemá bezklíčové, hromadně dotazovatelné API
+srovnatelné s ARES/INSEE/ACRA/GCIS. Nejblíž měly:
+
+* **GB** (Companies House) – API existuje, ale vyžaduje bezplatnou registraci
+  klíče (okamžitou, bez ověřování).
+* **JP** (houjin-bangou.nta.go.jp, japonská daňová správa) – vede *všechny*
+  registrované firmy, bezplatný `appid` se ale vyřizuje ~1 pracovní den.
+* **SE** – oficiální Bolagsverket API zatím neumí hledání podle jména;
+  funguje jen přes neoficiální `bolagsdataapi.se` (bezplatná registrace,
+  500 dotazů/den).
+
+U zbylých zemí (DE, NL, AT, BE, IE, CH, IT, ES, HU, PL, RO, BG, TR, KR, CN,
+MY, HK) je oficiální rejstřík buď jen placený, nebo vyžaduje tuzemskou
+identitu, nebo nemá žádné API vůbec – tam zůstává GLEIF + Wikidata jediná
+volně dostupná cesta.
 
 ## Taxonomie kategorií
 
@@ -446,7 +473,7 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
 --prah-ok 0.90          skóre shody názvu pro automatické přijetí
 --prah-overit 0.72      pod tímto skóre je záznam nenalezený
 --vies                  ověřit DIČ v EU (pomalejší, jeden dotaz navíc na firmu)
---bez-ares/-sk/-fr/-gleif/-edgar/-wikidata    vypnutí jednotlivých zdrojů
+--bez-ares/-sk/-fr/-sg/-tw/-gleif/-edgar/-wikidata    vypnutí jednotlivých zdrojů
 --bez-gleif-popisy      nepřekládat kódy GLEIF (rejstřík, právní forma) na text - rychlejší
 --cache SOUBOR          keš odpovědí (výchozí .dodavatele_cache.json.gz)
 --sloupec NÁZEV         název sloupce se jménem firmy, když se neurčí sám
