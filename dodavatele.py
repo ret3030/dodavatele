@@ -1132,7 +1132,22 @@ def _wikidata_ocisti(data):
     return {"entities": entity}
 
 
-def wikidata_podle_nazvu(klient, nazev, pocet=5):
+def wikidata_podle_nazvu(klient, nazev, pocet=5, i_kratky_nazev=False):
+    """
+    `i_kratky_nazev=True` navic zkusi hledani pod zkracenym nazvem (bez
+    pravni formy) a vysledky sloucí, i kdyz plny nazev neco naslo. Rejstriky
+    a VIES vraceji plny pravni nazev ("ABB Schweiz AG", "ENI SPA"), Wikidata
+    ale firmy vetsinou vede pod kratkym nazvem clanku ("ABB", "Eni") -
+    hledani s plnym nazvem tak casto neni prazdne, jen vrati nekoho jineho
+    (dceřinou spolecnost, pobocku).
+
+    Vyplati se to jen pri doplnovani oboru k uz jednoznacne identifikovane
+    firme (vic kandidatu vadit nemuze - obor se bere z prvniho s dost
+    podobnym jmenem). U hledani samotne identity firmy by to naopak skodilo:
+    kratky nazev typicky vrati vic stejne se jmenujicich firem/dceřinych
+    spolecnosti se stejnym skore, coz zvysuje falesnou "VICE_SHOD"
+    nejednoznacnost a muze prebit spravneho kandidata horsim.
+    """
     def hledej(text):
         url = WIKIDATA_API + "?" + urllib.parse.urlencode({
             "action": "wbsearchentities", "search": text, "language": "en",
@@ -1141,19 +1156,16 @@ def wikidata_podle_nazvu(klient, nazev, pocet=5):
             {"id": h.get("id")} for h in d.get("search", [])]})).get("search", [])
 
     hledani = hledej(nazev)
-    if not hledani:
-        # rejstriky vraceji plny pravni nazev ("ABB Schweiz AG"), Wikidata ale
-        # firmy vetsinou vede pod kratkym nazvem clanku ("ABB") - bez tohoto
-        # kroku by obohaceni oboru fungovalo jen pro malou cast zahranicnich
-        # nalezu z GLEIF
-        jadro = jadro_pro_hledani(re.sub(r"[,.]+$", "", nazev.replace(",", " ")))
-        jadro = re.sub(r"[\s,.\-]+$", "", jadro)
-        if jadro.lower() != nazev.lower() and jadro:
-            hledani = hledej(jadro)
+    jadro = jadro_pro_hledani(re.sub(r"[,.]+$", "", nazev.replace(",", " ")))
+    jadro = re.sub(r"[\s,.\-]+$", "", jadro)
+    ma_smysl_zkusit_jadro = jadro.lower() != nazev.lower() and jadro
+    if ma_smysl_zkusit_jadro and (not hledani or i_kratky_nazev):
+        videne = {h["id"] for h in hledani}
+        hledani += [h for h in hledej(jadro) if h["id"] not in videne]
     if not hledani:
         return []
 
-    qidy = [h["id"] for h in hledani[:5]]
+    qidy = [h["id"] for h in hledani[:8]]
     url = WIKIDATA_API + "?" + urllib.parse.urlencode({
         "action": "wbgetentities", "ids": "|".join(qidy),
         "props": "claims|labels", "languages": "en|cs|de", "format": "json"})
@@ -1570,7 +1582,8 @@ def zpracuj_radek(vstup, klient, n):
         if (z.stav not in (STAV_NENALEZENO, STAV_CHYBA) and not z.nace and not z.obory
                 and z.zdroj != "Wikidata" and not n["bez_wikidata"]):
             try:
-                shodne = [w for w in wikidata_podle_nazvu(klient, z.jmeno or nazev, 5)
+                shodne = [w for w in wikidata_podle_nazvu(klient, z.jmeno or nazev, 5,
+                                                          i_kratky_nazev=True)
                          if skore_shody(z.jmeno or nazev, w.jmeno) >= n["prah_ok"]]
                 # stejny nazev v ruznych jazykovych mutacich casto vede na vic
                 # QID - obor cinnosti byva zapsany jen u jednoho z nich
