@@ -31,16 +31,29 @@ rozpozná automaticky, rozumí česky i anglicky:
 | DIČ | DIČ, VAT, VAT ID, USt-IdNr, Tax ID | ne |
 | země | Země, Country, Stát, ISO | ne |
 
-\* místo názvu stačí IČO. Když vyplníte **IČO**, přeskočí se dohledávání podle
-názvu a záznam je jednoznačný — u problémových firem je to nejrychlejší oprava.
-Vyplněná **země** zúží hledání na správný rejstřík a zrychlí běh.
+\* místo názvu stačí IČO nebo DIČ. Vyplněná **země** zúží hledání na správný
+rejstřík a zrychlí běh.
 
-U **zahraničních firem** může sloupec IČO obsahovat i jiný identifikátor než
-české IČO — LEI, nebo národní registrační číslo (např. německé `HRB 6684`,
-francouzské SIREN, americké CIK). Nástroj typ čísla podle tvaru i země pozná
-sám a použije ho pro přesné vyhledání místo dohledávání podle jména. Viz
-[Dohledání identifikátoru pro zahraniční firmy](#dohledání-identifikátoru-pro-zahraniční-firmy---jen-id)
-níže, pokud takové číslo nemáte a chcete ho nechat dohledat automaticky.
+### Pořadí vyhledávání
+
+Nástroj zkouší postupně tři cesty, každá jednoznačnější než ta další:
+
+1. **IČO** – přesné vyhledání v rejstříku. U zahraničních firem může sloupec
+   IČO obsahovat i jiný identifikátor než české IČO — LEI, nebo národní
+   registrační číslo (např. německé `HRB 6684`, francouzské SIREN, americké
+   CIK). Nástroj typ čísla podle tvaru i země pozná sám. Viz
+   [Dohledání identifikátoru pro zahraniční firmy](#dohledání-identifikátoru-pro-zahraniční-firmy---jen-id)
+   níže, pokud takové číslo nemáte a chcete ho nechat dohledat automaticky.
+2. **DIČ** – když IČO cestu nevyřešilo (nebo nebylo zadané), zkusí se DIČ
+   přes evropský systém VIES. Data jsou chudší (jen jméno a adresa, žádné
+   NACE ani registrační číslo), ale DIČ je na rozdíl od názvu jednoznačné.
+   Funguje jen pro DIČ v rámci EU/EHP.
+3. **Jméno** – až když ani IČO, ani DIČ nevedlo k jednoznačnému výsledku,
+   hledá se fuzzy podle názvu firmy napříč dostupnými zdroji.
+
+VIES je občas dočasně přetížený (hlavně při více souběžných dotazech na
+stejný stát) — nástroj to pozná a dotaz sám 5× zopakuje, než to vzdá a
+přejde na hledání jménem.
 
 ## Výstup
 

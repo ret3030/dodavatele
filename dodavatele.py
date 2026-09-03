@@ -214,6 +214,20 @@ class Klient:
                     continue
         raise posledni_chyba or RuntimeError("neznama chyba")
 
+    def zapomen(self, url, json_body=None):
+        """
+        Odstrani odpoved z kese. Pouziva se, kdyz server vratil HTTP 200
+        s obsahem, ktery neni skutecna odpoved (napr. VIES pri privalu
+        soubeznych dotazu vraci 200 s "MS_MAX_CONCURRENT_REQ" misto
+        vysledku overeni) - bez tohoto by se docasna chyba ulozila do kese
+        natrvalo, jako by to byla platna odpoved.
+        """
+        klic = url
+        if json_body is not None:
+            klic += "|" + json.dumps(json_body, sort_keys=True, ensure_ascii=False)
+        with self._zamek:
+            self._cache.pop(klic, None)
+
     def uloz_cache(self):
         if self._cache_soubor and self._zmenena:
             tmp = self._cache_soubor + ".tmp"
@@ -1210,14 +1224,31 @@ def rozloz_dic(dic):
     return (m.group(1), m.group(2)) if m else (None, None)
 
 
-def vies_over(klient, dic):
+# VIES vraci docasne vypadky sluzby jako HTTP 200 s isValid:false a timto
+# priznakem v "userError" - ne jako chybu. Bez rozliseni by to vypadalo
+# jako platne overeni "DIC neexistuje", pritom sluzba jen byla docasne
+# preteizena (typicky pri vic soubeznych dotazech na stejny stat).
+VIES_DOCASNE_CHYBY = {"MS_MAX_CONCURRENT_REQ", "MS_UNAVAILABLE", "GLOBAL_MAX_CONCURRENT_REQ",
+                      "SERVICE_UNAVAILABLE", "TIMEOUT", "SERVER_BUSY"}
+
+
+def vies_over(klient, dic, pokusy=5):
     cc, num = rozloz_dic(dic)
     if not cc or cc not in EU_STATY:
         return None
-    data = json.loads(klient.ziskej(VIES_API.format(cc=cc, num=num)))
-    return {"platne": bool(data.get("isValid")),
-            "jmeno": (data.get("name") or "").strip(" -"),
-            "adresa": (data.get("address") or "").strip(" -")}
+    url = VIES_API.format(cc=cc, num=num)
+    for pokus in range(1, pokusy + 1):
+        data = json.loads(klient.ziskej(url))
+        chyba = data.get("userError")
+        if chyba in VIES_DOCASNE_CHYBY:
+            klient.zapomen(url)   # nezustane v kesi jako by to byla platna odpoved
+            if pokus < pokusy:
+                time.sleep(min(2 ** pokus, 6))
+                continue
+            raise RuntimeError("docasne nedostupne (%s)" % chyba)
+        return {"platne": bool(data.get("isValid")),
+                "jmeno": (data.get("name") or "").strip(" -"),
+                "adresa": (data.get("address") or "").strip(" -")}
 
 
 # ---------------------------------------------------------------------------
@@ -1445,6 +1476,29 @@ def zpracuj_radek(vstup, klient, n):
             except Exception as e:
                 poznamky.append("presna identifikace podle cisla: %s" % e)
 
+        # 1c) presna identifikace podle DIC pres VIES - kdyz ICO cestu
+        # nevyresilo. Data jsou chudsi (jen jmeno a adresa, zadne NACE ani
+        # registracni cislo), ale DIC je - na rozdil od nazvu - jednoznacne,
+        # takze se zaradi jeste pred hledanim jmenem. Funguje jen pro EU DIC
+        # (vies_over pro ostatni vrati None).
+        if z.stav != STAV_OK and dic:
+            try:
+                v = vies_over(klient, dic)
+                if v and v["platne"] and v["jmeno"]:
+                    cc, _ = rozloz_dic(dic)
+                    z.jmeno = v["jmeno"]
+                    z.ulice = v["adresa"]
+                    z.zeme = z.zeme or cc or ""
+                    z.dic = dic
+                    z.dic_overeno = "ANO"
+                    z.stav = STAV_OK
+                    z.shoda = "100%"
+                    z.zdroj = "VIES"
+                    z.hledany_nazev = nazev or dic
+                    poznamky.append("nalezeno podle DIC pres VIES")
+            except Exception as e:
+                poznamky.append("VIES (hledani podle DIC): %s" % e)
+
         # 2) hledani podle nazvu
         if z.stav != STAV_OK and nazev:
             nejlepsi, stav, prehled, nej_skore = None, STAV_NENALEZENO, [], -1.0
@@ -1502,7 +1556,7 @@ def zpracuj_radek(vstup, klient, n):
                 z.stav = STAV_NENALEZENO
                 z.kandidati = prehled
 
-        if not nazev and not ico:
+        if not nazev and not ico and not dic:
             z.stav = STAV_CHYBA
             poznamky.append("prazdny radek vstupu")
 
@@ -1665,7 +1719,7 @@ def nacti_vstup(cesta, sloupec_nazvu=None):
                 k = mapa.get(i)
                 if k and hodnota is not None:
                     zaznam[k] = str(hodnota).strip()
-            if zaznam.get("nazev") or zaznam.get("ico"):
+            if zaznam.get("nazev") or zaznam.get("ico") or zaznam.get("dic"):
                 radky.append(zaznam)
         return radky
 
@@ -1689,7 +1743,7 @@ def nacti_vstup(cesta, sloupec_nazvu=None):
                 prvni = next(iter(r.values()), None)
                 if prvni:
                     zaznam = {"nazev": str(prvni).strip()}
-            if zaznam.get("nazev") or zaznam.get("ico"):
+            if zaznam.get("nazev") or zaznam.get("ico") or zaznam.get("dic"):
                 radky.append(zaznam)
     return radky
 
