@@ -1846,6 +1846,98 @@ SIRKY = {"Jméno": 40, "Ulice": 30, "PSČ": 9, "Město": 20, "Země": 7, "IČO":
          "Název": 34, "Nalezené jméno": 34, "Typ čísla / rejstřík": 20}
 
 
+# ---------------------------------------------------------------------------
+# Rucni zarazeni pres LLM chat (MS Copilot, ChatGPT...) - bez API klice
+#
+# Nezname obory (XXX-00) se daji dohledat pres LLM, ale bez programoveho
+# pristupu k nemu (jen chatove okno) to nejde zapojit primo do behu skriptu.
+# Misto toho nastroj pripravi soubor k rucnimu vlozeni do chatu a pak nacte
+# odpoved zpet - stejny princip jako --jen-id, jen mezikrok dela clovek
+# v chatu mimo skript.
+# ---------------------------------------------------------------------------
+
+def zapis_export_llm(zaznamy, cesta, kategorie_ciselnik=None):
+    """
+    Vypise firmy bez kategorie (XXX-00) spolu s cisleníkem do textoveho
+    souboru pripraveneho na vlozeni do LLM chatu. Vraci pocet vypsanych firem.
+    """
+    kategorie_ciselnik = kategorie_ciselnik if kategorie_ciselnik is not None else taxonomie.KATEGORIE
+    nevyresene = [z for z in zaznamy
+                  if z.kod_kategorie == taxonomie.VYCHOZI_KOD and (z.hledany_nazev or z.jmeno)]
+    if not nevyresene:
+        return 0
+
+    radky = [
+        "Zařaď každou z firem níže do JEDNÉ z kategorií z číselníku podle toho, "
+        "čím se zabývá (obor podnikání). Pokud si u firmy nejsi jistý/á nebo o ní "
+        "nic nenajdeš, napiš u ní kód XXX-00 - jen vypsaná kategorie bez podložení "
+        "je horší než přiznané \"nevím\".",
+        "",
+        "ČÍSELNÍK KATEGORIÍ (kód | skupina | kategorie):",
+    ]
+    for kod, skupina, nazev in taxonomie.prehled_kategorii():
+        if kod != taxonomie.VYCHOZI_KOD:
+            radky.append("%s | %s | %s" % (kod, skupina, nazev))
+
+    radky += ["", "FIRMY K ZAŘAZENÍ (%d):" % len(nevyresene)]
+    for z in nevyresene:
+        udaje = [x for x in (z.zeme, z.ulice, z.psc, z.mesto) if x]
+        radky.append("- %s%s" % (z.hledany_nazev or z.jmeno,
+                                 " (%s)" % ", ".join(udaje) if udaje else ""))
+
+    radky += [
+        "",
+        "Odpověz přesně v tomto formátu, jeden řádek na firmu, oddělovač ';', "
+        "beze změny pořadí a bez dalšího textu okolo:",
+        "Původní název;Kód kategorie;Stručné zdůvodnění",
+    ]
+    with open(cesta, "w", encoding="utf-8") as f:
+        f.write("\n".join(radky))
+    return len(nevyresene)
+
+
+def nacti_kategorie_mapu(cesta):
+    """Nacte rucni zarazeni (Nazev;Kod kategorie[;...]) z odpovedi LLM."""
+    mapa = {}
+    with open(cesta, encoding="utf-8-sig", newline="") as f:
+        vzorek = f.read(4096)
+        f.seek(0)
+        try:
+            dialekt = csv.Sniffer().sniff(vzorek, delimiters=";,\t|")
+        except csv.Error:
+            dialekt = csv.excel
+            dialekt.delimiter = ";"
+        for radek in csv.reader(f, dialect=dialekt):
+            if len(radek) < 2:
+                continue
+            nazev, kod = radek[0].strip(), radek[1].strip().upper()
+            if not nazev or not kod or kod == "XXX-00":
+                continue
+            klic = normalizuj_nazev(nazev)
+            if klic:
+                mapa[klic] = kod
+    return mapa
+
+
+def pouzij_kategorie_mapu(zaznamy, mapa, kategorie_ciselnik=None):
+    """Aplikuje rucni zarazeni na zaznamy, ktere jsou porad XXX-00. Vraci pocet zmen."""
+    kategorie_ciselnik = kategorie_ciselnik if kategorie_ciselnik is not None else taxonomie.KATEGORIE
+    zmeny = 0
+    for z in zaznamy:
+        if z.kod_kategorie != taxonomie.VYCHOZI_KOD:
+            continue
+        klic = normalizuj_nazev(z.hledany_nazev or z.jmeno)
+        kod = mapa.get(klic)
+        if kod and kod in kategorie_ciselnik:
+            skupina, nazev_kat = kategorie_ciselnik[kod]
+            z.kod_kategorie = kod
+            z.kategorie = nazev_kat
+            z.skupina = skupina
+            z.zdroj_kategorie = "rucne (LLM)"
+            zmeny += 1
+    return zmeny
+
+
 def zapis_vystup(zaznamy, cesta, oddelovac=";", kompakt=False, jen_id=False):
     if jen_id:
         sloupce = SLOUPCE_ID
@@ -1930,6 +2022,12 @@ def main(argv=None):
     p.add_argument("--jen-id", action="store_true",
                    help="jen dohledat ICO/registracni cislo (bez plneho obohaceni) - "
                         "vystup jde rovnou pouzit jako vstup druheho, plneho behu")
+    p.add_argument("--export-nezarazene", metavar="SOUBOR",
+                   help="vypsat firmy bez kategorie + ciselnik do textu pripraveneho na "
+                        "vlozeni do LLM chatu (Copilot, ChatGPT...)")
+    p.add_argument("--kategorie-mapa", metavar="SOUBOR",
+                   help="CSV s rucnim zarazenim (Nazev;Kod kategorie) - odpoved z LLM chatu, "
+                        "aplikuje se na firmy bez kategorie pred zapisem vystupu")
     p.add_argument("--workers", type=int, default=4, help="pocet soubeznych dotazu (vychozi: 4)")
     p.add_argument("--prodleva", type=float, default=0.25,
                    help="min. prodleva mezi dotazy na jeden server v s (vychozi: 0.25)")
@@ -2000,6 +2098,22 @@ def main(argv=None):
         zaznamy = list(ex.map(uloha, radky))
 
     klient.uloz_cache()
+
+    if a.kategorie_mapa:
+        mapa_llm = nacti_kategorie_mapu(a.kategorie_mapa)
+        zmeny = pouzij_kategorie_mapu(zaznamy, mapa_llm, ciselnik)
+        print("Rucni zarazeni z %s: pouzito %d/%d" % (a.kategorie_mapa, zmeny, len(mapa_llm)),
+              file=sys.stderr)
+
+    if a.export_nezarazene:
+        pocet = zapis_export_llm(zaznamy, a.export_nezarazene, ciselnik)
+        if pocet:
+            print("Export pro LLM chat -> %s (%d firem bez kategorie)" % (
+                a.export_nezarazene, pocet), file=sys.stderr)
+        else:
+            print("Vsechny firmy maji kategorii, export pro LLM chat se nevytvaril.",
+                  file=sys.stderr)
+
     zapis_vystup(zaznamy, a.vystup, a.oddelovac, a.kompakt, jen_id=a.jen_id)
 
     souhrn = {}

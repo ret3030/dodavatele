@@ -178,6 +178,37 @@ registrační číslo po zániku původní firmy), a řádek nemá vyplněné i 
 zůstane `NENALEZENO` s kandidáty v Poznámce — bez jména totiž není podle čeho
 rozhodnout, která firma je ta správná.
 
+## Ruční zařazení nekategorizovaných firem přes LLM chat (--export-nezarazene)
+
+Firmy, které nemají NACE ani obor z Wikidat, skončí v `XXX-00 Nezařazeno`
+(viz [Taxonomie kategorií](#taxonomie-kategorií) níže — nástroj kategorii
+záměrně nehádá z ničeho nepodloženého). Pokud máte přístup k firemnímu LLM
+chatu (MS Copilot, ChatGPT…) jen jako k webovému rozhraní, bez API klíče,
+dá se k doplnění použít stejný dvoukrokový princip jako u `--jen-id`:
+
+```bash
+# 1. krok - normální běh + export nekategorizovaných firem pro chat
+python3 dodavatele.py vstup.csv -o vystup.xlsx --export-nezarazene nezarazene.txt
+
+# --> obsah nezarazene.txt vložit do Copilotu/ChatGPT, odpověď uložit
+#     jako CSV (Název;Kód kategorie;Zdůvodnění), např. odpoved.csv
+
+# 2. krok - stejný běh znovu, tentokrát s ručním zařazením
+python3 dodavatele.py vstup.csv -o vystup.xlsx --kategorie-mapa odpoved.csv
+```
+
+`--export-nezarazene` vypíše číselník všech kategorií a seznam nekategorizovaných
+firem (se zemí a adresou, je-li známá, pro kontext) do textového souboru
+připraveného na vložení do chatu i s instrukcí a požadovaným formátem odpovědi.
+`--kategorie-mapa` pak načte odpověď z chatu (soubor `Název;Kód kategorie[;…]`)
+a aplikuje ji na firmy, které jsou pořád `XXX-00` — nedotkne se řádků, které
+už kategorii mají z NACE nebo Wikidat. Takto přiřazené řádky mají ve sloupci
+**Zařazeno podle** hodnotu `rucne (LLM)`, takže je vždy vidět, co je ověřený
+fakt z rejstříku a co ruční/AI odhad ke kontrole.
+
+Žádný nový závislost, API klíč ani automatizace prohlížeče — jen soubor
+na kopírování mezi nástrojem a chatem, který už máte k dispozici.
+
 ## Zdroje dat
 
 | zdroj | pokrytí | co dodá |
@@ -510,6 +541,8 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
 -o, --vystup SOUBOR     .xlsx nebo .csv (výchozí dodavatele_vystup.xlsx)
 --kompakt               jen základní sloupce
 --jen-id                jen dohledat IČO/registrační číslo, viz "Dohledání identifikátoru"
+--export-nezarazene SOUBOR   export nekategorizovaných firem pro LLM chat, viz "Ruční zařazení"
+--kategorie-mapa SOUBOR      aplikovat ruční zařazení (odpověď z LLM chatu) na výstup
 --workers N             souběžné dotazy (výchozí 4)
 --prodleva S            minimální odstup dotazů na jeden server (výchozí 0.25 s)
 --pocet N               kolik kandidátů z rejstříku načíst (výchozí 30)
