@@ -341,6 +341,7 @@ class Zaznam:
     lei: str = ""
     reg_cislo: str = ""
     reg_rejstrik: str = ""
+    identifikator: str = ""
     pravni_forma: str = ""
     datum_vzniku: str = ""
     dic_overeno: str = ""
@@ -771,23 +772,93 @@ def gleif_popis_formy(klient, kod):
     return kod
 
 
+def gleif_podle_lei(klient, lei):
+    """Primy dotaz na jeden LEI zaznam - presnejsi a rychlejsi nez hledani jmenem."""
+    try:
+        data = json.loads(klient.ziskej(GLEIF_API + "/" + lei, hlavicky=GLEIF_HLAVICKY,
+                                        ocisti=_gleif_ocisti))
+    except Exception:
+        return None
+    return _gleif_na_zaznam(data["data"]) if data.get("data") else None
+
+
+def gleif_podle_registrovane(klient, cislo, zeme=None, pocet=10):
+    """
+    Presne vyhledani podle narodniho registracniho cisla (pole `registeredAs`
+    v GLEIF - napr. nemecke HRB, slovenske ICO). Spolehlivejsi nez hledani
+    jmenem, protoze cislo je (na rozdil od nazvu) jednoznacne.
+    """
+    parametry = {"filter[entity.registeredAs]": cislo, "page[size]": min(pocet, 25)}
+    if zeme:
+        parametry["filter[entity.legalAddress.country]"] = zeme
+    url = GLEIF_API + "?" + urllib.parse.urlencode(parametry)
+    try:
+        data = json.loads(klient.ziskej(url, hlavicky=GLEIF_HLAVICKY, ocisti=_gleif_ocisti))
+    except Exception:
+        return []
+    vysledky = [_gleif_na_zaznam(r) for r in data.get("data", [])]
+    # filtr je u GLEIF niekdy jen fulltextovy - overit presnou shodu cisla
+    cislo_n = re.sub(r"[\s.\-]", "", cislo).upper()
+    presne = [z for z in vysledky if re.sub(r"[\s.\-]", "", z.reg_cislo).upper() == cislo_n]
+    return presne or vysledky
+
+
 # ---------------------------------------------------------------------------
 # SEC EDGAR - USA
 # ---------------------------------------------------------------------------
 
+def _bez_ns(prvek, tag):
+    """
+    Najde primeho potomka podle mistniho jmena znacky bez ohledu na jmenny
+    prostor. Atom feed EDGARu vse zabaluje do namespace
+    "http://www.w3.org/2005/Atom", takze holé `Element.find("cik")` na nem
+    nikdy nic nenajde - tise vraci None i tam, kde element skutecne je.
+    """
+    return next((e for e in prvek if e.tag.rsplit("}", 1)[-1] == tag), None)
+
+
+def _vsichni_bez_ns(prvek, tag):
+    return [e for e in prvek.iter() if e.tag.rsplit("}", 1)[-1] == tag]
+
+
 def _edgar_adresa(prvek):
     for typ in ("business", "mailing"):
-        for adr in prvek.iter("address"):
+        for adr in _vsichni_bez_ns(prvek, "address"):
             if adr.get("type") != typ:
                 continue
 
             def h(tag):
-                e = adr.find(tag)
+                e = _bez_ns(adr, tag)
                 return (e.text or "").strip() if e is not None and e.text else ""
             ulice = " ".join(x for x in (h("street1"), h("street2")) if x)
             if ulice or h("city"):
                 return ulice, h("city"), h("state"), h("zip")
     return "", "", "", ""
+
+
+def _edgar_na_zaznam(ci, cik_zaloha="", nazev_zaloha=""):
+    def h(tag):
+        e = _bez_ns(ci, tag)
+        return (e.text or "").strip() if e is not None and e.text else ""
+    cik = h("cik") or cik_zaloha
+    sic = h("assigned-sic")
+    # v USA se NACE nepouziva - domaci obdoba je NAICS (SIC u SEC je jeho
+    # starsi predchudce). NACE se dopocitava jen jako priblizny ekvivalent
+    # pro zarazeni do vlastni taxonomie.
+    nace = taxonomie.sic_na_nace(sic) or ""
+    naics = taxonomie.sic_na_naics(sic) or ""
+    ulice, mesto, stat, psc = _edgar_adresa(ci)
+    cik_cislo = cik.lstrip("0") if cik else ""
+    return Zaznam(
+        jmeno=h("conformed-name") or nazev_zaloha,
+        ulice=ulice, psc=psc, mesto=mesto, region=stat, zeme="US",
+        reg_cislo=cik_cislo, reg_rejstrik="SEC CIK",
+        nace=nace, nace_popis=taxonomie.nazev_nace(nace),
+        klasifikace="NAICS %s - %s" % (naics, taxonomie.nazev_naics(naics)) if naics else "",
+        zdroj="SEC EDGAR",
+        odkaz="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=%s" % cik if cik else "",
+        poznamka=("SIC %s %s" % (sic, h("assigned-sic-desc"))).strip() if sic else "",
+    )
 
 
 def edgar_podle_nazvu(klient, nazev, pocet=10):
@@ -800,48 +871,43 @@ def edgar_podle_nazvu(klient, nazev, pocet=10):
     except (ET.ParseError, Exception):
         return []
 
-    def z_prvku(ci, cik_zaloha="", nazev_zaloha=""):
-        def h(tag):
-            e = ci.find(tag)
-            return (e.text or "").strip() if e is not None and e.text else ""
-        cik = h("cik") or cik_zaloha
-        sic = h("assigned-sic")
-        # v USA se NACE nepouziva - domaci obdoba je NAICS (SIC u SEC je jeho
-        # starsi predchudce). NACE se dopocitava jen jako priblizny ekvivalent
-        # pro zarazeni do vlastni taxonomie.
-        nace = taxonomie.sic_na_nace(sic) or ""
-        naics = taxonomie.sic_na_naics(sic) or ""
-        ulice, mesto, stat, psc = _edgar_adresa(ci)
-        cik_cislo = cik.lstrip("0") if cik else ""
-        return Zaznam(
-            jmeno=h("conformed-name") or nazev_zaloha,
-            ulice=ulice, psc=psc, mesto=mesto, region=stat, zeme="US",
-            reg_cislo=cik_cislo, reg_rejstrik="SEC CIK",
-            nace=nace, nace_popis=taxonomie.nazev_nace(nace),
-            klasifikace="NAICS %s - %s" % (naics, taxonomie.nazev_naics(naics)) if naics else "",
-            zdroj="SEC EDGAR",
-            odkaz="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=%s" % cik if cik else "",
-            poznamka=("SIC %s %s" % (sic, h("assigned-sic-desc"))).strip() if sic else "",
-        )
-
-    ci = koren.find("company-info")
+    ci = _bez_ns(koren, "company-info")
     if ci is not None:
-        return [z_prvku(ci)]
+        return [_edgar_na_zaznam(ci)]
 
     vysledky = []
     for entry in koren.iter():
         if not entry.tag.endswith("entry"):
             continue
-        ci = entry.find("company-info")
+        # u vice shodujicich se firem je <company-info> vnorene v <content>,
+        # ne primo pod <entry> - proto hledani do hloubky
+        ci = next(iter(_vsichni_bez_ns(entry, "company-info")), None)
         if ci is not None:
-            vysledky.append(z_prvku(ci))
+            vysledky.append(_edgar_na_zaznam(ci))
             continue
         titul = next((e for e in entry if e.tag.endswith("title")), None)
         if titul is not None and titul.text:
             m = re.match(r"(.*?)\s*\(CIK (\d+)\)", titul.text.strip())
             if m:
-                vysledky.append(z_prvku(entry, m.group(2), m.group(1)))
+                vysledky.append(_edgar_na_zaznam(entry, m.group(2), m.group(1)))
     return vysledky
+
+
+def edgar_podle_cik(klient, cik):
+    """Primy dotaz na jedno CIK - presnejsi a rychlejsi nez hledani jmenem."""
+    cik_cislo = re.sub(r"\D", "", str(cik))
+    if not cik_cislo:
+        return None
+    url = EDGAR_API + "?" + urllib.parse.urlencode({
+        "CIK": cik_cislo, "type": "", "dateb": "", "owner": "include",
+        "count": 1, "action": "getcompany", "output": "atom"})
+    try:
+        koren = ET.fromstring(klient.ziskej(
+            url, hlavicky={"Accept": "application/atom+xml"}).encode("utf-8"))
+    except (ET.ParseError, Exception):
+        return None
+    ci = _bez_ns(koren, "company-info")
+    return _edgar_na_zaznam(ci) if ci is not None else None
 
 
 # ---------------------------------------------------------------------------
@@ -1159,6 +1225,54 @@ def zpracuj_radek(vstup, klient, n):
                 except Exception:
                     pass
 
+        # 1b) presna identifikace zahranicniho subjektu podle zadaneho cisla
+        # (LEI, narodni registracni cislo typu HRB/SIREN/CIK zapsane
+        # do sloupce ICO) - spolehlivejsi nez hledani jmenem, protoze cislo
+        # je na rozdil od nazvu jednoznacne
+        if z.stav != STAV_OK and ico and zeme and zeme != "CZ":
+            try:
+                kandidati = []
+                if zeme == "FR" and not n["bez_fr"]:
+                    cislice = re.sub(r"\D", "", ico)
+                    kandidati = [k for k in fr_podle_nazvu(klient, ico, 10)
+                                if k.reg_cislo == cislice]
+                elif zeme == "US" and not n["bez_edgar"]:
+                    nalezeny = edgar_podle_cik(klient, ico)
+                    kandidati = [nalezeny] if nalezeny else []
+                if not kandidati and not n["bez_gleif"]:
+                    if re.fullmatch(r"[A-Za-z0-9]{20}", ico):
+                        nalezeny = gleif_podle_lei(klient, ico.upper())
+                        kandidati = [nalezeny] if nalezeny else []
+                    else:
+                        kandidati = gleif_podle_registrovane(klient, ico, zeme)
+
+                if len(kandidati) == 1:
+                    z = kandidati[0]
+                    z.hledany_nazev = nazev or ico
+                    z.stav = STAV_OK
+                    z.shoda = "100%"
+                    z.poznamka = "; ".join(p for p in (
+                        z.poznamka, "nalezeno podle zadaneho identifikacniho cisla") if p)
+                elif len(kandidati) > 1:
+                    # vzacny pripad - stejne cislo u vice zaznamu (napr.
+                    # znovupouzite HRB po zaniku puvodni firmy). Bez nazvu
+                    # k rozhodnuti aspon vypsat kandidaty k rucni kontrole
+                    if nazev:
+                        nej, stav_id, prehled_id = vyber_nejlepsi(
+                            kandidati, nazev, n["prah_ok"], n["prah_overit"], zeme)
+                        if nej is not None and stav_id != STAV_NENALEZENO:
+                            nej.hledany_nazev = nazev
+                            nej.kandidati = prehled_id
+                            z = nej
+                    else:
+                        z.kandidati = ["%s [%s %s]" % (k.jmeno, k.zeme, k.reg_cislo)
+                                      for k in kandidati[:5]]
+                        poznamky.append(
+                            "zadane cislo odpovida %d ruznym zaznamum - chybi nazev "
+                            "k rozliseni" % len(kandidati))
+            except Exception as e:
+                poznamky.append("presna identifikace podle cisla: %s" % e)
+
         # 2) hledani podle nazvu
         if z.stav != STAV_OK and nazev:
             nejlepsi, stav, prehled, nej_skore = None, STAV_NENALEZENO, [], -1.0
@@ -1315,6 +1429,11 @@ def zpracuj_radek(vstup, klient, n):
     if not z.jmeno:
         z.jmeno = z.hledany_nazev or nazev or ico or dic
 
+    # nejlepsi cislo k rucnimu vlozeni do sloupce ICO pri druhem behu
+    # (viz rezim --jen-id) - ICO/registracni cislo je citelnejsi nez LEI,
+    # proto ma prednost
+    z.identifikator = z.ico or z.reg_cislo or z.lei
+
     return z
 
 
@@ -1411,6 +1530,16 @@ SLOUPCE_DOPLNKY = [
     ("odkaz", "Odkaz na rejstřík"), ("poznamka", "Poznámka"),
 ]
 
+# Rezim --jen-id: prvni sloupce jsou zamerne stejne jako vzorovy vstup
+# (Nazev/ICO/DIC/Zeme), aby sel vystup rovnou pouzit jako vstup druheho,
+# plneho behu - staci zkontrolovat/opravit doplnene ICO.
+SLOUPCE_ID = [
+    ("hledany_nazev", "Název"), ("identifikator", "IČO"), ("dic", "DIČ"), ("zeme", "Země"),
+    ("jmeno", "Nalezené jméno"), ("reg_rejstrik", "Typ čísla / rejstřík"),
+    ("shoda", "Shoda názvu"), ("stav", "Stav"), ("zdroj", "Zdroj dat"),
+    ("poznamka", "Poznámka"),
+]
+
 SIRKY = {"Jméno": 40, "Ulice": 30, "PSČ": 9, "Město": 20, "Země": 7, "IČO": 12, "DIČ": 15,
          "NACE": 9, "NACE popis": 34, "Kód kategorie": 13, "Skupina": 24,
          "Kategorie dodavatele": 42, "Zařazeno podle": 14, "Zdroj dat": 12, "Shoda názvu": 11,
@@ -1418,11 +1547,15 @@ SIRKY = {"Jméno": 40, "Ulice": 30, "PSČ": 9, "Město": 20, "Země": 7, "IČO":
          "Registrační číslo": 18, "Rejstřík": 20, "Právní forma": 14,
          "NACE - zdroj": 22, "Klasifikace (US NAICS)": 34,
          "Datum vzniku": 13, "DIČ ověřeno (VIES)": 16, "NACE (všechny)": 30,
-         "Odkaz na rejstřík": 46, "Poznámka": 70}
+         "Odkaz na rejstřík": 46, "Poznámka": 70,
+         "Název": 34, "Nalezené jméno": 34, "Typ čísla / rejstřík": 20}
 
 
-def zapis_vystup(zaznamy, cesta, oddelovac=";", kompakt=False):
-    sloupce = SLOUPCE_ZAKLAD + ([] if kompakt else SLOUPCE_DOPLNKY)
+def zapis_vystup(zaznamy, cesta, oddelovac=";", kompakt=False, jen_id=False):
+    if jen_id:
+        sloupce = SLOUPCE_ID
+    else:
+        sloupce = SLOUPCE_ZAKLAD + ([] if kompakt else SLOUPCE_DOPLNKY)
     hlavicka = [n for _, n in sloupce]
     radky = [[getattr(z, k, "") or "" for k, _ in sloupce] for z in zaznamy]
 
@@ -1458,20 +1591,22 @@ def zapis_vystup(zaznamy, cesta, oddelovac=";", kompakt=False):
     for i, n in enumerate(hlavicka, 1):
         ws.column_dimensions[get_column_letter(i)].width = SIRKY.get(n, 16)
 
-    # druhy list: ciselnik pouzite taxonomie
-    ws2 = wb.create_sheet("Číselník kategorií")
-    ws2.append(["Kód", "Skupina", "Kategorie dodavatele", "Počet dodavatelů"])
-    pocty = {}
-    for z in zaznamy:
-        pocty[z.kod_kategorie] = pocty.get(z.kod_kategorie, 0) + 1
-    for kod, skupina, nazev in taxonomie.prehled_kategorii():
-        ws2.append([kod, skupina, nazev, pocty.get(kod, 0)])
-    for b in ws2[1]:
-        b.font = hlavicka_font
-        b.fill = vypln
-    ws2.freeze_panes = "A2"
-    for i, s in enumerate((14, 28, 48, 16), 1):
-        ws2.column_dimensions[get_column_letter(i)].width = s
+    # druhy list: ciselnik pouzite taxonomie (nema smysl v rezimu --jen-id,
+    # kde jde jen o dohledani identifikacniho cisla, ne o zarazeni)
+    if not jen_id:
+        ws2 = wb.create_sheet("Číselník kategorií")
+        ws2.append(["Kód", "Skupina", "Kategorie dodavatele", "Počet dodavatelů"])
+        pocty = {}
+        for z in zaznamy:
+            pocty[z.kod_kategorie] = pocty.get(z.kod_kategorie, 0) + 1
+        for kod, skupina, nazev in taxonomie.prehled_kategorii():
+            ws2.append([kod, skupina, nazev, pocty.get(kod, 0)])
+        for b in ws2[1]:
+            b.font = hlavicka_font
+            b.fill = vypln
+        ws2.freeze_panes = "A2"
+        for i, s in enumerate((14, 28, 48, 16), 1):
+            ws2.column_dimensions[get_column_letter(i)].width = s
 
     wb.save(cesta)
 
@@ -1497,6 +1632,9 @@ def main(argv=None):
     p.add_argument("--sloupec", help="nazev sloupce se jmenem firmy, pokud se neurci automaticky")
     p.add_argument("--oddelovac", default=";", help="oddelovac pro CSV vystup (vychozi: ;)")
     p.add_argument("--kompakt", action="store_true", help="jen zakladni sloupce")
+    p.add_argument("--jen-id", action="store_true",
+                   help="jen dohledat ICO/registracni cislo (bez plneho obohaceni) - "
+                        "vystup jde rovnou pouzit jako vstup druheho, plneho behu")
     p.add_argument("--workers", type=int, default=4, help="pocet soubeznych dotazu (vychozi: 4)")
     p.add_argument("--prodleva", type=float, default=0.25,
                    help="min. prodleva mezi dotazy na jeden server v s (vychozi: 0.25)")
@@ -1565,7 +1703,7 @@ def main(argv=None):
         zaznamy = list(ex.map(uloha, radky))
 
     klient.uloz_cache()
-    zapis_vystup(zaznamy, a.vystup, a.oddelovac, a.kompakt)
+    zapis_vystup(zaznamy, a.vystup, a.oddelovac, a.kompakt, jen_id=a.jen_id)
 
     souhrn = {}
     for z in zaznamy:

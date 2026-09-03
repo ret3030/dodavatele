@@ -35,6 +35,13 @@ rozpozná automaticky, rozumí česky i anglicky:
 názvu a záznam je jednoznačný — u problémových firem je to nejrychlejší oprava.
 Vyplněná **země** zúží hledání na správný rejstřík a zrychlí běh.
 
+U **zahraničních firem** může sloupec IČO obsahovat i jiný identifikátor než
+české IČO — LEI, nebo národní registrační číslo (např. německé `HRB 6684`,
+francouzské SIREN, americké CIK). Nástroj typ čísla podle tvaru i země pozná
+sám a použije ho pro přesné vyhledání místo dohledávání podle jména. Viz
+[Dohledání identifikátoru pro zahraniční firmy](#dohledání-identifikátoru-pro-zahraniční-firmy---jen-id)
+níže, pokud takové číslo nemáte a chcete ho nechat dohledat automaticky.
+
 ## Výstup
 
 Sloupce podle zadání: `Jméno | Ulice | PSČ | Město | Země | IČO | DIČ | NACE`,
@@ -98,6 +105,45 @@ rejstriku 2019-06-30, duvod: Výmaz z důvodu likvidace“).
 už neexistuje, takže nemá smysl vyplňovat aktuální adresu/NACE. Pokud ani VR
 nic nenajde, ověřte IČO ručně např. v insolvenčním rejstříku nebo Obchodním
 věstníku.
+
+## Dohledání identifikátoru pro zahraniční firmy (--jen-id)
+
+Nejpřesnější způsob, jak najít zahraniční firmu, je podle **jejího
+identifikačního čísla** (LEI, německé `HRB`, francouzské SIREN, americké
+CIK…) — na rozdíl od jména je jednoznačné, takže odpadá riziko `VYBRANO`
+u více podobně znějících firem. Pokud takové číslo nemáte, dá se nechat
+dohledat ve dvou krocích:
+
+```bash
+# 1. krok - jen dohledat identifikační čísla, bez plného obohacení
+python3 dodavatele.py vstup.csv -o kroky/id.xlsx --jen-id
+
+# --> zkontrolovat sloupce "Nalezené jméno" a "Shoda názvu" v kroky/id.xlsx,
+#     případně opravit řádky se stavem VYBRANO/OVERIT ručně
+
+# 2. krok - plné obohacení, tentokrat uz s dohledanymi cisly
+python3 dodavatele.py kroky/id.xlsx -o vystup.xlsx
+```
+
+První krok (`--jen-id`) prohledá stejné zdroje jako běžný běh, ale vypíše jen
+sloupce potřebné ke kontrole — `Název | IČO | DIČ | Země` (přesně ve tvaru
+vzorového vstupu, takže výstup jde bez úprav použít jako vstup druhého kroku)
+a navíc `Nalezené jméno`, `Typ čísla / rejstřík`, `Shoda názvu`, `Stav`,
+`Zdroj dat`, `Poznámka` pro kontrolu.
+
+Druhý krok pak u řádků s vyplněným IČO/identifikátorem **přeskočí hledání
+podle jména** a jde rovnou na přesné vyhledání podle čísla — přesnější
+i rychlejší. Nástroj typ čísla pozná automaticky:
+
+* 20znakový kód → **LEI**, přímé vyhledání v GLEIF,
+* francouzská země → **SIREN**, přímé vyhledání v INSEE,
+* americká země → **CIK**, přímé vyhledání v SEC EDGAR,
+* jinak → **národní registrační číslo**, přesný filtr v GLEIF podle země.
+
+Když číslo odpovídá více firmám najednou (vzácné, např. znovupoužité
+registrační číslo po zániku původní firmy), a řádek nemá vyplněné i jméno,
+zůstane `NENALEZENO` s kandidáty v Poznámce — bez jména totiž není podle čeho
+rozhodnout, která firma je ta správná.
 
 ## Zdroje dat
 
@@ -393,6 +439,7 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
 ```
 -o, --vystup SOUBOR     .xlsx nebo .csv (výchozí dodavatele_vystup.xlsx)
 --kompakt               jen základní sloupce
+--jen-id                jen dohledat IČO/registrační číslo, viz "Dohledání identifikátoru"
 --workers N             souběžné dotazy (výchozí 4)
 --prodleva S            minimální odstup dotazů na jeden server (výchozí 0.25 s)
 --pocet N               kolik kandidátů z rejstříku načíst (výchozí 30)
