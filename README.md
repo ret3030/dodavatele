@@ -106,6 +106,16 @@ už neexistuje, takže nemá smysl vyplňovat aktuální adresu/NACE. Pokud ani 
 nic nenajde, ověřte IČO ručně např. v insolvenčním rejstříku nebo Obchodním
 věstníku.
 
+#### Firma se nenajde v zemi bez napojeného rejstříku
+
+U zemí bez vlastního připojení (DE, NL, AT, BE, CH, IT, ES, HU, PL, RO, BG,
+TR, MY, HK, CA, zatím i GB) se u `NENALEZENO` řádku předpřipraví do sloupce
+**Odkaz na rejstřík** hotový vyhledávací dotaz — Google omezený na doménu
+příslušného národního rejstříku (`site:handelsregister.de "Název firmy"`),
+u zemí připojených k evropskému BRIS odkaz na centrální
+[e-justice.europa.eu](https://e-justice.europa.eu/content_find_a_company-489-en.do).
+Stačí kliknout, nemusíte nic přepisovat ručně.
+
 ## Dohledání identifikátoru pro zahraniční firmy (--jen-id)
 
 Nejpřesnější způsob, jak najít zahraniční firmu, je podle **jejího

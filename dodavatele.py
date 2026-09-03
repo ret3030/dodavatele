@@ -1221,6 +1221,57 @@ def vies_over(klient, dic):
 
 
 # ---------------------------------------------------------------------------
+# Odkaz na rucni dohledani - zeme bez napojeneho rejstriku ani u GLEIF/Wikidat
+# ---------------------------------------------------------------------------
+
+# Domena narodniho rejstriku pro zeme, kde nemame API (viz README - overeno,
+# ze bezklicove hromadne API neexistuje). Pouziva se jen k sestaveni odkazu
+# na vyhledavani "site:domena nazev" - clovek pak dotaz jen otevre, nic se
+# tim neautomatizuje ani neobchazi.
+ZEME_MANUALNI_REJSTRIK = {
+    "DE": "handelsregister.de",
+    "NL": "kvk.nl",
+    "AT": "justiz.gv.at",
+    "BE": "kbopub.economie.fgov.be",
+    "CH": "zefix.ch",
+    "IT": "registroimprese.it",
+    "ES": "sede.registradores.org",
+    "HU": "e-cegjegyzek.hu",
+    "PL": "krs-online.com.pl",
+    "RO": "onrc.ro",
+    "BG": "portal.registryagency.bg",
+    "TR": "ticaretsicil.gov.tr",
+    "MY": "ssm-einfo.my",
+    "HK": "cr.gov.hk",
+    "CA": "corporationscanada.ic.gc.ca",
+    "GB": "find-and-update.company-information.service.gov.uk",
+}
+
+# Zeme pripojene k BRIS (European Business Registers Interconnection System) -
+# u tech je alternativou i centralni EU vyhledavani (rucne, viz README)
+BRIS_ZEME = {"AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "EL", "ES", "FI",
+             "FR", "HR", "HU", "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PL",
+             "PT", "RO", "SE", "SI", "SK", "IS", "LI", "NO"}
+
+
+def manualni_odkaz(zeme, nazev):
+    """
+    Kdyz se firma nenajde a zeme nema napojeny zadny rejstrik, vrati odkaz
+    na predpripraveny vyhledavaci dotaz (Google omezeny na spravnou domenu,
+    pripadne centralni BRIS) - usetri rucni psani nazvu do vyhledavace.
+    """
+    if not nazev:
+        return ""
+    domena = ZEME_MANUALNI_REJSTRIK.get(zeme)
+    if domena:
+        dotaz = 'site:%s "%s"' % (domena, nazev)
+        return "https://www.google.com/search?q=" + urllib.parse.quote(dotaz)
+    if zeme in BRIS_ZEME:
+        return "https://e-justice.europa.eu/content_find_a_company-489-en.do"
+    return ""
+
+
+# ---------------------------------------------------------------------------
 # Zpracovani jednoho radku
 # ---------------------------------------------------------------------------
 
@@ -1553,6 +1604,11 @@ def zpracuj_radek(vstup, klient, n):
     # jinak firma z nenalezene shody v exportu "zmizi"
     if not z.jmeno:
         z.jmeno = z.hledany_nazev or nazev or ico or dic
+
+    # u nenalezene firmy ze zeme bez napojeneho rejstriku aspon predpripravit
+    # odkaz na rucni vyhledani - usetri psani nazvu do vyhledavace
+    if z.stav == STAV_NENALEZENO and not z.odkaz:
+        z.odkaz = manualni_odkaz(z.zeme, z.jmeno)
 
     # nejlepsi cislo k rucnimu vlozeni do sloupce ICO pri druhem behu
     # (viz rezim --jen-id) - ICO/registracni cislo je citelnejsi nez LEI,
