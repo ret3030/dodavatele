@@ -1,0 +1,3 @@
+# Skript bezi na cistem Pythonu 3.9+ bez zavislosti.
+# openpyxl je potreba pouze pro cteni a zapis XLSX (vystup .csv ho nevyzaduje).
+openpyxl>=3.1
