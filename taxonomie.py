@@ -244,77 +244,162 @@ NACE_MAPA = {
 # ---------------------------------------------------------------------------
 
 KLICOVA_SLOVA = [
-    (("cloud comput", "cloud", "hosting", "datacent", "data cent", "colocation", "saas",
-      "webhost"), "ICT-03"),
-    (("consumer electronics", "computer hardware", "spotrebni elektronika"), "ICT-07"),
-    (("computer software", "software industry", "software"), "ICT-01"),
-    (("petroleum", "oil and gas", "ropn", "rafin", "refinery"), "ENE-03"),
-    (("electric power", "electricity", "utility", "utilities", "elektrarens"), "ENE-01"),
-    (("cyber", "kyber", "security software", "infosec", "pentest"), "ICT-06"),
-    (("telecom", "telekom", "telco", "mobile", "vodafone", "t-mobile", "connectivity"), "ICT-09"),
-    (("software", "systems", "solutions", "it services", "informatik", "informacni systemy",
-      "devops", "sap ", "erp", "digital", "technologies", "technologie", "app "), "ICT-01"),
-    (("computer", "pocitac", "hardware", "notebook", "print solutions"), "ICT-07"),
-    (("network", "networks", "sitove"), "ICT-08"),
-    (("outsourcing", "shared service", "bpo", "call center", "kontaktni centrum"), "ICT-10"),
-    (("bank", "banka", "banking"), "FIN-01"),
-    (("payment", "platebni", "acquiring", "card services"), "FIN-02"),
-    (("insurance", "pojist", "versicherung", "assurance"), "FIN-03"),
-    (("leasing", "credit", "uverov", "factoring"), "FIN-04"),
-    (("audit", "assurance"), "PRO-03"),
-    (("ucetni", "accounting", "tax ", "danov", "steuerber", "payroll", "mzdov"), "PRO-02"),
-    (("advokat", "legal", "law firm", "rechtsanw", "notar", "kanzlei", "pravni"), "PRO-01"),
-    (("consult", "poraden", "advisory", "beratung", "management consult"), "PRO-04"),
-    (("recruit", "staffing", "personal", "human resources", "agentura prace", "zeitarbeit",
-      "job", "kariera"), "HR-01"),
-    (("training", "skoleni", "vzdelav", "education", "academy", "akadem", "learning"), "HR-04"),
-    (("energy", "energie", "energet", "power", "elektrarna", "teplarna"), "ENE-01"),
-    (("gas", "plyn", "oil", "petrol", "fuel", "paliva", "benzina"), "ENE-03"),
-    (("vodarn", "waterworks", "wasser"), "ENE-04"),
-    (("security", "ostrah", "sicherheit", "guard", "protection service"), "SEC-01"),
-    (("facility", "cleaning", "uklid", "reinigung", "sprava budov", "sprava nemovit"), "FAC-02"),
-    (("catering", "restaur", "stravov", "kantyn", "gastro"), "FAC-04"),
-    (("hotel", "travel", "cestovn", "reise", "tour"), "FAC-08"),
-    (("shred", "skartac", "likvidace dat", "data destruction"), "ODP-02"),
-    (("recycl", "recykl", "waste", "odpad", "entsorgung", "ekolog"), "ODP-01"),
-    (("logistic", "logistik", "spedice", "spedition", "forwarding", "freight", "shipping",
-      "transport", "doprava", "cargo"), "LOG-03"),
-    (("kurier", "courier", "express", "post", "posta", "parcel", "zasilkovna"), "LOG-05"),
-    (("warehouse", "sklad", "fulfillment"), "LOG-04"),
-    (("pharma", "farmac", "medical", "medizin", "zdravot", "health"), "ZDR-03"),
-    (("laborat", "labor ", "diagnost"), "ZDR-02"),
-    (("automation", "automatizace", "control system", "ridici system", "scada", "plc",
-      "measurement", "mereni"), "TEC-02"),
-    (("engineering", "inzenyr", "projekce", "projekt", "design office", "architek"), "PRO-05"),
-    (("certifik", "inspection", "tuv", "dekra", "bureau veritas", "zkusebn", "testing"), "PRO-06"),
-    (("research", "vyzkum", "forschung", "institut", "innovation"), "PRO-07"),
-    (("machin", "stroj", "maschin", "equipment", "zarizeni", "werkzeug"), "TEC-01"),
-    (("service", "servis", "opravy", "wartung", "maintenance"), "TEC-03"),
-    (("electric", "elektro", "elektrotech"), "TEC-04"),
-    (("automotive", "motors", "vehicle", "vozidl", "auto "), "TEC-05"),
-    (("rental", "pronajem", "rent ", "miet", "verleih"), "TEC-06"),
-    (("steel", "ocel", "metal", "kovo", "hut", "aluminium", "hlinik", "slevarn", "foundry"), "MAT-01"),
-    (("chemic", "chemie", "chemical", "chemi"), "MAT-02"),
-    (("plast", "polymer", "rubber", "kaucuk", "pryz"), "MAT-03"),
-    (("packaging", "obal", "verpackung", "papir", "paper", "karton"), "MAT-04"),
-    (("beton", "cement", "stavebni hmoty", "kamenolom"), "MAT-05"),
-    (("textil", "odev", "clothing", "workwear", "ochranne pomucky"), "MAT-06"),
-    (("electronic", "elektronik", "semiconduct", "components", "komponenty"), "MAT-07"),
-    (("food", "potravin", "napoj", "beverage", "lebensmittel", "pivovar", "mlekarna"), "MAT-08"),
-    (("agro", "zemedel", "farm", "landwirt"), "MAT-09"),
-    (("bau", "stavb", "stavebni", "construction", "building", "sanace"), "STA-01"),
-    (("marketing", "reklam", "advertis", "werbung", "media", "agency", "agentura", "kreativ"), "MKT-01"),
-    (("research market", "pruzkum trhu", "survey"), "MKT-02"),
-    (("print", "tisk", "druck", "polygraf", "tiskarna"), "MKT-03"),
-    (("event", "kongres", "veletrh", "conference", "expo"), "MKT-04"),
-    (("real estate", "reality", "immobil", "nemovit", "properties", "estate"), "FAC-05"),
-    (("nabytek", "furniture", "mobel", "interier"), "FAC-07"),
-    (("papirnictvi", "office supplies", "kancelarsk"), "FAC-06"),
-    (("wholesale", "velkoobchod", "distribut", "trading", "trade", "supply", "handel"), "OBC-01"),
-    (("retail", "maloobchod", "shop", "store", "market"), "OBC-02"),
-    (("univerzit", "university", "vysoka skola", "college", "gymnaz", "skola"), "VER-03"),
-    (("mesto ", "obec ", "kraj ", "ministerstvo", "urad", "statni"), "VER-01"),
-    (("spolek", "asociace", "association", "verband", "nadace", "obecne prospesn"), "VER-02"),
+    # --- ICT ---------------------------------------------------------------
+    (("cloud comput", "hyperscale", "hosting", "datacent", "data cent", "rechenzentrum",
+      "colocation", "colokace", "saas", "webhost", "serverhousing"), "ICT-03"),
+    (("cyber", "kyber", "siber", "security software", "infosec", "pentest", "soc as a service",
+      "threat intelligence", "antivir"), "ICT-06"),
+    (("consumer electronics", "computer hardware", "spotrebni elektronika",
+      "unterhaltungselektronik"), "ICT-07"),
+    (("software house", "computer software", "software industry", "oprogramowanie",
+      "szoftver", "yazilim", "programvara", "logiciel"), "ICT-01"),
+    (("telecom", "telekom", "telco", "telefon", "mobile network", "vodafone", "t-mobile",
+      "connectivity", "telecomunicaz", "telecomunica", "telekomunik"), "ICT-09"),
+    (("software", "systems", "solutions", "it services", "it-service", "informatik",
+      "informatica", "informatique", "informacni systemy", "devops", "sap ", " erp",
+      "digital", "technologies", "technologie", "teknoloji", "yazilim"), "ICT-01"),
+    (("computer", "pocitac", "hardware", "notebook", "print solutions", "bilgisayar"), "ICT-07"),
+    (("network", "networks", "sitove", "netzwerk", "netwerk"), "ICT-08"),
+    (("outsourcing", "shared service", " bpo", "call center", "contact center",
+      "kontaktni centrum", "back office"), "ICT-10"),
+    (("portal", "e-commerce", "ecommerce", "marketplace", "online platform", "webshop"), "ICT-12"),
+
+    # --- Finance -----------------------------------------------------------
+    (("bank", "banka", "banca", "banco", "banque", "bankasi", "bankası", "banking",
+      "sparkasse", "kreditanstalt"), "FIN-01"),
+    (("payment", "platebni", "acquiring", "card services", "paiement", "zahlungs",
+      "fintech"), "FIN-02"),
+    (("insurance", "pojist", "poist", "versicherung", "assurance", "assicuraz", "seguros",
+      "ubezpiecz", "biztosit", "forsakring", "sigorta", "asigurar"), "FIN-03"),
+    (("leasing", "credit", "kredit", "uverov", "factoring", "financing", "finansman"), "FIN-04"),
+    (("inkaso", "debt collection", "pohledavek", "vymahani"), "FIN-06"),
+
+    # --- Profesni sluzby ---------------------------------------------------
+    (("audit", "assurance", "wirtschaftspruf", "revision"), "PRO-03"),
+    (("ucetni", "uctov", "accounting", "bookkeeping", "tax advis", " tax ", "danov",
+      "steuerber", "payroll", "mzdov", "fiscal"), "PRO-02"),
+    (("advokat", "legal", "law firm", "rechtsanw", "notar", "kanzlei", "pravni", "avocat",
+      "avvocat", "abogad", "kancelaria prawna"), "PRO-01"),
+    (("consult", "poraden", "advisory", "beratung", "management consult", "conseil",
+      "consulen", "consultor", "doradztwo", "danismanlik"), "PRO-04"),
+    (("certifik", "inspection", " tuv", "dekra", "bureau veritas", "zkusebn", "testing",
+      "prufung", "notified body", "sgs "), "PRO-06"),
+    (("research", "vyzkum", "forschung", "recherche", "innovation", "r&d", " institut"), "PRO-07"),
+    (("translat", "preklad", "ubersetz", "localization", "lokalizace", "tlumoc"), "PRO-08"),
+    (("engineering", "inzenyr", "inzinier", "projekce", "projektov", "design office",
+      "architek", "ingenieur", "ingegneria", "ingenieria", "muhendislik"), "PRO-05"),
+
+    # --- Lidske zdroje -----------------------------------------------------
+    (("recruit", "staffing", "personalberatung", "human resources", "agentura prace",
+      "zeitarbeit", "headhunt", "personalagentur", "job", "kariera", "career"), "HR-01"),
+    (("agenturni zamestnav", "temporary work", "interim", "leiharbeit"), "HR-02"),
+    (("training", "skoleni", "vzdelav", "education", "academy", "akadem", "learning",
+      "bildung", "formation", "szkolen"), "HR-04"),
+    (("benefit", "stravenk", "sodexo", "edenred", "cafeteria"), "HR-05"),
+
+    # --- Energie -----------------------------------------------------------
+    (("petroleum", "oil and gas", "ropn", "rafin", "refinery", "raffiner", "petrol",
+      "naft", "petrom", "orlen"), "ENE-03"),
+    (("electric power", "electricity", "elektrarens", "elektrarna", "powerplant",
+      "power plant", "energetyka", "enerji", "elektrik"), "ENE-01"),
+    (("energy", "energie", "energet", "energia", "energi ", "teplarna", "heating",
+      "fernwarme", "district heat"), "ENE-01"),
+    (("gas", "plyn", "gaz", "fuel", "paliva", "benzina", "tankstelle"), "ENE-03"),
+    (("vodarn", "waterworks", "wasserwerk", "vodovod", "water utility", "kanalizac"), "ENE-04"),
+
+    # --- Bezpecnost --------------------------------------------------------
+    (("security", "ostrah", "sicherheit", "guard", "protection service", "securitas",
+      "bezpecnostni sluzb", "ochrona"), "SEC-01"),
+    (("ezs", "cctv", "access control", "pristupove systemy", "alarm"), "SEC-02"),
+
+    # --- Sprava objektu a provoz -------------------------------------------
+    (("facility", "cleaning", "uklid", "reinigung", "nettoyage", "pulizia", "sprava budov",
+      "sprava nemovit", "hausmeister", "sprzatan"), "FAC-02"),
+    (("catering", "restaur", "stravov", "kantyn", "gastro", "canteen", "mensa"), "FAC-04"),
+    (("hotel", "travel", "cestovn", "reise", "tour ", "tourism", "turizm", "airline",
+      "airways", "aerolinie", "ryanair"), "FAC-08"),
+    (("nabytek", "furniture", "mobel", "meble", "interier", "interior"), "FAC-07"),
+    (("papirnictvi", "office supplies", "kancelarsk", "burobedarf"), "FAC-06"),
+    (("real estate", "reality", "immobil", "nemovit", "properties", "estate", "nieruchomo"),
+     "FAC-05"),
+
+    # --- Odpady ------------------------------------------------------------
+    (("shred", "skartac", "likvidace dat", "data destruction", "aktenvernicht"), "ODP-02"),
+    (("recycl", "recykl", "waste", "odpad", "entsorgung", "ekolog", "environment",
+      "smieci", "atik", "dechet"), "ODP-01"),
+
+    # --- Logistika ---------------------------------------------------------
+    (("logistic", "logistik", "logistyka", "spedice", "spedition", "forwarding", "freight",
+      "shipping", "transport", "doprava", "cargo", "nakliyat", "lojistik"), "LOG-03"),
+    (("kurier", "courier", "express", " post", "posta", "parcel", "zasilkovna", "dhl",
+      "kargo"), "LOG-05"),
+    (("warehouse", "sklad", "fulfillment", "lager"), "LOG-04"),
+    (("shipyard", "maritime", "namorni", "reederei", "denizcilik"), "LOG-02"),
+
+    # --- Zdravotnictvi -----------------------------------------------------
+    (("pharma", "farmac", "farmaceut", "ilac", "leki", "gyogyszer", "sopharma",
+      "richter gedeon"), "ZDR-03"),
+    (("medical", "medizin", "medica", "zdravot", "health", "medyczn", "saglik",
+      "medizintechnik", "klinik", "hospital", "nemocnic"), "ZDR-01"),
+    (("laborat", "labor ", "diagnost", "analytik"), "ZDR-02"),
+    (("veterin",), "ZDR-05"),
+
+    # --- Technologie a stroje ----------------------------------------------
+    (("automation", "automatizace", "control system", "ridici system", "scada", " plc",
+      "measurement", "mereni", "messtechnik", "regeltechnik", "robotik", "robotics"), "TEC-02"),
+    (("machin", "stroj", "maschin", "equipment", "zarizeni", "werkzeug", "maszyn",
+      "macchine", "maquinaria", "makina"), "TEC-01"),
+    (("automotive", "motors", "vehicle", "vozidl", "auto ", "fahrzeug", "otomotiv",
+      "samochod", "aerospace", "aviation", "aircraft", "letecky prumysl"), "TEC-05"),
+    (("electric", "elektro", "elektrotech", "elektryk", "elettric", "elektrik"), "TEC-04"),
+    (("service", "servis", "opravy", "wartung", "maintenance", "instandhalt"), "TEC-03"),
+    (("rental", "pronajem", "rent ", "miet", "verleih", "wynajem", "kiralama"), "TEC-06"),
+
+    # --- Material ----------------------------------------------------------
+    (("steel", "ocel", "metal", "kovo", "hut ", "hutn", "aluminium", "hlinik", "slevarn",
+      "foundry", "stahl", "acciai", "celik", "stal ", "huta"), "MAT-01"),
+    (("chemic", "chemie", "chemical", "chemi", "kimya", "chemia", "petrochem"), "MAT-02"),
+    (("plast", "polymer", "rubber", "kaucuk", "pryz", "gummi", "kunststoff"), "MAT-03"),
+    (("packaging", "obal", "verpackung", "papir", "paper", "karton", "opakowan",
+      "ambalaj", "papier"), "MAT-04"),
+    (("beton", "cement", "stavebni hmoty", "kamenolom", "ziegel", "baustoff"), "MAT-05"),
+    (("textil", "odev", "clothing", "workwear", "ochranne pomucky", "bekleidung",
+      "tekstil", "apparel", "confectii"), "MAT-06"),
+    (("semiconduct", "electronic", "elektronik", "components", "komponenty", "bauelemente",
+      "microchip", "wafer"), "MAT-07"),
+    (("food", "potravin", "napoj", "beverage", "lebensmittel", "pivovar", "brewery",
+      "brauerei", "mlekarna", "dairy", "alimentar", "gida", "zywnos"), "MAT-08"),
+    (("agro", "zemedel", "farm", "landwirt", "rolnic", "tarim"), "MAT-09"),
+    (("mining", "tezba", "bergbau", "kopalnia", "madencilik", "quarry"), "MAT-10"),
+    (("drevo", "timber", "holz", "lumber", "sawmill", "pila "), "MAT-11"),
+
+    # --- Stavebnictvi ------------------------------------------------------
+    (("bau", "stavb", "stavebni", "construction", "building", "sanace", "budowl",
+      "insaat", "costruzion", "construccion", "epito"), "STA-01"),
+    (("elektroinstalac", "slaboproud", "electrical installation"), "STA-04"),
+
+    # --- Marketing ---------------------------------------------------------
+    (("marketing", "reklam", "advertis", "werbung", "media", "agency", "agentura",
+      "kreativ", "publicit", "pubblicit", "reklamcilik"), "MKT-01"),
+    (("research market", "pruzkum trhu", "survey", "marktforschung"), "MKT-02"),
+    (("print", "tisk", "druck", "polygraf", "tiskarna", "drukarnia", "matbaa"), "MKT-03"),
+    (("event", "kongres", "veletrh", "conference", "expo", "messe", "targi"), "MKT-04"),
+    (("broadcast", "television", "televiz", "rundfunk", "film", "studio", "publishing",
+      "vydavatel", "verlag", "wydawnictwo"), "MKT-05"),
+
+    # --- Obchod ------------------------------------------------------------
+    (("wholesale", "velkoobchod", "distribut", "trading", "trade", "supply", "handel",
+      "hurtown", "grosist", "commerciale"), "OBC-01"),
+    (("retail", "maloobchod", "shop", "store", "market", "detal", "perakende"), "OBC-02"),
+    (("dealership", "autosalon", "autohaus"), "OBC-03"),
+
+    # --- Verejny sektor ----------------------------------------------------
+    (("univerzit", "university", "vysoka skola", "college", "gymnaz", "skola", "schule",
+      "universita", "uniwersytet", "universite"), "VER-03"),
+    (("mesto ", "obec ", "kraj ", "ministerstvo", "urad", "statni", "ministry", "agency of",
+      "bundesamt", "gemeinde"), "VER-01"),
+    (("spolek", "asociace", "association", "verband", "nadace", "obecne prospesn",
+      "foundation", "stiftung", "fundacja", "dernek", "vakfi"), "VER-02"),
 ]
 
 
@@ -393,6 +478,271 @@ SIC_NA_NACE = {
 
 
 # ---------------------------------------------------------------------------
+# Obory z Wikidat (P452) -> kod kategorie a odhad NACE
+#
+# Wikidata u firem uvadi obor cinnosti jako odkaz na polozku (QID). Je to
+# stabilnejsi signal nez hadani z nazvu: QID je jazykove nezavisly, takze
+# funguje pro korejskou i turecku firmu stejne. Vlastni NACE ma na Wikidatech
+# jen zlomek techto polozek (P4496), proto si prirazeni vedeme sami.
+#
+# Format:  QID -> (kod kategorie, odhad NACE nebo "")
+# ---------------------------------------------------------------------------
+
+WIKIDATA_OBORY = {
+    # --- ICT -----------------------------------------------------------------
+    "Q880371": ("ICT-02", "5829"),      # software industry
+    "Q638608": ("ICT-01", "6201"),      # software development
+    "Q11660": ("ICT-01", "6201"),       # artificial intelligence
+    "Q941594": ("ICT-02", "5821"),      # video game industry
+    "Q11661": ("ICT-05", "6202"),       # information technology
+    "Q110702998": ("ICT-05", "6202"),   # information technology industry
+    "Q1481411": ("ICT-04", "6203"),     # IT service management
+    "Q3510521": ("ICT-06", "6203"),     # computer security
+    "Q73768396": ("ICT-07", "2620"),    # consumer electronics industry
+    "Q112165387": ("ICT-07", "2640"),   # manufacture of consumer electronics
+    "Q56604188": ("ICT-07", "2751"),    # home appliance industry
+    "Q56598901": ("ICT-07", "2630"),    # mobile phone industry
+    "Q112165709": ("ICT-07", "4651"),   # wholesale of computers
+    "Q2401742": ("ICT-09", "61"),       # telecommunications industry
+    "Q418": ("ICT-09", "61"),           # telecommunications
+    "Q269415": ("ICT-12", "6312"),      # digital distribution
+    "Q3390477": ("ICT-12", "6312"),     # online marketplace
+
+    # --- Profesni sluzby -----------------------------------------------------
+    "Q23699878": ("PRO-04", "7022"),    # management consulting industry
+    "Q112166038": ("PRO-04", "7010"),   # activities of head offices
+    "Q23700345": ("PRO-09", "74"),      # professional services industry
+    "Q12271": ("PRO-05", "7111"),       # architecture
+    "Q42240": ("PRO-07", "72"),         # research
+    "Q7108": ("PRO-07", "7211"),        # biotechnology
+
+    # --- Finance -------------------------------------------------------------
+    "Q22687": ("FIN-01", "6419"),       # bank
+    "Q806718": ("FIN-01", "6419"),      # economics of banking
+    "Q837171": ("FIN-05", "64"),        # financial services
+    "Q57774188": ("FIN-05", "64"),      # financial sector
+    "Q29584334": ("FIN-05", "64"),      # financial service activities except insurance
+    "Q16319025": ("FIN-02", "6619"),    # fintech
+    "Q43183": ("FIN-03", "65"),         # insurance
+    "Q2518196": ("FIN-03", "65"),       # insurance industry
+    "Q1787082": ("FIN-04", "6492"),     # line of credit
+
+    # --- Lidske zdroje, vzdelavani -------------------------------------------
+    "Q8434": ("VER-03", "85"),          # education
+    "Q136822": ("VER-03", "8542"),      # higher education
+    "Q112166127": ("VER-03", "8520"),   # primary education
+
+    # --- Marketing a media ---------------------------------------------------
+    "Q39809": ("MKT-01", "7311"),       # marketing
+    "Q969040": ("MKT-01", "73"),        # creative industries
+    "Q11034": ("MKT-03", "1812"),       # printing
+    "Q112165253": ("MKT-03", "1813"),   # pre-press activities
+    "Q3972943": ("MKT-03", "5811"),     # publishing
+    "Q1415395": ("MKT-05", "5911"),     # film industry
+    "Q932586": ("MKT-05", "5911"),      # film production
+    "Q746359": ("MKT-05", "5920"),      # music industry
+    "Q16023726": ("MKT-05", "5920"),    # music publishing
+    "Q11033": ("MKT-05", "60"),         # mass media
+    "Q56611639": ("MKT-05", "60"),      # media industry
+    "Q11030": ("MKT-05", "6391"),       # journalism
+
+    # --- Sprava objektu a provoz ---------------------------------------------
+    "Q1660132": ("FAC-05", "68"),       # real estate industry
+    "Q112166025": ("FAC-05", "6820"),   # accommodation rental
+    "Q11707": ("FAC-04", "5610"),       # restaurant
+    "Q1495452": ("FAC-08", "55"),       # hospitality industry
+    "Q49389": ("FAC-08", "79"),         # tourism
+    "Q112165478": ("FAC-07", "3109"),   # manufacture of other furniture
+    "Q112165469": ("FAC-07", "3101"),   # office and shop furniture
+
+    # --- Logistika -----------------------------------------------------------
+    "Q7590": ("LOG-01", "49"),          # transport
+    "Q3565868": ("LOG-01", "4920"),     # rail transport
+    "Q178512": ("LOG-01", "4931"),      # public transport
+    "Q155930": ("LOG-02", "50"),        # water transport
+    "Q177777": ("LOG-04", "5210"),      # logistics
+
+    # --- Energie -------------------------------------------------------------
+    "Q862571": ("ENE-03", "19"),        # petroleum industry
+    "Q1778629": ("MAT-10", "05"),       # coal industry
+    "Q383973": ("ENE-01", "3511"),      # electricity generation
+    "Q1304795": ("ENE-01", "35"),       # energy sector
+    "Q2151621": ("ENE-01", "35"),       # energy industry
+    "Q1341477": ("ENE-01", "35"),       # energy supply
+    "Q1786253": ("ENE-02", "3530"),     # power plant technology
+
+    # --- Material a suroviny -------------------------------------------------
+    "Q44497": ("MAT-10", "07"),         # mining
+    "Q2285982": ("MAT-01", "241"),      # iron and steel industry
+    "Q1924906": ("MAT-01", "24"),       # metal industry
+    "Q112165364": ("MAT-01", "2561"),   # metal treatment and coating
+    "Q207652": ("MAT-02", "20"),        # chemical industry
+    "Q12752882": ("MAT-02", "2042"),    # cosmetics industry
+    "Q112165275": ("MAT-02", "2042"),   # perfumes and toiletries
+    "Q607081": ("MAT-06", "13"),        # textile industry
+    "Q11828862": ("MAT-06", "14"),      # clothing industry
+    "Q107601662": ("MAT-06", "13"),     # textile and clothing industry
+    "Q12684": ("MAT-06", "14"),         # fashion
+    "Q112165215": ("MAT-06", "1413"),   # manufacture of outerwear
+    "Q112165225": ("MAT-06", "1512"),   # leather goods
+    "Q2986369": ("MAT-07", "2611"),     # semiconductor industry
+    "Q5358497": ("MAT-07", "26"),       # electronics industry
+    "Q11650": ("MAT-07", "26"),         # electronics
+    "Q112165382": ("MAT-07", "2611"),   # manufacture of electronic components
+    "Q112165711": ("MAT-07", "4652"),   # wholesale of electronic equipment
+    "Q540912": ("MAT-08", "10"),        # food industry
+    "Q107601756": ("MAT-08", "10"),     # food and tobacco industry
+    "Q4899370": ("MAT-08", "11"),       # beverage industry
+    "Q11644505": ("MAT-08", "1105"),    # brewing industry
+    "Q112165131": ("MAT-08", "1011"),   # meat processing
+    "Q112165152": ("MAT-08", "1051"),   # cheesemaking
+    "Q112165155": ("MAT-08", "1052"),   # ice creams and sorbets
+    "Q112165171": ("MAT-08", "1082"),   # cocoa, chocolate, confectionery
+    "Q112165691": ("MAT-08", "4638"),   # food distributor
+    "Q112165678": ("MAT-08", "4633"),   # wholesale dairy products
+    "Q1187656": ("MAT-08", "10"),       # fast-moving consumer goods
+    "Q11451": ("MAT-09", "01"),         # agriculture
+    "Q1283714": ("MAT-09", "0111"),     # crop production
+
+    # --- Technologie a stroje ------------------------------------------------
+    "Q101333": ("TEC-01", "28"),        # mechanical engineering
+    "Q187939": ("TEC-01", "28"),        # industrial manufacturing
+    "Q170978": ("TEC-01", "2899"),      # robotics
+    "Q112165723": ("TEC-01", "28"),     # industrial parts manufacturer
+    "Q112165421": ("TEC-01", "2822"),   # lifting and handling equipment
+    "Q112165425": ("TEC-01", "2825"),   # industrial refrigeration equipment
+    "Q392933": ("TEC-01", "2540"),      # weapons industry
+    "Q112165390": ("TEC-02", "2651"),   # scientific and technical instruments
+    "Q112165518": ("TEC-03", "3320"),   # installation of mechanical machines
+    "Q112165507": ("TEC-03", "3314"),   # electrical equipment repair
+    "Q112165510": ("TEC-03", "3316"),   # repair and maintenance of aircraft
+    "Q43035": ("TEC-04", "27"),         # electrical engineering
+    "Q1326885": ("TEC-04", "27"),       # electrical industry
+    "Q99529212": ("TEC-04", "2720"),    # battery industry
+    "Q17177506": ("TEC-04", "2740"),    # lighting technique
+    "Q112165400": ("TEC-04", "2712"),   # electrical distribution equipment
+    "Q190117": ("TEC-05", "29"),        # automotive industry
+    "Q786820": ("TEC-05", "2910"),      # automobile manufacturer
+    "Q108428104": ("TEC-05", "2910"),   # car manufacturing
+    "Q3477381": ("TEC-05", "2932"),     # automotive supplier
+    "Q609131": ("TEC-05", "2910"),      # powertrain technology
+    "Q3477363": ("TEC-05", "3030"),     # aerospace industry
+    "Q112165459": ("TEC-05", "3030"),   # aircraft and space construction
+    "Q474200": ("TEC-05", "3011"),      # shipbuilding
+    "Q112165456": ("TEC-05", "3012"),   # construction of pleasure boats
+    "Q112165363": ("TEC-07", "2550"),   # cutting, stamping
+    "Q112165373": ("TEC-07", "2573"),   # manufacture of other tools
+
+    # --- Stavebnictvi --------------------------------------------------------
+    "Q385378": ("STA-01", "41"),        # construction
+    "Q13405640": ("STA-01", "41"),      # construction industry
+    "Q112165582": ("STA-03", "4312"),   # site preparation industry
+
+    # --- Obchod --------------------------------------------------------------
+    "Q220695": ("OBC-01", "46"),        # wholesale
+    "Q112165707": ("OBC-01", "4690"),   # wholesale B2B, other
+    "Q112165713": ("OBC-01", "4690"),   # wholesale B2B
+    "Q112165696": ("OBC-01", "4690"),   # wholesale B2B
+    "Q112165659": ("OBC-01", "4619"),   # intermediaries in trade
+    "Q112165656": ("OBC-01", "4618"),   # specialized trade agents
+    "Q112165649": ("OBC-01", "4616"),   # intermediaries, textiles
+    "Q126793": ("OBC-02", "47"),        # retail
+    "Q484847": ("OBC-02", "4791"),      # e-commerce
+
+    # --- Zdravotnictvi -------------------------------------------------------
+    "Q31207": ("ZDR-01", "86"),         # health care
+    "Q15067276": ("ZDR-01", "86"),      # health care industry
+    "Q112166139": ("ZDR-01", "8610"),   # hospital activities
+    "Q130370834": ("ZDR-01", "8610"),   # hospitals and rehabilitation
+    "Q507443": ("ZDR-03", "21"),        # pharmaceutical industry
+    "Q112165702": ("ZDR-03", "4646"),   # wholesale of pharmaceuticals
+    "Q6554101": ("ZDR-03", "3250"),     # medical device
+    "Q327092": ("ZDR-03", "3250"),      # biomedical engineering
+    "Q112165495": ("ZDR-03", "3250"),   # glasses manufacturing
+    "Q112166168": ("ZDR-04", "88"),     # outpatient social services
+
+    # --- Odpady a zivotni prostredi ------------------------------------------
+    "Q180388": ("ODP-01", "38"),        # waste management
+    "Q112165543": ("ODP-01", "3811"),   # collection of non-hazardous waste
+    "Q130370849": ("ODP-03", "39"),     # environment
+
+    # --- Verejny a neziskovy sektor ------------------------------------------
+    "Q112166113": ("VER-01", "8411"),   # general public administration
+    "Q112166115": ("VER-01", "8412"),   # public administration, health & social
+    "Q112166116": ("VER-01", "8413"),   # public administration, economy
+    "Q130370871": ("VER-02", "9411"),   # business and professional associations
+    "Q29586079": ("VER-02", "9499"),    # other membership organisations
+    "Q112166193": ("VER-02", "9499"),   # voluntary membership organizations
+    "Q130370869": ("VER-02", "9491"),   # religious congregations
+    "Q1021488": ("VER-02", "9499"),     # community foundation
+
+    # --- Ostatni -------------------------------------------------------------
+    "Q173799": ("OST-01", "90"),        # entertainment
+    "Q124022875": ("OST-01", "9311"),   # sporting activities
+    "Q112166176": ("OST-01", "9102"),   # museum management
+    "Q4373046": ("OST-01", "5911"),     # pornography industry
+    "Q112165482": ("OST-02", "3212"),   # jewelry manufacturing
+    "Q112165492": ("OST-02", "3240"),   # games and toys
+    "Q112165489": ("OST-02", "3230"),   # sports goods
+    "Q112166206": ("OST-02", "9603"),   # funeral services
+}
+
+
+# ---------------------------------------------------------------------------
+# US: SIC -> NAICS (hrube, na urovni odvetvi). Slouzi k tomu, aby vystup
+# nesl i americkou obdobu NACE - firmy v USA vlastni "NACE" nemaji, oficialni
+# klasifikace je NAICS, SEC u kazdeho subjektu vede starsi SIC.
+# ---------------------------------------------------------------------------
+
+SIC_NA_NAICS = {
+    "01": "111", "02": "112", "07": "115", "08": "113", "09": "114",
+    "10": "2122", "12": "2121", "13": "211", "14": "2123",
+    "15": "236", "16": "237", "17": "238",
+    "20": "311", "21": "312230", "22": "313", "23": "315", "24": "321", "25": "337",
+    "26": "322", "27": "323", "28": "325", "283": "3254", "29": "324",
+    "30": "326", "31": "316", "32": "327", "33": "331", "34": "332",
+    "35": "333", "357": "334110", "36": "335", "366": "3342", "367": "3344",
+    "37": "336", "372": "33641", "38": "3345", "382": "334513", "384": "3391", "39": "339",
+    "40": "482", "41": "485", "42": "484", "44": "483", "45": "481", "46": "486",
+    "47": "488", "48": "517", "484": "515", "49": "221",
+    "50": "423", "51": "424", "52": "444", "53": "455", "54": "445", "55": "441",
+    "56": "458", "57": "449", "58": "722", "59": "459",
+    "60": "5221", "61": "5222", "62": "523", "63": "524", "64": "5242", "65": "531",
+    "67": "5511", "70": "721", "72": "812", "73": "5415", "7370": "541511",
+    "7371": "541511", "7372": "5132", "7374": "518210", "7375": "519290", "7379": "541519",
+    "78": "512", "79": "713", "80": "622", "81": "5411", "82": "611", "83": "624",
+    "86": "813", "87": "5413", "8711": "541330", "8721": "541211", "8731": "5417",
+    "89": "5419", "91": "921", "92": "922", "93": "921", "94": "923", "95": "924",
+    "96": "926", "97": "928", "99": "5614",
+}
+
+# Nazvy NAICS sektoru (2 mistne) - popis do vystupu u americkych subjektu
+NAICS_SEKTORY = {
+    "11": "Zemedelstvi, lesnictvi, rybolov a lov",
+    "21": "Tezba a dobyvani",
+    "22": "Energetika a vodni hospodarstvi",
+    "23": "Stavebnictvi",
+    "31": "Zpracovatelsky prumysl", "32": "Zpracovatelsky prumysl",
+    "33": "Zpracovatelsky prumysl",
+    "42": "Velkoobchod",
+    "44": "Maloobchod", "45": "Maloobchod",
+    "48": "Doprava a skladovani", "49": "Doprava a skladovani",
+    "51": "Informacni a mediani cinnosti",
+    "52": "Finance a pojistovnictvi",
+    "53": "Nemovitosti, pronajem a leasing",
+    "54": "Profesni, vedecke a technicke sluzby",
+    "55": "Rizeni podniku a holdingy",
+    "56": "Administrativni, podpurne a odpadove sluzby",
+    "61": "Vzdelavani",
+    "62": "Zdravotni a socialni pece",
+    "71": "Umeni, zabava a rekreace",
+    "72": "Ubytovani a stravovani",
+    "81": "Ostatni sluzby",
+    "92": "Verejna sprava",
+}
+
+
+# ---------------------------------------------------------------------------
 # Funkce
 # ---------------------------------------------------------------------------
 
@@ -413,6 +763,53 @@ def sic_na_nace(sic):
     return _prefix(sic, SIC_NA_NACE)
 
 
+def sic_na_naics(sic):
+    """Prevede US SIC kod na priblizny NAICS (americka obdoba NACE)."""
+    return _prefix(sic, SIC_NA_NAICS)
+
+
+def nazev_naics(kod):
+    """Cesky nazev NAICS sektoru podle prvnich dvou cislic."""
+    if not kod:
+        return ""
+    cislice = "".join(ch for ch in str(kod) if ch.isdigit())
+    return NAICS_SEKTORY.get(cislice[:2], "")
+
+
+def naf_na_nace(naf):
+    """
+    Francouzsky NAF (APE) je NACE rev. 2 s pismenem na konci - "62.02A" je
+    NACE 6202. Staci tedy zahodit oddelovace a koncove pismeno.
+    """
+    if not naf:
+        return ""
+    return "".join(ch for ch in str(naf) if ch.isdigit())
+
+
+# Obory, ktere same o sobe nic neurcuji - pouziji se, jen kdyz Wikidata
+# u firmy zadny konkretnejsi obor neuvadi.
+OBECNE_OBORY = {
+    "Q8148", "Q7406919", "Q187939", "Q11661", "Q110702998", "Q57774188",
+    "Q837171", "Q23700345", "Q2151621", "Q1304795", "Q1341477", "Q112166038",
+    "Q969040", "Q126793", "Q220695",
+}
+
+
+def obor_na_kategorii(qidy, mapa_oboru=None):
+    """
+    Z Wikidata oboru cinnosti (seznam QID) vybere kod kategorie a odhad NACE.
+    Konkretni obor ma prednost pred obecnym ("energy industry", "retail"),
+    protoze velke firmy maji casto vyjmenovanych oboru nekolik.
+    """
+    mapa_oboru = mapa_oboru if mapa_oboru is not None else WIKIDATA_OBORY
+    znamy = [(q, mapa_oboru[q]) for q in (qidy or []) if q in mapa_oboru]
+    if not znamy:
+        return None, ""
+    konkretni = [z for z in znamy if z[0] not in OBECNE_OBORY]
+    kod, nace = (konkretni or znamy)[0][1]
+    return kod, nace
+
+
 def nazev_nace(kod):
     """Cesky nazev NACE divize podle prvnich dvou cislic."""
     if not kod:
@@ -421,25 +818,37 @@ def nazev_nace(kod):
     return NACE_DIVIZE.get(cislice[:2], "")
 
 
-def zarad(nace=None, nazev=None, mapa=None, klicova_slova=None, kategorie=None):
+def zarad(nace=None, nazev=None, mapa=None, klicova_slova=None, kategorie=None,
+          obory=None, mapa_oboru=None):
     """
     Zaradi dodavatele do vlastni taxonomie.
+
+    Poradi duveryhodnosti podkladu:
+        1. NACE z rejstriku (CZ, FR, ...)  - nejpresnejsi
+        2. obor cinnosti z Wikidat (QID)   - jazykove nezavisly, funguje i pro
+                                             korejskou nebo tureckou firmu
+        3. klicova slova v nazvu firmy     - posledni zachrana
 
     Vrati dict:
         kod       - kod kategorie, napr. "ICT-03"
         kategorie - nazev kategorie
         skupina   - nadrazena skupina
-        zdroj     - 'nace' | 'nazev' | 'vychozi'
+        zdroj     - 'nace' | 'obor' | 'nazev' | 'vychozi'
+        nace      - odhad NACE z oboru, pokud zadny NACE na vstupu nebyl
     """
     mapa = mapa if mapa is not None else NACE_MAPA
     klicova_slova = klicova_slova if klicova_slova is not None else KLICOVA_SLOVA
     kategorie = kategorie if kategorie is not None else KATEGORIE
 
-    kod, zdroj = None, "vychozi"
+    kod, zdroj, nace_odhad = None, "vychozi", ""
     if nace:
         kod = _prefix(nace, mapa)
         if kod:
             zdroj = "nace"
+    if not kod and obory:
+        kod, nace_odhad = obor_na_kategorii(obory, mapa_oboru)
+        if kod:
+            zdroj = "obor"
     if not kod and nazev:
         n = " " + nazev.lower() + " "
         for slova, k in klicova_slova:
@@ -450,7 +859,8 @@ def zarad(nace=None, nazev=None, mapa=None, klicova_slova=None, kategorie=None):
         kod = VYCHOZI_KOD
 
     skupina, nazev_kat = kategorie.get(kod, kategorie[VYCHOZI_KOD])
-    return {"kod": kod, "kategorie": nazev_kat, "skupina": skupina, "zdroj": zdroj}
+    return {"kod": kod, "kategorie": nazev_kat, "skupina": skupina, "zdroj": zdroj,
+            "nace": nace_odhad}
 
 
 def prehled_kategorii():
@@ -465,12 +875,16 @@ def jako_json():
         "klicova_slova": [[list(s), k] for s, k in KLICOVA_SLOVA],
         "vychozi_kod": VYCHOZI_KOD,
         "sic_na_nace": SIC_NA_NACE,
+        "sic_na_naics": SIC_NA_NAICS,
+        "wikidata_obory": {k: list(v) for k, v in WIKIDATA_OBORY.items()},
     }
 
 
 def z_json(data):
-    """Vrati (mapa, klicova_slova, kategorie) z JSON podoby taxonomie."""
+    """Vrati (mapa, klicova_slova, kategorie, mapa_oboru) z JSON podoby taxonomie."""
     kat = {k: tuple(v) for k, v in data.get("kategorie", {}).items()} or KATEGORIE
     mapa = data.get("nace_mapa") or NACE_MAPA
     klic = [(tuple(s), k) for s, k in data.get("klicova_slova", [])] or KLICOVA_SLOVA
-    return mapa, klic, kat
+    oboru = ({k: tuple(v) for k, v in data.get("wikidata_obory", {}).items()}
+             or WIKIDATA_OBORY)
+    return mapa, klic, kat, oboru

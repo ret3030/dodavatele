@@ -39,7 +39,15 @@ Vyplněná **země** zúží hledání na správný rejstřík a zrychlí běh.
 
 Sloupce podle zadání: `Jméno | Ulice | PSČ | Město | Země | IČO | DIČ |
 St.-Nr. 2 | NACE`, k tomu `Kód kategorie | Skupina | Kategorie dodavatele`
-a doplňkové sloupce pro kontrolu (`--kompakt` je vypne).
+a doplňkové sloupce pro kontrolu (`--kompakt` je vypne):
+
+* **Registrační číslo / Rejstřík** – u zahraničních firem národní registrační
+  číslo (obdoba IČO, např. `HRB 719915` u Německa, `1803-01-018771` u Japonska)
+  a jméno rejstříku, u kterého je vedeno.
+* **NACE - zdroj** – rozlišuje skutečný NACE z rejstříku (ARES, INSEE) od
+  odhadu z oboru na Wikidatech, který je méně přesný.
+* **Klasifikace (US NAICS)** – u amerických dodavatelů severoamerická obdoba
+  NACE (NACE se u USA jen odhaduje pro účely vlastní taxonomie).
 
 XLSX má druhý list **Číselník kategorií** s celou taxonomií a počtem
 dodavatelů v každé kategorii.
@@ -61,13 +69,42 @@ Jiné chování přepínačem `--stnr2 registrace|ico|dic|zadne`.
 | stav | význam |
 |---|---|
 | `OK` | jednoznačná shoda názvu, data lze převzít |
-| `VICE_SHOD` | dvě a více stejně podobných firem – vyberte ručně (kandidáti jsou v Poznámce) |
-| `OVERIT` | shoda pod prahem, data převzata, ale zkontrolujte je |
-| `NENALEZENO` | nic dost podobného; **datové sloupce zůstávají prázdné**, v Poznámce jsou nejbližší kandidáti |
+| `VYBRANO` | více srovnatelně podobných firem – nástroj automaticky vybral tu nejlepší (viz níže), ostatní kandidáty najdete v Poznámce |
+| `OVERIT` | shoda pod prahem, nebo shoda s výhradou (např. jiná země sídla, než jste zadali) – data převzata, ale zkontrolujte je |
+| `NENALEZENO` | nic dost podobného; **datové sloupce (adresa, IČO, DIČ, NACE…) zůstávají prázdné**, v Poznámce jsou nejbližší kandidáti |
 | `CHYBA` | prázdný řádek nebo výpadek všech zdrojů |
 
 Záznam s nízkou shodou se nikdy nepropíše do datových sloupců — raději prázdno
-než údaje cizí firmy.
+než údaje cizí firmy. **Sloupec Jméno je ale vyplněný vždy** — u `NENALEZENO`
+a `CHYBA` obsahuje hledaný název ze vstupu, aby firma v exportu "nezmizela" a
+šlo ji dohledat i bez otevření vstupního souboru.
+
+#### Automatický výběr při více shodách
+
+Dřív, když rejstřík vrátil víc stejně podobných firem (např. "Danone S.A."
+sedí jak na francouzskou mateřskou společnost, tak na portugalskou dceřinou),
+musel se výsledek dohledávat ručně. Nástroj teď vybere sám — kombinuje
+podobnost názvu s dalšími signály:
+
+* **shoda země** – kandidát se sídlem v zadané zemi má přednost, sídlo jinde je penalizováno,
+* **aktivní subjekt** – zaniklá/vymazaná firma je penalizována,
+* **úplnost záznamu** – kandidát s NACE, registračním číslem nebo DIČ vyhrává těsné remízy.
+
+Pokud po tomto zvážení zbude jasný vítěz, dostane stav `VYBRANO` a do
+Poznámky se zapíše, o kolik bodů byl druhý v pořadí horší — u výrazně horších
+kandidátů rovnou `OK`. Pokud i po zvážení zůstanou dva kandidáti prakticky
+nerozeznatelní, projeví se to nižším skóre a stavem `OVERIT` s vysvětlením v
+Poznámce (např. „pozor: sídlo v PT místo FR“) — tam ještě stojí za to
+zkontrolovat ručně.
+
+#### Firma se nenajde v ARES (`NENALEZENO` u české firmy)
+
+ARES vede i zaniklé subjekty, ale u některých starších výmazů (typicky po
+likvidaci nebo zániku bez likvidace) v registru chybí i historický záznam.
+Takový řádek skončí jako `NENALEZENO` s prázdnými datovými sloupci. Ověřte
+IČO ručně např. v insolvenčním rejstříku nebo Obchodním věstníku — pokud
+firma skutečně zanikla, prázdný záznam je správně (nechcete data neexistující
+firmy), jen ho v Poznámce/sloupci Jméno uvidíte i tak.
 
 ## Zdroje dat
 
@@ -75,19 +112,66 @@ než údaje cizí firmy.
 |---|---|---|
 | **ARES** (ares.gov.cz) | ČR, kompletní | název, adresa, IČO, DIČ, NACE včetně *převažující činnosti* |
 | **RPO SR** (statistics.sk) | SR | název, adresa, IČO |
-| **GLEIF** (api.gleif.org) | svět, ale jen firmy s LEI | název, adresa, národní registrační číslo |
-| **SEC EDGAR** (sec.gov) | USA, jen firmy registrované u SEC | název, adresa, SIC → NACE, CIK |
-| **Wikidata** | velké nadnárodní firmy | obor činnosti, EU DIČ, LEI, sídlo |
+| **INSEE/INPI** (recherche-entreprises.api.gouv.fr) | Francie, kompletní | název, adresa, SIREN, NAF → NACE, DIČ (dopočteno) |
+| **GLEIF** (api.gleif.org) | svět, firmy s LEI (většina větších/kotovaných firem) | název (i v původním jazyce), adresa, národní registrační číslo, právní forma |
+| **SEC EDGAR** (sec.gov) | USA, firmy registrované u SEC | název, adresa, SIC → NACE i NAICS, CIK |
+| **Wikidata** | velké nadnárodní firmy | obor činnosti (viz níže), EU DIČ, LEI, sídlo |
 | **VIES** (`--vies`) | EU | ověření platnosti DIČ |
 
 Vše bez API klíče a bez registrace.
 
-**Známé limity.** GLEIF obsahuje jen entity s LEI, takže řada evropských firem
-střední velikosti tam není (např. Robert Bosch GmbH se dohledá až přes
-Wikidata). Pro takové dodavatele doplňte IČO/VAT do vstupu, nebo počítejte se
-stavem `NENALEZENO` a ručním doplněním. Pro EU firmy mimo ČR a SR není veřejně
-dostupný obor činnosti — NACE zůstane prázdné a kategorie se určí z názvu
-firmy nebo z Wikidat.
+### Jak nástroj hledá dodavatele mimo ČR/SR/FR
+
+Země bez přímo napojeného rejstříku (viz tabulka výše) se hledají přes GLEIF a
+Wikidata:
+
+1. **GLEIF** dá jméno, adresu a národní registrační číslo (obdoba IČO – např.
+   `HRB 719915` u Německa, Business Registration Number v Koreji). GLEIF vede
+   pravní název v národním jazyce (korejsky, japonsky, čínsky, bulharsky…) –
+   nástroj proto porovnává i anglickou variantu jména (`otherNames`), jinak by
+   se firmy z těchto zemí vůbec nedohledaly.
+2. **Wikidata** doplní obor činnosti podle vlastní mapy ~165 oborů
+   (Wikidata property *industry*, P452) na kategorii a odhad NACE – funguje
+   nezávisle na jazyce, protože se srovnávají číselné identifikátory (QID),
+   ne text.
+3. Když ani jedno nedá obor, poslední záchranou jsou **klíčová slova v
+   názvu firmy** (`taxonomie.py`) – rozpoznávají i němčinu, francouzštinu,
+   polštinu, maďarštinu, turečtinu a další jazyky zadaných zemí.
+
+**Pro USA** se místo NACE dohledává NAICS (americká obdoba) přes SIC kód ze
+SEC EDGAR – je ve sloupci **Klasifikace (US NAICS)**, NACE se u amerických
+firem jen přibližně dopočítává pro účely vlastní taxonomie.
+
+**Známé limity.**
+* GLEIF obsahuje jen entity s LEI, takže řada firem střední velikosti tam
+  není (typicky se dohledají přes Wikidata, ale s méně přesnými daty).
+  Pro takové dodavatele doplňte IČO/VAT do vstupu, nebo počítejte se stavem
+  `NENALEZENO`/`OVERIT` a ručním doplněním.
+* Sloupec **NACE - zdroj** říká, jestli je NACE skutečný údaj z rejstříku,
+  nebo jen odhad z oboru na Wikidatech („odhad z oboru (Wikidata)“) — u
+  odhadu počítejte s nižší přesností než u NACE z ARES/INSEE.
+* Turecko (TR) je nejobtížnější země v seznamu – GLEIF má z tureckých firem
+  jen zlomek, hlavní subjekty tak často skončí na `OVERIT` nebo
+  `NENALEZENO`. Doplnění VAT/registračního čísla do vstupu výrazně pomůže.
+
+### Pokrytí zemí
+
+Ověřeno na běžných dodavatelích z těchto zemí (kontrolní seznam napříč
+odvětvími, 34 z 37 reálných firem se dohledalo a zařadilo do kategorie):
+
+| země | přímý rejstřík | jinak přes |
+|---|---|---|
+| CZ | ARES | – |
+| SK | RPO SR | – |
+| FR | INSEE/INPI | – |
+| US | SEC EDGAR (jen firmy registrované u SEC) | GLEIF + Wikidata |
+| DE, NL, AT, BE, GB, IT, ES, HU, IE, SE, BG, PL, RO | – | GLEIF + Wikidata |
+| KR, CH, HK, JP, SG, MY, CA, TW, CN, TR | – | GLEIF + Wikidata |
+
+U zemí bez přímého rejstříku (vše kromě CZ/SK/FR/US) závisí přesnost adresy a
+NACE na tom, jestli má firma LEI (GLEIF) a/nebo je vedená na Wikidatech –
+u velkých a kotovaných firem to funguje spolehlivě, u menších dodavatelů
+počítejte s `OVERIT`/`NENALEZENO` a doplňte IČO/VAT do vstupu.
 
 ## Taxonomie kategorií
 
@@ -323,7 +407,8 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
 --prah-overit 0.72      pod tímto skóre je záznam nenalezený
 --stnr2 REŽIM           auto | registrace | ico | dic | zadne
 --vies                  ověřit DIČ v EU (pomalejší, jeden dotaz navíc na firmu)
---bez-ares/-sk/-gleif/-edgar/-wikidata    vypnutí jednotlivých zdrojů
+--bez-ares/-sk/-fr/-gleif/-edgar/-wikidata    vypnutí jednotlivých zdrojů
+--bez-gleif-popisy      nepřekládat kódy GLEIF (rejstřík, právní forma) na text - rychlejší
 --cache SOUBOR          keš odpovědí (výchozí .dodavatele_cache.json.gz)
 --sloupec NÁZEV         název sloupce se jménem firmy, když se neurčí sám
 --oddelovac ;           oddělovač pro CSV výstup

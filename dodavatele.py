@@ -53,6 +53,7 @@ GLEIF_AUTO = "https://api.gleif.org/api/v1/autocompletions"
 VIES_API = "https://ec.europa.eu/taxation_customs/vies/rest-api/ms/{cc}/vat/{num}"
 EDGAR_API = "https://www.sec.gov/cgi-bin/browse-edgar"
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
+INSEE_FR = "https://recherche-entreprises.api.gouv.fr/search"
 
 EU_STATY = {"AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "EL", "GR", "ES", "FI", "FR",
             "HR", "HU", "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PL", "PT", "RO", "SE",
@@ -74,11 +75,26 @@ PRAVNI_FORMY = {
     "oy", "oyj", "ab", "aps", "asa", "kft", "zrt", "nyrt", "bt", "kkt",
     "sp z oo", "spzoo", "z oo", "doo", "dooel", "dd", "ood", "eood", "ad", "ead",
     "lda", "unipessoal", "kk", "yk", "pte", "pty", "bhd", "sdn", "akciova spolocnost",
+    # viceslovne narodni formy - bez nich se "ORLEN S.A." neshodne
+    # s "ORLEN SPOLKA AKCYJNA" ani "Vodafone Group Plc" s "VODAFONE GROUP
+    # PUBLIC LIMITED COMPANY"
+    "public limited company", "public company limited", "company limited", "co ltd",
+    "joint stock company", "designated activity company", "dac",
+    "spolka akcyjna", "spolka z ograniczona odpowiedzialnoscia", "sp z o o",
+    "societa per azioni", "societa a responsabilita limitata",
+    "sociedad anonima unipersonal", "sociedade anonima",
+    "societe par actions simplifiee", "societe a responsabilite limitee",
+    "anonim sirketi", "anonim ortakligi", "limited sirketi", "sirketi",
+    "reszvenytarsasag", "nyilvanosan mukodo reszvenytarsasag",
+    "societate pe actiuni", "societate cu raspundere limitata",
+    "kabushiki kaisha", "berhad", "sendirian berhad",
+    "naamloze vennootschap", "besloten vennootschap",
+    "publikt aktiebolag", "aktiengesellschaft", "eingetragener verein",
 }
 
 STAV_OK = "OK"
+STAV_VYBRANO = "VYBRANO"        # vice srovnatelnych shod, nastroj vybral nejlepsi
 STAV_OVERIT = "OVERIT"
-STAV_VICE = "VICE_SHOD"
 STAV_NENALEZENO = "NENALEZENO"
 STAV_CHYBA = "CHYBA"
 
@@ -184,8 +200,19 @@ class Klient:
 # Porovnavani nazvu firem
 # ---------------------------------------------------------------------------
 
+# NFKD tahle pismena nerozklada na zaklad + diakritiku - jsou to samostatna
+# pismena, ne prekombinovane znaky ("ł" v "Spółka" tak bez tohoto prekladu
+# zustane a rozbije tokenizaci nazvu).
+BEZ_DIAKRITIKY_TABULKA = str.maketrans({
+    "ł": "l", "Ł": "L", "đ": "d", "Đ": "D", "ø": "o", "Ø": "O",
+    "þ": "th", "Þ": "Th", "æ": "ae", "Æ": "AE", "ß": "ss",
+    "ı": "i", "İ": "I", "ĸ": "k", "ħ": "h", "Ħ": "H",
+})
+
+
 def bez_diakritiky(s):
-    return "".join(c for c in unicodedata.normalize("NFKD", str(s)) if not unicodedata.combining(c))
+    s = str(s).translate(BEZ_DIAKRITIKY_TABULKA)
+    return "".join(c for c in unicodedata.normalize("NFKD", s) if not unicodedata.combining(c))
 
 
 def normalizuj_nazev(s):
@@ -193,6 +220,9 @@ def normalizuj_nazev(s):
     if not s:
         return ""
     s = bez_diakritiky(s).lower().replace("&", " and ")
+    # zkratky typu "S.p.A." nebo "a.s." se jinak rozpadnou na osamocena
+    # jednopismenna slova ("s", "p", "a") a neshodnou se s "spa"/"as" v PRAVNI_FORMY
+    s = re.sub(r"([a-z0-9])\.(?=[a-z0-9])", r"\1", s)
     s = re.sub(r"[^a-z0-9]+", " ", s)
     tokeny = [t for t in s.split() if t]
     for delka in (3, 2):
@@ -202,6 +232,61 @@ def normalizuj_nazev(s):
         tokeny = tokeny[:-1]
     zbytek = [t for t in tokeny if t not in PRAVNI_FORMY]
     return " ".join(zbytek or tokeny)
+
+
+# Koncovky pravnich forem. Narozdil od PRAVNI_FORMY sem nepatri slova jako
+# "group", "holding" nebo "company" - ta nesou cast identity firmy a bez nich
+# by dotaz na rejstrik vratil desitky dcerinych spolecnosti.
+PRAVNI_SUFIXY = {
+    "as", "a s", "sro", "s r o", "spol s r o", "ks", "vos", "se", "ops", "zs",
+    "akciova spolecnost", "akciova spolocnost", "spolecnost s rucenim omezenym",
+    "spolocnost s rucenim obmedzenym",
+    "gmbh", "mbh", "ag", "kg", "kgaa", "ohg", "ug", "eg", "gbr", "co kg", "se co kg",
+    "aktiengesellschaft", "gesellschaft mit beschrankter haftung",
+    "bv", "nv", "cv", "vof", "sa", "sas", "sasu", "sarl", "eurl",
+    "srl", "spa", "snc", "sl", "slu", "sau", "s p a", "s a", "n v", "b v",
+    "ltd", "limited", "plc", "llp", "llc", "inc", "incorporated", "corp", "corporation",
+    "oy", "oyj", "ab", "aps", "asa", "kft", "zrt", "nyrt", "bt", "kkt",
+    "sp z oo", "spzoo", "z oo", "doo", "dd", "ood", "eood", "ad", "ead",
+    "lda", "kk", "yk", "pte", "pty", "bhd", "sdn", "dac", "cvba", "bvba",
+    "sa nv", "nv sa", "a s ", "gmbh co kg", "se co kgaa",
+}
+
+
+def jadro_pro_hledani(s):
+    """
+    Nazev bez koncove pravni formy, jinak beze zmeny - "ORLEN S.A." -> "ORLEN",
+    "Vodafone Group Plc" -> "Vodafone Group".
+
+    Na dotazovani rejstriku se `normalizuj_nazev` pouzit neda: ta slouzi
+    k porovnavani, vse zmensi a z "ORLEN S.A." udela "orlen s a", coz uz
+    GLEIF nenajde.
+    """
+    tokeny = str(s or "").split()
+    for _ in range(2):
+        if len(tokeny) < 2:
+            break
+        posledni = re.sub(r"[^a-z]+", " ", bez_diakritiky(tokeny[-1]).lower()).strip()
+        if posledni and posledni in PRAVNI_SUFIXY:
+            tokeny = tokeny[:-1]
+        else:
+            break
+    return re.sub(r"[\s,]+$", "", " ".join(tokeny)).strip() or str(s or "").strip()
+
+
+def skore_syrove(a, b):
+    """
+    Podobnost nazvu bez odstraneni pravnich forem, jen bez diakritiky a
+    interpunkce. Rozhoduje tam, kde `skore_shody` da remizu: "Vodafone Group
+    Plc" sedi na "Vodafone Limited" i "Vodafone Group Public Limited Company"
+    stejne, protoze "group" i "plc" se zahazuji - syrove skore uz rozdil vidi.
+    """
+    def uprav(s):
+        return re.sub(r"[^a-z0-9]+", " ", bez_diakritiky(str(s or "")).lower()).strip()
+    ua, ub = uprav(a), uprav(b)
+    if not ua or not ub:
+        return 0.0
+    return round(SequenceMatcher(None, ua, ub).ratio(), 4)
 
 
 def skore_shody(a, b):
@@ -243,6 +328,8 @@ class Zaznam:
     nace: str = ""
     nace_popis: str = ""
     nace_vse: str = ""
+    nace_zdroj: str = ""
+    klasifikace: str = ""
     kod_kategorie: str = ""
     kategorie: str = ""
     skupina: str = ""
@@ -252,11 +339,16 @@ class Zaznam:
     stav: str = STAV_NENALEZENO
     region: str = ""
     lei: str = ""
+    reg_cislo: str = ""
+    reg_rejstrik: str = ""
     pravni_forma: str = ""
     datum_vzniku: str = ""
     dic_overeno: str = ""
     odkaz: str = ""
     poznamka: str = ""
+    obory: list = field(default_factory=list)      # QID oboru z Wikidat
+    jmena: list = field(default_factory=list)      # dalsi nazvy (jine jazyky/prepisy)
+    aktivni: bool = True
     kandidati: list = field(default_factory=list)
 
 
@@ -323,6 +415,7 @@ def _ares_na_zaznam(s):
         region=sidlo.get("nazevKraje") or "",
         pravni_forma=s.get("pravniForma") or "",
         datum_vzniku=s.get("datumVzniku") or "",
+        aktivni=not s.get("datumZaniku"),
         zdroj="ARES",
         odkaz="https://ares.gov.cz/ekonomicke-subjekty?ico=%s" % ico if ico else "",
         poznamka="; ".join(p for p in (
@@ -423,7 +516,10 @@ def rpo_sk_podle_nazvu(klient, nazev, pocet=10):
             ico=ico,
             dic="SK%s" % ico if ico else "",
             stnr2=ico,
+            reg_cislo=ico,
+            reg_rejstrik="RPO SR",
             datum_vzniku=r.get("establishment") or "",
+            aktivni=not r.get("termination"),
             zdroj="RPO SR",
             odkaz="https://www.registeruz.sk/cruz-public/domain/accountingentity/simplesearch?ico=%s" % ico,
             poznamka="zanikl %s" % r.get("termination") if r.get("termination") else "",
@@ -435,36 +531,127 @@ def rpo_sk_podle_nazvu(klient, nazev, pocet=10):
 # GLEIF (LEI) - cely svet
 # ---------------------------------------------------------------------------
 
+GLEIF_RA = "https://api.gleif.org/api/v1/registration-authorities/{kod}"
+GLEIF_ELF = "https://api.gleif.org/api/v1/entity-legal-forms/{kod}"
+GLEIF_HLAVICKY = {"Accept": "application/vnd.api+json"}
+
+
+def je_latinka(s):
+    """True, pokud retezec nese aspon jedno pismeno a vsechna jsou latinkou."""
+    pismena = [c for c in str(s or "") if c.isalpha()]
+    if not pismena:
+        return False
+    return all("LATIN" in unicodedata.name(c, "") for c in pismena)
+
+
+def _gleif_jmena(ent):
+    """
+    Vsechny nazvy entity. GLEIF vede pravni nazev v narodnim jazyce, takze
+    korejska nebo japonska firma ma v `legalName` znaky, ktere se se vstupem
+    nikdy neshodnou - anglicka varianta je az v `otherNames`. Bez ni by
+    dodavatele z KR, JP, CN, TW nebo BG nesli dohledat vubec.
+    """
+    jmena = []
+    hlavni = (ent.get("legalName") or {}).get("name") or ""
+    if hlavni:
+        jmena.append(hlavni)
+    for klic in ("otherNames", "transliteratedOtherNames"):
+        for o in ent.get(klic) or []:
+            n = (o or {}).get("name")
+            if n and n not in jmena:
+                jmena.append(n)
+    return jmena
+
+
+def _gleif_adresa(ent):
+    """
+    Vrati adresu prednostne latinkou. Poradi: pravni sidlo -> alternativni
+    jazykova varianta sidla -> centrala. Adresy typu "c/o ..." patri
+    registracnimu agentovi, ne firme, takze se preskakuji.
+    """
+    def radky(adr):
+        return [r for r in (adr.get("addressLines") or []) if r]
+
+    moznosti = []
+    for adr in (ent.get("legalAddress"), ent.get("headquartersAddress")):
+        if adr:
+            moznosti.append(adr)
+    for adr in ent.get("otherAddresses") or []:
+        if (adr.get("type") or "").startswith("ALTERNATIVE_LANGUAGE"):
+            moznosti.append(adr)
+
+    pouzitelne = [a for a in moznosti
+                  if radky(a) and not re.match(r"(?i)\s*c/?o[\s.]", radky(a)[0])]
+    if not pouzitelne:
+        return ent.get("legalAddress") or {}, ""
+    latinkou = [a for a in pouzitelne if je_latinka(radky(a)[0])]
+    return (latinkou or pouzitelne)[0], ""
+
+
 def _gleif_na_zaznam(rec):
     a = rec.get("attributes", {})
     ent = a.get("entity", {}) or {}
-    adr = ent.get("legalAddress") or {}
-    hq = ent.get("headquartersAddress") or {}
+    jmena = _gleif_jmena(ent)
+    # do vystupu jde nazev latinkou, aby byl seznam citelny; originalni zapis
+    # zustava v poznamce
+    zobrazit = next((j for j in jmena if je_latinka(j)), jmena[0] if jmena else "")
+    puvodni = jmena[0] if jmena else ""
+
+    adr, _ = _gleif_adresa(ent)
     radky = [r for r in (adr.get("addressLines") or []) if r]
-    je_agent = radky and re.match(r"(?i)\s*c/?o[\s.]", radky[0])
-    if (je_agent or not radky) and hq.get("addressLines"):
-        adr = hq
-        radky = [r for r in hq.get("addressLines") or [] if r]
     zeme = adr.get("country") or ent.get("jurisdiction") or ""
     stav = ent.get("status")
+    reg = ent.get("registeredAs") or ""
+    poznamky = []
+    if stav and stav != "ACTIVE":
+        poznamky.append("stav v LEI: %s" % stav)
+    if puvodni and puvodni != zobrazit:
+        poznamky.append("puvodni zapis nazvu: %s" % puvodni)
     return Zaznam(
-        jmeno=(ent.get("legalName") or {}).get("name") or "",
+        jmeno=zobrazit,
         ulice=radky[0] if radky else "",
         psc=adr.get("postalCode") or "",
         mesto=adr.get("city") or "",
         zeme=zeme[:2],
-        stnr2=ent.get("registeredAs") or "",
+        stnr2=reg,
+        reg_cislo=reg,
+        reg_rejstrik=(ent.get("registeredAt") or {}).get("id") or "",
         region=adr.get("region") or "",
         lei=a.get("lei") or "",
         pravni_forma=(ent.get("legalForm") or {}).get("id") or "",
+        datum_vzniku=(ent.get("creationDate") or "")[:10],
+        jmena=jmena,
+        aktivni=stav in (None, "", "ACTIVE"),
         zdroj="GLEIF",
         odkaz="https://search.gleif.org/#/record/%s" % a.get("lei", ""),
-        poznamka="stav v LEI: %s" % stav if stav and stav != "ACTIVE" else "",
+        poznamka="; ".join(poznamky),
     )
 
 
-def gleif_podle_nazvu(klient, nazev, zeme=None, pocet=10):
-    """Kombinuje presnejsi filtr na nazev, naseptavac a fulltext."""
+GLEIF_POLE = ("lei", "entity")
+
+
+def _gleif_ocisti(data):
+    """Z odpovedi GLEIF nechá jen atributy, ktere ctame."""
+    def zmensi(r):
+        return {"attributes": {k: v for k, v in (r.get("attributes") or {}).items()
+                               if k in GLEIF_POLE}}
+    if isinstance(data.get("data"), list):
+        return {"data": [zmensi(r) for r in data["data"]]}
+    if isinstance(data.get("data"), dict):
+        return {"data": zmensi(data["data"])}
+    return data
+
+
+def gleif_podle_nazvu(klient, nazev, zeme=None, pocet=15):
+    """
+    Hleda v GLEIF nekolika zpusoby a vysledky slucuje.
+
+    Jeden dotaz nestaci: filtr `entity.names` neprojde, kdyz nazev obsahuje
+    pravni formu ("Vodafone Group Plc" nenajde nic, "Vodafone Group" ano),
+    a naopak zkraceny nazev sam o sobe vraci desitky dcerinych spolecnosti.
+    Posilame proto obe varianty a vyber nejlepsiho nechavame na skorovani.
+    """
     nalezene, videne = [], set()
 
     def pridej(zaznamy):
@@ -475,39 +662,87 @@ def gleif_podle_nazvu(klient, nazev, zeme=None, pocet=10):
 
     def dotaz(parametry):
         url = GLEIF_API + "?" + urllib.parse.urlencode(parametry)
-        data = json.loads(klient.ziskej(url, hlavicky={"Accept": "application/vnd.api+json"}))
+        data = json.loads(klient.ziskej(url, hlavicky=GLEIF_HLAVICKY, ocisti=_gleif_ocisti))
         return [_gleif_na_zaznam(r) for r in data.get("data", [])]
 
-    zakladni = {"page[size]": min(pocet, 50)}
-    if zeme:
-        zakladni["filter[entity.legalAddress.country]"] = zeme
-    try:
-        pridej(dotaz(dict(zakladni, **{"filter[entity.legalName]": nazev})))
-    except Exception:
-        pass
+    jadro = jadro_pro_hledani(nazev)
+    varianty = [nazev] + ([jadro] if jadro.lower() != nazev.lower() else [])
+
+    for hledat in varianty:
+        for s_zemi in ([True, False] if zeme else [False]):
+            parametry = {"filter[entity.names]": hledat, "page[size]": min(pocet, 50)}
+            if s_zemi:
+                parametry["filter[entity.legalAddress.country]"] = zeme
+            try:
+                pridej(dotaz(parametry))
+            except Exception:
+                pass
+        # dalsi varianty ma smysl vynechat, az kdyz uz mame presnou shodu
+        # nazvu ze spravne zeme
+        if any(z.zeme == zeme and max(skore_shody(nazev, j) for j in (z.jmena or [z.jmeno]))
+               >= 0.97 for z in nalezene if z.jmena or z.jmeno):
+            break
 
     # naseptavac vraci LEI presnych/blizkych nazvu, ktere fulltext casto minie
-    try:
-        url = GLEIF_AUTO + "?" + urllib.parse.urlencode({"field": "fulltext", "q": nazev})
-        data = json.loads(klient.ziskej(url, hlavicky={"Accept": "application/vnd.api+json"}))
-        leie = [d["relationships"]["lei-records"]["data"]["id"]
-                for d in data.get("data", [])[:5]
-                if d.get("relationships", {}).get("lei-records", {}).get("data")]
-        for lei in leie:
-            if lei in videne:
-                continue
-            rec = json.loads(klient.ziskej(GLEIF_API + "/" + lei,
-                                           hlavicky={"Accept": "application/vnd.api+json"}))
-            pridej([_gleif_na_zaznam(rec["data"])])
-    except Exception:
-        pass
+    if len(nalezene) < 3:
+        try:
+            url = GLEIF_AUTO + "?" + urllib.parse.urlencode({"field": "fulltext", "q": nazev})
+            data = json.loads(klient.ziskej(url, hlavicky=GLEIF_HLAVICKY))
+            leie = [d["relationships"]["lei-records"]["data"]["id"]
+                    for d in data.get("data", [])[:5]
+                    if d.get("relationships", {}).get("lei-records", {}).get("data")]
+            for lei in leie:
+                if lei in videne:
+                    continue
+                rec = json.loads(klient.ziskej(GLEIF_API + "/" + lei,
+                                               hlavicky=GLEIF_HLAVICKY, ocisti=_gleif_ocisti))
+                pridej([_gleif_na_zaznam(rec["data"])])
+        except Exception:
+            pass
 
     if not nalezene:
+        zakladni = {"filter[fulltext]": nazev, "page[size]": min(pocet, 50)}
+        if zeme:
+            zakladni["filter[entity.legalAddress.country]"] = zeme
         try:
-            pridej(dotaz(dict(zakladni, **{"filter[fulltext]": nazev})))
+            pridej(dotaz(zakladni))
         except Exception:
             pass
     return nalezene
+
+
+def gleif_popis_rejstriku(klient, kod):
+    """Prelozi kod registracni autority (RA000657) na nazev rejstriku."""
+    if not kod or not kod.startswith("RA"):
+        return kod or ""
+    try:
+        data = json.loads(klient.ziskej(GLEIF_RA.format(kod=kod), hlavicky=GLEIF_HLAVICKY,
+                                        ocisti=lambda d: {"data": {"attributes": {
+                                            k: v for k, v in d["data"]["attributes"].items()
+                                            if k in ("internationalName",
+                                                     "internationalOrganizationName")}}}))
+        a = data["data"]["attributes"]
+        return ", ".join(x for x in (a.get("internationalOrganizationName"),
+                                     a.get("internationalName")) if x) or kod
+    except Exception:
+        return kod
+
+
+def gleif_popis_formy(klient, kod):
+    """Prelozi ELF kod pravni formy (5RCH) na citelny nazev."""
+    if not kod or len(kod) != 4:
+        return kod or ""
+    try:
+        data = json.loads(klient.ziskej(GLEIF_ELF.format(kod=kod), hlavicky=GLEIF_HLAVICKY,
+                                        ocisti=lambda d: {"data": {"attributes": {
+                                            "names": d["data"]["attributes"].get("names")}}}))
+        for n in data["data"]["attributes"].get("names") or []:
+            nazev = n.get("transliteratedName") or n.get("localName")
+            if nazev:
+                return nazev
+    except Exception:
+        pass
+    return kod
 
 
 # ---------------------------------------------------------------------------
@@ -545,13 +780,20 @@ def edgar_podle_nazvu(klient, nazev, pocet=10):
             return (e.text or "").strip() if e is not None and e.text else ""
         cik = h("cik") or cik_zaloha
         sic = h("assigned-sic")
+        # v USA se NACE nepouziva - domaci obdoba je NAICS (SIC u SEC je jeho
+        # starsi predchudce). NACE se dopocitava jen jako priblizny ekvivalent
+        # pro zarazeni do vlastni taxonomie.
         nace = taxonomie.sic_na_nace(sic) or ""
+        naics = taxonomie.sic_na_naics(sic) or ""
         ulice, mesto, stat, psc = _edgar_adresa(ci)
+        cik_cislo = cik.lstrip("0") if cik else ""
         return Zaznam(
             jmeno=h("conformed-name") or nazev_zaloha,
             ulice=ulice, psc=psc, mesto=mesto, region=stat, zeme="US",
-            stnr2="CIK %s" % cik.lstrip("0") if cik else "",
+            stnr2="CIK %s" % cik_cislo if cik_cislo else "",
+            reg_cislo=cik_cislo, reg_rejstrik="SEC CIK",
             nace=nace, nace_popis=taxonomie.nazev_nace(nace),
+            klasifikace="NAICS %s - %s" % (naics, taxonomie.nazev_naics(naics)) if naics else "",
             zdroj="SEC EDGAR",
             odkaz="https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=%s" % cik if cik else "",
             poznamka=("SIC %s %s" % (sic, h("assigned-sic-desc"))).strip() if sic else "",
@@ -578,6 +820,75 @@ def edgar_podle_nazvu(klient, nazev, pocet=10):
 
 
 # ---------------------------------------------------------------------------
+# Francie - Recherche d'entreprises (INSEE/INPI, data.gouv.fr)
+# ---------------------------------------------------------------------------
+
+def fr_dic_ze_siren(siren):
+    """
+    Francouzske DIC se pocita ze SIREN kontrolnim vzorcem (bez sazby
+    z rejstriku): klic = (12 + 3 * (SIREN mod 97)) mod 97.
+    """
+    cislice = re.sub(r"\D", "", str(siren or ""))
+    if len(cislice) != 9:
+        return ""
+    klic = (12 + 3 * (int(cislice) % 97)) % 97
+    return "FR%02d%s" % (klic, cislice)
+
+
+def _fr_adresa(sidlo):
+    cast = " ".join(x for x in (
+        sidlo.get("numero_voie"), sidlo.get("type_voie"), sidlo.get("libelle_voie")) if x)
+    return cast or (sidlo.get("adresse") or "")
+
+
+FR_POLE = ("siren", "nom_complet", "nom_raison_sociale", "sigle", "siege",
+           "activite_principale", "nature_juridique", "date_creation", "etat_administratif")
+
+
+def _fr_ocisti(data):
+    def zmensi(r):
+        r = {k: v for k, v in r.items() if k in FR_POLE}
+        s = r.get("siege") or {}
+        r["siege"] = {k: v for k, v in s.items() if k in (
+            "numero_voie", "type_voie", "libelle_voie", "code_postal",
+            "libelle_commune", "adresse", "etat_administratif")}
+        return r
+    return {"results": [zmensi(r) for r in data.get("results", [])]}
+
+
+def fr_podle_nazvu(klient, nazev, pocet=15):
+    url = INSEE_FR + "?" + urllib.parse.urlencode({"q": nazev, "per_page": min(pocet, 25)})
+    data = json.loads(klient.ziskej(url, ocisti=_fr_ocisti))
+    vysledky = []
+    for r in data.get("results", []):
+        sidlo = r.get("siege") or {}
+        naf = r.get("activite_principale") or ""
+        nace = taxonomie.naf_na_nace(naf)
+        siren = r.get("siren") or ""
+        aktivni = (sidlo.get("etat_administratif") or r.get("etat_administratif")) != "F"
+        vysledky.append(Zaznam(
+            jmeno=r.get("nom_complet") or r.get("nom_raison_sociale") or "",
+            ulice=_fr_adresa(sidlo),
+            psc=_psc(sidlo.get("code_postal")),
+            mesto=sidlo.get("libelle_commune") or "",
+            zeme="FR",
+            dic=fr_dic_ze_siren(siren),
+            reg_cislo=siren,
+            reg_rejstrik="SIREN",
+            nace=nace,
+            nace_popis=taxonomie.nazev_nace(nace),
+            nace_vse=naf,
+            pravni_forma=r.get("nature_juridique") or "",
+            datum_vzniku=r.get("date_creation") or "",
+            aktivni=aktivni,
+            zdroj="INSEE/INPI",
+            odkaz="https://annuaire-entreprises.data.gouv.fr/entreprise/%s" % siren if siren else "",
+            poznamka="zanikla firma (INSEE)" if not aktivni else "",
+        ))
+    return vysledky
+
+
+# ---------------------------------------------------------------------------
 # Wikidata - zalozni zdroj pro velke zahranicni firmy
 # ---------------------------------------------------------------------------
 
@@ -599,15 +910,27 @@ def _wikidata_ocisti(data):
 
 
 def wikidata_podle_nazvu(klient, nazev, pocet=5):
-    url = WIKIDATA_API + "?" + urllib.parse.urlencode({
-        "action": "wbsearchentities", "search": nazev, "language": "en",
-        "uselang": "en", "type": "item", "limit": pocet, "format": "json"})
-    hledani = json.loads(klient.ziskej(url, ocisti=lambda d: {"search": [
-        {"id": h.get("id")} for h in d.get("search", [])]})).get("search", [])
+    def hledej(text):
+        url = WIKIDATA_API + "?" + urllib.parse.urlencode({
+            "action": "wbsearchentities", "search": text, "language": "en",
+            "uselang": "en", "type": "item", "limit": pocet, "format": "json"})
+        return json.loads(klient.ziskej(url, ocisti=lambda d: {"search": [
+            {"id": h.get("id")} for h in d.get("search", [])]})).get("search", [])
+
+    hledani = hledej(nazev)
+    if not hledani:
+        # rejstriky vraceji plny pravni nazev ("ABB Schweiz AG"), Wikidata ale
+        # firmy vetsinou vede pod kratkym nazvem clanku ("ABB") - bez tohoto
+        # kroku by obohaceni oboru fungovalo jen pro malou cast zahranicnich
+        # nalezu z GLEIF
+        jadro = jadro_pro_hledani(re.sub(r"[,.]+$", "", nazev.replace(",", " ")))
+        jadro = re.sub(r"[\s,.\-]+$", "", jadro)
+        if jadro.lower() != nazev.lower() and jadro:
+            hledani = hledej(jadro)
     if not hledani:
         return []
 
-    qidy = [h["id"] for h in hledani[:3]]
+    qidy = [h["id"] for h in hledani[:5]]
     url = WIKIDATA_API + "?" + urllib.parse.urlencode({
         "action": "wbgetentities", "ids": "|".join(qidy),
         "props": "claims|labels", "languages": "en|cs|de", "format": "json"})
@@ -627,7 +950,7 @@ def wikidata_podle_nazvu(klient, nazev, pocet=5):
     odkazovane = set()
     for qid in qidy:
         c = entity.get(qid, {}).get("claims", {})
-        odkazovane.update(tvrzeni(c, "P452")[:3] + tvrzeni(c, "P17")[:1] + tvrzeni(c, "P159")[:1])
+        odkazovane.update(tvrzeni(c, "P452")[:5] + tvrzeni(c, "P17")[:1] + tvrzeni(c, "P159")[:1])
     popisky, iso = {}, {}
     if odkazovane:
         url = WIKIDATA_API + "?" + urllib.parse.urlencode({
@@ -646,7 +969,8 @@ def wikidata_podle_nazvu(klient, nazev, pocet=5):
     for qid in qidy:
         e = entity.get(qid, {})
         c = e.get("claims", {})
-        obory = [popisky.get(q, "") for q in tvrzeni(c, "P452")[:3]]
+        obory_qid = tvrzeni(c, "P452")[:5]
+        obory = [popisky.get(q, "") for q in obory_qid]
         zeme_q = tvrzeni(c, "P17")[:1]
         sidlo_q = tvrzeni(c, "P159")[:1]
         dic = next((v for v in tvrzeni(c, "P3608") if isinstance(v, str)), "")
@@ -657,6 +981,7 @@ def wikidata_podle_nazvu(klient, nazev, pocet=5):
             mesto=popisky.get(sidlo_q[0], "") if sidlo_q else "",
             zeme=iso.get(zeme_q[0], "") if zeme_q else "",
             dic=dic, lei=lei,
+            obory=obory_qid,
             zdroj="Wikidata",
             odkaz="https://www.wikidata.org/wiki/%s" % qid,
             poznamka="obor dle Wikidata: %s" % ", ".join(o for o in obory if o) if any(obory) else "",
@@ -690,19 +1015,82 @@ def vies_over(klient, dic):
 # Zpracovani jednoho radku
 # ---------------------------------------------------------------------------
 
-def vyber_nejlepsi(kandidati, nazev, prah_ok, prah_overit):
-    """Vrati (nejlepsi, stav, prehled kandidatu)."""
+def skore_kandidata(nazev, zeme, k):
+    """
+    Slozene skore jednoho kandidata: podobnost nazvu plus prirazky za to,
+    jak dobre zaznam sedi na zbytek zadani.
+
+    Diky prirazkam se da rozhodnout i tam, kde je nazev stejne podobny u vic
+    firem - typicky "Danone S.A." sedi na DANONE (FR) i DANONE PORTUGAL (PT)
+    a rozhodne az zadana zeme.
+
+    Vrati (celkove skore, skore nazvu, duvody prirazek).
+    """
+    jmena = [j for j in (k.jmena or [k.jmeno]) if j]
+    if not jmena:
+        return 0.0, 0.0, []
+    skore = max(skore_shody(nazev, j) for j in jmena)
+    syrove = max(skore_syrove(nazev, j) for j in jmena)
+
+    bonus, duvody = 0.0, []
+    if zeme and k.zeme:
+        if k.zeme == zeme:
+            bonus += 0.08
+        else:
+            bonus -= 0.12
+            duvody.append("sidlo v %s misto %s" % (k.zeme, zeme))
+    if not k.aktivni:
+        bonus -= 0.15
+        duvody.append("neaktivni subjekt")
+    if k.nace:
+        bonus += 0.03
+    if k.reg_cislo or k.ico:
+        bonus += 0.02
+    if k.dic:
+        bonus += 0.01
+    if k.obory:
+        bonus += 0.02
+    # syrova podobnost rozhodne remizy, kde normalizace zahodila prave to
+    # slovo, kterym se kandidati lisi ("Group", "Holding")
+    return round(skore + bonus + 0.05 * syrove, 4), skore, duvody
+
+
+def vyber_nejlepsi(kandidati, nazev, prah_ok, prah_overit, zeme=None):
+    """
+    Vrati (nejlepsi, stav, prehled kandidatu).
+
+    Pri vice srovnatelnych shodach se vzdy vybere jeden zaznam - ten
+    s nejvyssim slozenym skore - a stav je VYBRANO. Rucni dohledavani
+    v seznamu o stovkach dodavatelu se tim nahradi kontrolou par radku;
+    ostatni kandidati zustavaji vypsani v poznamce.
+    """
     if not kandidati:
         return None, STAV_NENALEZENO, []
-    ohodnocene = sorted(((skore_shody(nazev, k.jmeno), k) for k in kandidati), key=lambda x: -x[0])
-    skore, nejlepsi = ohodnocene[0]
+    ohodnocene = sorted(((skore_kandidata(nazev, zeme, k), k) for k in kandidati),
+                        key=lambda x: -x[0][0])
+    (celkem, skore, duvody), nejlepsi = ohodnocene[0]
     nejlepsi.shoda = "%.0f%%" % (skore * 100)
-    prehled = ["%s [%s] %.0f%%" % (k.jmeno, k.ico or k.lei or k.mesto or "?", s * 100)
-               for s, k in ohodnocene[:5] if s > 0.3]
+
+    prehled = ["%s [%s%s] %.0f%%" % (k.jmeno, k.zeme + " " if k.zeme else "",
+                                     k.reg_cislo or k.ico or k.lei or k.mesto or "?", s * 100)
+               for (c, s, _), k in ohodnocene[:5] if s > 0.3]
+
     if skore >= prah_ok:
-        druhy = ohodnocene[1][0] if len(ohodnocene) > 1 else 0.0
-        if druhy >= prah_ok and (skore - druhy) < 0.03:
-            return nejlepsi, STAV_VICE, prehled
+        # kolik dalsich kandidatu je jmenem stejne dobrych
+        srovnatelni = sum(1 for (c, s, _), _ in ohodnocene[1:] if s >= prah_ok)
+        if srovnatelni:
+            druhy_celkem = ohodnocene[1][0][0]
+            nejlepsi.poznamka = "; ".join(p for p in (
+                nejlepsi.poznamka,
+                "vybrano z %d srovnatelnych shod, druhy v poradi o %.2f bodu niz"
+                % (srovnatelni + 1, celkem - druhy_celkem),
+                ", ".join(duvody),
+            ) if p)
+            return nejlepsi, STAV_VYBRANO, prehled
+        if duvody:
+            nejlepsi.poznamka = "; ".join(p for p in (nejlepsi.poznamka,
+                                                      "pozor: " + ", ".join(duvody)) if p)
+            return nejlepsi, STAV_OVERIT, prehled
         return nejlepsi, STAV_OK, prehled
     if skore >= prah_overit:
         return nejlepsi, STAV_OVERIT, prehled
@@ -740,7 +1128,7 @@ def zpracuj_radek(vstup, klient, n):
         if z.stav != STAV_OK and nazev:
             nejlepsi, stav, prehled, nej_skore = None, STAV_NENALEZENO, [], -1.0
             # poradi stavu pri rozhodovani, ktery zdroj vyhraje
-            vaha = {STAV_OK: 3, STAV_VICE: 2, STAV_OVERIT: 1, STAV_NENALEZENO: 0}
+            vaha = {STAV_OK: 3, STAV_VYBRANO: 2, STAV_OVERIT: 1, STAV_NENALEZENO: 0}
 
             def zkus(funkce, *args):
                 nonlocal nejlepsi, stav, prehled, nej_skore
@@ -748,7 +1136,7 @@ def zpracuj_radek(vstup, klient, n):
                     return
                 try:
                     k_nejlepsi, k_stav, k_prehled = vyber_nejlepsi(
-                        funkce(klient, *args), nazev, n["prah_ok"], n["prah_overit"])
+                        funkce(klient, *args), nazev, n["prah_ok"], n["prah_overit"], zeme)
                 except Exception as e:
                     poznamky.append("%s: %s" % (funkce.__name__, e))
                     return
@@ -759,11 +1147,15 @@ def zpracuj_radek(vstup, klient, n):
                     nejlepsi, stav, nej_skore = k_nejlepsi, k_stav, k_skore
                     prehled = k_prehled or prehled
 
-            # poradi: nejdriv rejstriky, ktere nesou i obor cinnosti
+            # poradi: nejdriv narodni rejstriky, ktere nesou i obor cinnosti,
+            # az pak celosvetove zdroje bez oboru (GLEIF) a bez presneho NACE
+            # (Wikidata)
             if zeme in ("", "CZ") and not n["bez_ares"]:
                 zkus(ares_podle_nazvu, nazev, n["pocet"])
             if zeme in ("", "SK") and not n["bez_sk"]:
                 zkus(rpo_sk_podle_nazvu, nazev, min(n["pocet"], 20))
+            if zeme == "FR" and not n["bez_fr"]:
+                zkus(fr_podle_nazvu, nazev, n["pocet"])
             if zeme in ("", "US") and not n["bez_edgar"]:
                 zkus(edgar_podle_nazvu, nazev, n["pocet"])
             if zeme != "CZ" and not n["bez_gleif"]:
@@ -793,23 +1185,25 @@ def zpracuj_radek(vstup, klient, n):
         z.dic = z.dic or dic
         z.zeme = z.zeme or zeme
 
-        # 3) upresneni oboru
+        # 3) upresneni oboru cinnosti
         if z.stav != STAV_NENALEZENO and not n["bez_ares"]:
             doplr_prevazujici_nace(klient, z)
-        obor_z_wikidat = ""
-        if (z.stav != STAV_NENALEZENO and not z.nace and z.zdroj != "Wikidata"
-                and not n["bez_wikidata"]):
+        if (z.stav not in (STAV_NENALEZENO, STAV_CHYBA) and not z.nace and not z.obory
+                and z.zdroj != "Wikidata" and not n["bez_wikidata"]):
             try:
-                for w in wikidata_podle_nazvu(klient, z.jmeno or nazev, 3):
-                    if skore_shody(z.jmeno or nazev, w.jmeno) >= n["prah_ok"]:
-                        obor_z_wikidat = w.poznamka
-                        if obor_z_wikidat:
-                            poznamky.append(obor_z_wikidat)
-                        if not z.dic and w.dic:
-                            z.dic = w.dic
-                        if not z.lei and w.lei:
-                            z.lei = w.lei
-                        break
+                shodne = [w for w in wikidata_podle_nazvu(klient, z.jmeno or nazev, 5)
+                         if skore_shody(z.jmeno or nazev, w.jmeno) >= n["prah_ok"]]
+                # stejny nazev v ruznych jazykovych mutacich casto vede na vic
+                # QID - obor cinnosti byva zapsany jen u jednoho z nich
+                w = next((c for c in shodne if c.obory), shodne[0] if shodne else None)
+                if w is not None:
+                    if w.poznamka:
+                        poznamky.append(w.poznamka)
+                    z.obory = w.obory
+                    if not z.dic and w.dic:
+                        z.dic = w.dic
+                    if not z.lei and w.lei:
+                        z.lei = w.lei
             except Exception as e:
                 poznamky.append("Wikidata: %s" % e)
 
@@ -837,19 +1231,43 @@ def zpracuj_radek(vstup, klient, n):
             except Exception as e:
                 poznamky.append("VIES: %s" % e)
 
-        # 5) St.-Nr. 2
+        # 5) narodni registracni cislo -> citelny nazev rejstriku / pravni forma
+        if z.zdroj == "GLEIF" and not n["bez_gleif_popisy"]:
+            try:
+                if z.reg_rejstrik:
+                    z.reg_rejstrik = gleif_popis_rejstriku(klient, z.reg_rejstrik)
+                if z.pravni_forma and len(z.pravni_forma) == 4:
+                    z.pravni_forma = gleif_popis_formy(klient, z.pravni_forma)
+            except Exception:
+                pass
+
+        # 6) St.-Nr. 2
         z.stnr2 = urci_stnr2(z, n["stnr2"])
 
-        # 6) vlastni taxonomie
-        podklad_nazev = " ".join(x for x in (z.jmeno or nazev, obor_z_wikidat, z.poznamka) if x)
+        # 7) vlastni taxonomie - NACE/obor z rejstriku ma prednost, pak obor
+        # z Wikidat (jazykove nezavisly), az naposled klicova slova v nazvu
+        podklad_nazev = " ".join(x for x in (z.jmeno or nazev, z.poznamka) if x)
         k = taxonomie.zarad(nace=z.nace, nazev=podklad_nazev, mapa=n["mapa"],
-                            klicova_slova=n["klicova_slova"], kategorie=n["kategorie_ciselnik"])
+                            klicova_slova=n["klicova_slova"], kategorie=n["kategorie_ciselnik"],
+                            obory=z.obory, mapa_oboru=n["mapa_oboru"])
         z.kod_kategorie = k["kod"]
         z.kategorie = k["kategorie"]
         z.skupina = k["skupina"]
         z.zdroj_kategorie = k["zdroj"]
+        if not z.nace and k["nace"]:
+            # NACE se u zahranicnich firem bez rejstriku pocita jen jako
+            # odhad z oboru cinnosti - proto se oznaci zvlast, ne jako
+            # oficialni udaj z rejstriku
+            z.nace = k["nace"]
+            z.nace_zdroj = "odhad z oboru (Wikidata)"
         if not z.nace_popis:
             z.nace_popis = taxonomie.nazev_nace(z.nace)
+        if z.nace and not z.nace_zdroj:
+            z.nace_zdroj = z.zdroj
+
+        # 8) je zaznam za aktivni subjekt?
+        if not z.aktivni and z.stav not in (STAV_NENALEZENO, STAV_CHYBA):
+            poznamky.append("subjekt neni v rejstriku veden jako aktivni")
 
     except Exception as e:
         z.stav = STAV_CHYBA
@@ -858,6 +1276,13 @@ def zpracuj_radek(vstup, klient, n):
     if z.kandidati and z.stav != STAV_OK:
         poznamky.append("kandidati: " + " | ".join(z.kandidati))
     z.poznamka = "; ".join(p for p in poznamky if p)
+
+    # zaznam bez shody se do datovych sloupcu nepropisuje (viz README), ale
+    # hledany nazev musi zustat viditelny i v zakladnim sloupci Jmeno -
+    # jinak firma z nenalezene shody v exportu "zmizi"
+    if not z.jmeno:
+        z.jmeno = z.hledany_nazev or nazev or ico or dic
+
     return z
 
 
@@ -877,10 +1302,10 @@ def urci_stnr2(z, rezim):
     if rezim == "dic":
         return z.dic
     if rezim == "ico":
-        return z.ico or z.stnr2
+        return z.ico or z.reg_cislo or z.stnr2
     if rezim == "registrace":
-        return z.stnr2 or z.ico
-    return "" if z.zeme == "CZ" else (z.stnr2 or z.ico)
+        return z.reg_cislo or z.stnr2 or z.ico
+    return "" if z.zeme == "CZ" else (z.reg_cislo or z.stnr2 or z.ico)
 
 
 # ---------------------------------------------------------------------------
@@ -969,15 +1394,19 @@ SLOUPCE_ZAKLAD = [
 SLOUPCE_DOPLNKY = [
     ("zdroj_kategorie", "Zařazeno podle"), ("zdroj", "Zdroj dat"), ("shoda", "Shoda názvu"),
     ("stav", "Stav"), ("hledany_nazev", "Hledaný název"), ("region", "Region"),
-    ("lei", "LEI"), ("pravni_forma", "Právní forma"), ("datum_vzniku", "Datum vzniku"),
+    ("lei", "LEI"), ("reg_cislo", "Registrační číslo"), ("reg_rejstrik", "Rejstřík"),
+    ("pravni_forma", "Právní forma"), ("datum_vzniku", "Datum vzniku"),
     ("dic_overeno", "DIČ ověřeno (VIES)"), ("nace_vse", "NACE (všechny)"),
+    ("nace_zdroj", "NACE - zdroj"), ("klasifikace", "Klasifikace (US NAICS)"),
     ("odkaz", "Odkaz na rejstřík"), ("poznamka", "Poznámka"),
 ]
 
 SIRKY = {"Jméno": 40, "Ulice": 30, "PSČ": 9, "Město": 20, "Země": 7, "IČO": 12, "DIČ": 15,
          "St.-Nr. 2": 16, "NACE": 9, "NACE popis": 34, "Kód kategorie": 13, "Skupina": 24,
          "Kategorie dodavatele": 42, "Zařazeno podle": 14, "Zdroj dat": 12, "Shoda názvu": 11,
-         "Stav": 12, "Hledaný název": 34, "Region": 18, "LEI": 22, "Právní forma": 12,
+         "Stav": 12, "Hledaný název": 34, "Region": 18, "LEI": 22,
+         "Registrační číslo": 18, "Rejstřík": 20, "Právní forma": 14,
+         "NACE - zdroj": 22, "Klasifikace (US NAICS)": 34,
          "Datum vzniku": 13, "DIČ ověřeno (VIES)": 16, "NACE (všechny)": 30,
          "Odkaz na rejstřík": 46, "Poznámka": 70}
 
@@ -1071,7 +1500,10 @@ def main(argv=None):
     p.add_argument("--vies", action="store_true", help="overit DIC v EU pres VIES (pomalejsi)")
     p.add_argument("--bez-ares", action="store_true")
     p.add_argument("--bez-sk", action="store_true")
+    p.add_argument("--bez-fr", action="store_true")
     p.add_argument("--bez-gleif", action="store_true")
+    p.add_argument("--bez-gleif-popisy", action="store_true",
+                   help="nepřekládat kódy GLEIF (rejstřík, právní forma) na text - rychlejší")
     p.add_argument("--bez-edgar", action="store_true")
     p.add_argument("--bez-wikidata", action="store_true")
     p.add_argument("--cache", default=".dodavatele_cache.json.gz",
@@ -1091,10 +1523,10 @@ def main(argv=None):
     if not a.vstup:
         p.error("chybi vstupni soubor (nebo pouzijte --dump-taxonomy)")
 
-    mapa, klicova, ciselnik = None, None, None
+    mapa, klicova, ciselnik, mapa_oboru = None, None, None, None
     if a.taxonomy:
         with open(a.taxonomy, encoding="utf-8") as f:
-            mapa, klicova, ciselnik = taxonomie.z_json(json.load(f))
+            mapa, klicova, ciselnik, mapa_oboru = taxonomie.z_json(json.load(f))
 
     radky = nacti_vstup(a.vstup, a.sloupec)
     if not radky:
@@ -1104,8 +1536,10 @@ def main(argv=None):
     klient = Klient(cache_soubor=a.cache or None, prodleva=a.prodleva, ua=a.ua)
     n = {"pocet": a.pocet, "prah_ok": a.prah_ok, "prah_overit": a.prah_overit,
          "stnr2": a.stnr2, "vies": a.vies, "bez_ares": a.bez_ares, "bez_sk": a.bez_sk,
-         "bez_gleif": a.bez_gleif, "bez_edgar": a.bez_edgar, "bez_wikidata": a.bez_wikidata,
-         "mapa": mapa, "klicova_slova": klicova, "kategorie_ciselnik": ciselnik}
+         "bez_fr": a.bez_fr, "bez_gleif": a.bez_gleif, "bez_gleif_popisy": a.bez_gleif_popisy,
+         "bez_edgar": a.bez_edgar, "bez_wikidata": a.bez_wikidata,
+         "mapa": mapa, "klicova_slova": klicova, "kategorie_ciselnik": ciselnik,
+         "mapa_oboru": mapa_oboru}
 
     hotovo = [0]
     zamek = threading.Lock()
