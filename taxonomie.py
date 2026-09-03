@@ -14,6 +14,9 @@ Mapa NACE -> kategorie se prohledava od nejdelsiho prefixu, takze zaznam
 pro "6201" ma prednost pred obecnym "62".
 """
 
+import re
+from functools import lru_cache
+
 # ---------------------------------------------------------------------------
 # Ciselnik kategorii:  kod -> (skupina, nazev kategorie)
 # ---------------------------------------------------------------------------
@@ -818,6 +821,26 @@ def nazev_nace(kod):
     return NACE_DIVIZE.get(cislice[:2], "")
 
 
+@lru_cache(maxsize=4096)
+def _klicovy_vzor(slovo):
+    return re.compile(r"(?<![^\W\d_])%s" % re.escape(slovo))
+
+
+def _obsahuje_klicove_slovo(nazev_lower, slovo):
+    """
+    True, kdyz `slovo` v nazvu zacina na hranici slova - ne kdekoli uvnitr
+    jineho slova. Bez teto kontroly by napr. kratke klicove slovo "kredit"
+    chybne sedelo i uprostred nemecke slozeniny "akkreditierungsstelle"
+    (akreditacni organ, ne uverova firma).
+
+    Hlida se jen leva hranice, ne prava - hodne klicovych slov je zamerne
+    jen zacatek slova ("semiconduct" ma chytit i "semiconductor",
+    "telecom" i "telecommunications"), takze na prave strane muzou
+    pokracovat dalsi pismena.
+    """
+    return _klicovy_vzor(slovo).search(nazev_lower) is not None
+
+
 def zarad(nace=None, nazev=None, mapa=None, klicova_slova=None, kategorie=None,
           obory=None, mapa_oboru=None):
     """
@@ -850,9 +873,9 @@ def zarad(nace=None, nazev=None, mapa=None, klicova_slova=None, kategorie=None,
         if kod:
             zdroj = "obor"
     if not kod and nazev:
-        n = " " + nazev.lower() + " "
+        n = nazev.lower()
         for slova, k in klicova_slova:
-            if any(s in n for s in slova):
+            if any(_obsahuje_klicove_slovo(n, s) for s in slova):
                 kod, zdroj = k, "nazev"
                 break
     if not kod:
