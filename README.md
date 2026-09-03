@@ -30,9 +30,19 @@ rozpozná automaticky, rozumí česky i anglicky:
 | IČO | IČO, IC, Company ID, Registration number | ne |
 | DIČ | DIČ, VAT, VAT ID, USt-IdNr, Tax ID | ne |
 | země | Země, Country, Stát, ISO | ne |
+| ulice | Ulice, Street, Address, Adresa, Straße | ne |
+| PSČ | PSČ, ZIP, Postal code, PLZ | ne |
+| město | Město, City, Town, Ort | ne |
 
 \* místo názvu stačí IČO nebo DIČ. Vyplněná **země** zúží hledání na správný
 rejstřík a zrychlí běh.
+
+Vyplněná **adresa** (ulice/PSČ/město) pomáhá rozlišit mezi více firmami se
+stejným nebo podobným názvem — třeba dvě samostatné firmy `Škoda a.s.`
+(jedna v Plzni, druhá v Praze) mají v rejstříku identický název a bez adresy
+by šlo o čirou náhodu, která se vybere. Shoda PSČ nebo města zvýší důvěru ve
+správný nález, nesoulad naopak upozorní v Poznámce. Kategorii ani NACE
+adresa neurčuje — pomáhá jen najít správný subjekt, ne ho zařadit.
 
 ### Pořadí vyhledávání
 

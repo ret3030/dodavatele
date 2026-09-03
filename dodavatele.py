@@ -1318,14 +1318,47 @@ def manualni_odkaz(zeme, nazev):
 # Zpracovani jednoho radku
 # ---------------------------------------------------------------------------
 
-def skore_kandidata(nazev, zeme, k):
+def _normalizuj_mesto(s):
+    return re.sub(r"[^a-z0-9]+", " ", bez_diakritiky(str(s or "")).lower()).strip()
+
+
+def _normalizuj_psc(s):
+    return re.sub(r"\D", "", str(s or ""))
+
+
+def _shoduje_se_adresa(hledana, k):
+    """
+    Porovna zadanou adresu s adresou kandidata. Vraci (bonus, duvod|None).
+    Shoda mesta nebo PSC je silny signal, ze jde o spravny subjekt (obzvlast
+    u firem se skupinou stejne se jmenujicich dcerinych spolecnosti v ruznych
+    mestech) - naopak jasny nesoulad (zadano konkretni mesto, kandidat sidli
+    jinde) je duvod k ostrazitosti podobne jako spatna zeme.
+    """
+    if not hledana or not any(hledana.values()):
+        return 0.0, None
+    mesto_h, psc_h = _normalizuj_mesto(hledana.get("mesto")), _normalizuj_psc(hledana.get("psc"))
+    mesto_k, psc_k = _normalizuj_mesto(k.mesto), _normalizuj_psc(k.psc)
+
+    if psc_h and psc_k:
+        if psc_h == psc_k:
+            return 0.06, None
+        if psc_h[:2] != psc_k[:2]:
+            return -0.05, "PSC %s misto %s" % (k.psc, hledana.get("psc"))
+    if mesto_h and mesto_k:
+        if mesto_h == mesto_k or mesto_h in mesto_k or mesto_k in mesto_h:
+            return 0.06, None
+        return -0.05, "sidlo v %s misto %s" % (k.mesto, hledana.get("mesto"))
+    return 0.0, None
+
+
+def skore_kandidata(nazev, zeme, k, adresa=None):
     """
     Slozene skore jednoho kandidata: podobnost nazvu plus prirazky za to,
     jak dobre zaznam sedi na zbytek zadani.
 
     Diky prirazkam se da rozhodnout i tam, kde je nazev stejne podobny u vic
     firem - typicky "Danone S.A." sedi na DANONE (FR) i DANONE PORTUGAL (PT)
-    a rozhodne az zadana zeme.
+    a rozhodne az zadana zeme (nebo adresa, je-li k dispozici).
 
     Vrati (celkove skore, skore nazvu, duvody prirazek).
     """
@@ -1342,6 +1375,10 @@ def skore_kandidata(nazev, zeme, k):
         else:
             bonus -= 0.12
             duvody.append("sidlo v %s misto %s" % (k.zeme, zeme))
+    adr_bonus, adr_duvod = _shoduje_se_adresa(adresa, k)
+    bonus += adr_bonus
+    if adr_duvod:
+        duvody.append(adr_duvod)
     if not k.aktivni:
         bonus -= 0.15
         duvody.append("neaktivni subjekt")
@@ -1358,7 +1395,7 @@ def skore_kandidata(nazev, zeme, k):
     return round(skore + bonus + 0.05 * syrove, 4), skore, duvody
 
 
-def vyber_nejlepsi(kandidati, nazev, prah_ok, prah_overit, zeme=None):
+def vyber_nejlepsi(kandidati, nazev, prah_ok, prah_overit, zeme=None, adresa=None):
     """
     Vrati (nejlepsi, stav, prehled kandidatu).
 
@@ -1369,7 +1406,7 @@ def vyber_nejlepsi(kandidati, nazev, prah_ok, prah_overit, zeme=None):
     """
     if not kandidati:
         return None, STAV_NENALEZENO, []
-    ohodnocene = sorted(((skore_kandidata(nazev, zeme, k), k) for k in kandidati),
+    ohodnocene = sorted(((skore_kandidata(nazev, zeme, k, adresa), k) for k in kandidati),
                         key=lambda x: -x[0][0])
     (celkem, skore, duvody), nejlepsi = ohodnocene[0]
     nejlepsi.shoda = "%.0f%%" % (skore * 100)
@@ -1405,6 +1442,11 @@ def zpracuj_radek(vstup, klient, n):
     ico = (vstup.get("ico") or "").strip()
     dic = (vstup.get("dic") or "").strip()
     zeme = (vstup.get("zeme") or "").strip().upper()[:2]
+    hledana_adresa = {
+        "ulice": (vstup.get("ulice") or "").strip(),
+        "psc": (vstup.get("psc") or "").strip(),
+        "mesto": (vstup.get("mesto") or "").strip(),
+    }
 
     z = Zaznam(hledany_nazev=nazev or ico or dic)
     poznamky = []
@@ -1474,7 +1516,8 @@ def zpracuj_radek(vstup, klient, n):
                     # k rozhodnuti aspon vypsat kandidaty k rucni kontrole
                     if nazev:
                         nej, stav_id, prehled_id = vyber_nejlepsi(
-                            kandidati, nazev, n["prah_ok"], n["prah_overit"], zeme)
+                            kandidati, nazev, n["prah_ok"], n["prah_overit"], zeme,
+                            hledana_adresa)
                         if nej is not None and stav_id != STAV_NENALEZENO:
                             nej.hledany_nazev = nazev
                             nej.kandidati = prehled_id
@@ -1523,7 +1566,8 @@ def zpracuj_radek(vstup, klient, n):
                     return
                 try:
                     k_nejlepsi, k_stav, k_prehled = vyber_nejlepsi(
-                        funkce(klient, *args), nazev, n["prah_ok"], n["prah_overit"], zeme)
+                        funkce(klient, *args), nazev, n["prah_ok"], n["prah_overit"], zeme,
+                        hledana_adresa)
                 except Exception as e:
                     poznamky.append("%s: %s" % (funkce.__name__, e))
                     return
@@ -1698,6 +1742,9 @@ MAPOVANI_SLOUPCU = {
     "dic": ("dic", "dič", "vat", "vat id", "vat number", "ust-idnr", "ustidnr", "tax id",
             "st.-nr.", "st-nr"),
     "zeme": ("zeme", "země", "country", "stat", "stát", "land", "iso", "kod zeme"),
+    "ulice": ("ulice", "street", "address", "adresa", "strasse", "straße", "adresse"),
+    "psc": ("psc", "psč", "zip", "zip code", "postal code", "postcode", "plz"),
+    "mesto": ("mesto", "město", "city", "town", "obec", "ort", "stadt"),
 }
 
 
