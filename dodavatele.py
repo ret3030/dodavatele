@@ -5,7 +5,7 @@ dodavatele.py - obohaceni seznamu dodavatelu z verejnych rejstriku.
 
 Vstup : CSV / XLSX / TXT se seznamem nazvu firem (volitelne ICO, DIC, zeme).
 Vystup: XLSX / CSV se sloupci
-        Jmeno | Ulice | PSC | Mesto | Zeme | ICO | DIC | St.-Nr. 2 | NACE
+        Jmeno | Ulice | PSC | Mesto | Zeme | ICO | DIC | NACE
         | Kategorie dodavatele | ...
 
 Zdroje (vse bez API klice):
@@ -324,7 +324,6 @@ class Zaznam:
     zeme: str = ""
     ico: str = ""
     dic: str = ""
-    stnr2: str = ""
     nace: str = ""
     nace_popis: str = ""
     nace_vse: str = ""
@@ -515,7 +514,6 @@ def rpo_sk_podle_nazvu(klient, nazev, pocet=10):
             zeme="SK",
             ico=ico,
             dic="SK%s" % ico if ico else "",
-            stnr2=ico,
             reg_cislo=ico,
             reg_rejstrik="RPO SR",
             datum_vzniku=r.get("establishment") or "",
@@ -613,7 +611,6 @@ def _gleif_na_zaznam(rec):
         psc=adr.get("postalCode") or "",
         mesto=adr.get("city") or "",
         zeme=zeme[:2],
-        stnr2=reg,
         reg_cislo=reg,
         reg_rejstrik=(ent.get("registeredAt") or {}).get("id") or "",
         region=adr.get("region") or "",
@@ -790,7 +787,6 @@ def edgar_podle_nazvu(klient, nazev, pocet=10):
         return Zaznam(
             jmeno=h("conformed-name") or nazev_zaloha,
             ulice=ulice, psc=psc, mesto=mesto, region=stat, zeme="US",
-            stnr2="CIK %s" % cik_cislo if cik_cislo else "",
             reg_cislo=cik_cislo, reg_rejstrik="SEC CIK",
             nace=nace, nace_popis=taxonomie.nazev_nace(nace),
             klasifikace="NAICS %s - %s" % (naics, taxonomie.nazev_naics(naics)) if naics else "",
@@ -1241,9 +1237,6 @@ def zpracuj_radek(vstup, klient, n):
             except Exception:
                 pass
 
-        # 6) St.-Nr. 2
-        z.stnr2 = urci_stnr2(z, n["stnr2"])
-
         # 7) vlastni taxonomie - NACE/obor z rejstriku ma prednost, pak obor
         # z Wikidat (jazykove nezavisly), az naposled klicova slova v nazvu
         podklad_nazev = " ".join(x for x in (z.jmeno or nazev, z.poznamka) if x)
@@ -1284,28 +1277,6 @@ def zpracuj_radek(vstup, klient, n):
         z.jmeno = z.hledany_nazev or nazev or ico or dic
 
     return z
-
-
-def urci_stnr2(z, rezim):
-    """
-    'St.-Nr. 2' je v nemeckych systemech (SAP pole STCD2) druhe danove/registracni
-    cislo vedle DIC. Rezimy:
-      auto       - u ceskych firem prazdne (staci ICO + DIC), u ostatnich narodni
-                   registracni cislo (napr. HRB u DE, CIK u US)
-      registrace - vzdy narodni registracni cislo
-      ico        - vzdy ICO
-      dic        - VAT / DIC
-      zadne      - nevyplnovat
-    """
-    if rezim == "zadne":
-        return ""
-    if rezim == "dic":
-        return z.dic
-    if rezim == "ico":
-        return z.ico or z.reg_cislo or z.stnr2
-    if rezim == "registrace":
-        return z.reg_cislo or z.stnr2 or z.ico
-    return "" if z.zeme == "CZ" else (z.reg_cislo or z.stnr2 or z.ico)
 
 
 # ---------------------------------------------------------------------------
@@ -1386,7 +1357,7 @@ def nacti_vstup(cesta, sloupec_nazvu=None):
 
 SLOUPCE_ZAKLAD = [
     ("jmeno", "Jméno"), ("ulice", "Ulice"), ("psc", "PSČ"), ("mesto", "Město"),
-    ("zeme", "Země"), ("ico", "IČO"), ("dic", "DIČ"), ("stnr2", "St.-Nr. 2"),
+    ("zeme", "Země"), ("ico", "IČO"), ("dic", "DIČ"),
     ("nace", "NACE"), ("nace_popis", "NACE popis"),
     ("kod_kategorie", "Kód kategorie"), ("skupina", "Skupina"),
     ("kategorie", "Kategorie dodavatele"),
@@ -1402,7 +1373,7 @@ SLOUPCE_DOPLNKY = [
 ]
 
 SIRKY = {"Jméno": 40, "Ulice": 30, "PSČ": 9, "Město": 20, "Země": 7, "IČO": 12, "DIČ": 15,
-         "St.-Nr. 2": 16, "NACE": 9, "NACE popis": 34, "Kód kategorie": 13, "Skupina": 24,
+         "NACE": 9, "NACE popis": 34, "Kód kategorie": 13, "Skupina": 24,
          "Kategorie dodavatele": 42, "Zařazeno podle": 14, "Zdroj dat": 12, "Shoda názvu": 11,
          "Stav": 12, "Hledaný název": 34, "Region": 18, "LEI": 22,
          "Registrační číslo": 18, "Rejstřík": 20, "Právní forma": 14,
@@ -1495,8 +1466,6 @@ def main(argv=None):
                    help="skore shody nazvu pro automaticke prijeti (vychozi: 0.90)")
     p.add_argument("--prah-overit", type=float, default=0.72,
                    help="skore, pod kterym je zaznam nenalezeny (vychozi: 0.72)")
-    p.add_argument("--stnr2", choices=["auto", "registrace", "ico", "dic", "zadne"],
-                   default="auto", help="cim naplnit sloupec St.-Nr. 2 (vychozi: auto)")
     p.add_argument("--vies", action="store_true", help="overit DIC v EU pres VIES (pomalejsi)")
     p.add_argument("--bez-ares", action="store_true")
     p.add_argument("--bez-sk", action="store_true")
@@ -1535,7 +1504,7 @@ def main(argv=None):
 
     klient = Klient(cache_soubor=a.cache or None, prodleva=a.prodleva, ua=a.ua)
     n = {"pocet": a.pocet, "prah_ok": a.prah_ok, "prah_overit": a.prah_overit,
-         "stnr2": a.stnr2, "vies": a.vies, "bez_ares": a.bez_ares, "bez_sk": a.bez_sk,
+         "vies": a.vies, "bez_ares": a.bez_ares, "bez_sk": a.bez_sk,
          "bez_fr": a.bez_fr, "bez_gleif": a.bez_gleif, "bez_gleif_popisy": a.bez_gleif_popisy,
          "bez_edgar": a.bez_edgar, "bez_wikidata": a.bez_wikidata,
          "mapa": mapa, "klicova_slova": klicova, "kategorie_ciselnik": ciselnik,

@@ -37,9 +37,9 @@ Vyplněná **země** zúží hledání na správný rejstřík a zrychlí běh.
 
 ## Výstup
 
-Sloupce podle zadání: `Jméno | Ulice | PSČ | Město | Země | IČO | DIČ |
-St.-Nr. 2 | NACE`, k tomu `Kód kategorie | Skupina | Kategorie dodavatele`
-a doplňkové sloupce pro kontrolu (`--kompakt` je vypne):
+Sloupce podle zadání: `Jméno | Ulice | PSČ | Město | Země | IČO | DIČ | NACE`,
+k tomu `Kód kategorie | Skupina | Kategorie dodavatele` a doplňkové sloupce
+pro kontrolu (`--kompakt` je vypne):
 
 * **Registrační číslo / Rejstřík** – u zahraničních firem národní registrační
   číslo (obdoba IČO, např. `HRB 719915` u Německa, `1803-01-018771` u Japonska)
@@ -51,18 +51,6 @@ a doplňkové sloupce pro kontrolu (`--kompakt` je vypne):
 
 XLSX má druhý list **Číselník kategorií** s celou taxonomií a počtem
 dodavatelů v každé kategorii.
-
-### Sloupec „St.-Nr. 2“
-
-V německých systémech (SAP pole `STCD1`/`STCD2`) je to **druhé daňové nebo
-registrační číslo** vedle DIČ. Protože IČO i DIČ máte ve vlastních sloupcích,
-plní se ve výchozím režimu `auto` takto:
-
-* česká firma → prázdné (IČO + DIČ už údaje pokrývají),
-* zahraniční firma → národní registrační číslo (např. `HRB 719915` u Německa,
-  `CIK 320193` u USA, slovenské IČO).
-
-Jiné chování přepínačem `--stnr2 registrace|ico|dic|zadne`.
 
 ### Sloupec „Stav“
 
@@ -406,7 +394,6 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
 --pocet N               kolik kandidátů z rejstříku načíst (výchozí 30)
 --prah-ok 0.90          skóre shody názvu pro automatické přijetí
 --prah-overit 0.72      pod tímto skóre je záznam nenalezený
---stnr2 REŽIM           auto | registrace | ico | dic | zadne
 --vies                  ověřit DIČ v EU (pomalejší, jeden dotaz navíc na firmu)
 --bez-ares/-sk/-fr/-gleif/-edgar/-wikidata    vypnutí jednotlivých zdrojů
 --bez-gleif-popisy      nepřekládat kódy GLEIF (rejstřík, právní forma) na text - rychlejší
