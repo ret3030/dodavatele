@@ -150,6 +150,7 @@ class Klient:
         self._cache_soubor = cache_soubor
         self._cache = {}
         self._zmenena = False
+        self._obnova = threading.local()   # viz zapni_obnovu/vypni_obnovu
         if cache_soubor and os.path.exists(cache_soubor):
             try:
                 with self._otevri(cache_soubor, "rt") as f:
@@ -173,6 +174,18 @@ class Klient:
         if spat > 0:
             time.sleep(spat)
 
+    def zapni_obnovu(self):
+        """
+        Pro aktualni vlakno vynuti pri ziskej() ignorovani cteni z kese (zapis
+        do kese probiha porad, vysledek se tedy osvezi) - viz --obnovit-nenalezene,
+        kde se takhle znovu dotazuji jen firmy se spatnym stavem z minula, aniz
+        by se musela mazat cela kes.
+        """
+        self._obnova.aktivni = True
+
+    def vypni_obnovu(self):
+        self._obnova.aktivni = False
+
     def ziskej(self, url, hlavicky=None, json_body=None, ocisti=None, kontext=None):
         """
         Vrati telo odpovedi. `ocisti` je funkce nad rozparsovanym JSON, ktera
@@ -183,9 +196,10 @@ class Klient:
         klic = url
         if json_body is not None:
             klic += "|" + json.dumps(json_body, sort_keys=True, ensure_ascii=False)
-        with self._zamek:
-            if klic in self._cache:
-                return self._cache[klic]
+        if not getattr(self._obnova, "aktivni", False):
+            with self._zamek:
+                if klic in self._cache:
+                    return self._cache[klic]
 
         h = {"User-Agent": self.ua, "Accept": "application/json"}
         if hlavicky:
@@ -2589,6 +2603,20 @@ def _najdi_sloupec(hlavicka, nazev):
             % (nazev, ", ".join(hlavicka)))
 
 
+def nacti_stavy_k_obnove(cesta, spatne_stavy=(STAV_NENALEZENO, STAV_OVERIT, STAV_CHYBA)):
+    """
+    Precte drivejsi vystup teto aplikace a vrati mnozinu hodnot sloupce
+    "Hledany nazev", jejichz Stav byl spatny (NENALEZENO/OVERIT/CHYBA) -
+    pro --obnovit-nenalezene, aby se pri opakovanem behu nad stejnym
+    vstupem vynutil cerstvy dotaz jen pro tyto konkretni firmy, misto mazani
+    cele kese (ktera by zahodila i spravne nalezene zaznamy).
+    """
+    hlavicka, radky = nacti_tabulku(cesta)
+    i_nazev = _najdi_sloupec(hlavicka, "Hledaný název")
+    i_stav = _najdi_sloupec(hlavicka, "Stav")
+    return {r[i_nazev] for r in radky if len(r) > i_stav and r[i_stav] in spatne_stavy}
+
+
 def zpracuj_komparaci(cesta_vstup, sloupec_kolega, cesta_vystup, sloupec_nas="NACE"):
     """
     Porovna nas sloupec NACE se sloupcem, ktery do jiz vygenerovaneho vystupu
@@ -2700,6 +2728,11 @@ def main(argv=None):
     p.add_argument("--bez-wikidata", action="store_true")
     p.add_argument("--cache", default=".dodavatele_cache.json.gz",
                    help="soubor s kesi odpovedi (prazdny retezec = bez kese)")
+    p.add_argument("--obnovit-nenalezene", metavar="SOUBOR",
+                   help="drivejsi vystup (bez --kompakt) - firmy, ktere v nem mely "
+                        "stav NENALEZENO/OVERIT/CHYBA, se pro tento beh vynucene "
+                        "znovu dotazi (obejde kes jen pro ne), ostatni se beze "
+                        "zmeny berou z kese")
     p.add_argument("--taxonomy", help="JSON soubor s vlastni taxonomii")
     p.add_argument("--dump-taxonomy", metavar="SOUBOR",
                    help="zapsat vestavenou taxonomii do JSON a skoncit")
@@ -2761,11 +2794,27 @@ def main(argv=None):
          "bez_edgar": a.bez_edgar, "bez_wikidata": a.bez_wikidata,
          "mapa": mapa, "kategorie_ciselnik": ciselnik, "mapa_oboru": mapa_oboru}
 
+    k_obnove = None
+    if a.obnovit_nenalezene:
+        k_obnove = nacti_stavy_k_obnove(a.obnovit_nenalezene)
+        print("Vynucena obnova pro %d firem se spatnym stavem z '%s'" % (
+            len(k_obnove), a.obnovit_nenalezene), file=sys.stderr)
+
     hotovo = [0]
     zamek = threading.Lock()
 
     def uloha(vstup):
-        z = zpracuj_radek(vstup, klient, n)
+        hledany = ((vstup.get("nazev") or "").strip()
+                  or (vstup.get("ico") or "").strip()
+                  or (vstup.get("dic") or "").strip())
+        if k_obnove is not None and hledany in k_obnove:
+            klient.zapni_obnovu()
+            try:
+                z = zpracuj_radek(vstup, klient, n)
+            finally:
+                klient.vypni_obnovu()
+        else:
+            z = zpracuj_radek(vstup, klient, n)
         with zamek:
             hotovo[0] += 1
             print("  [%d/%d] %-42.42s -> %-11s %s" % (

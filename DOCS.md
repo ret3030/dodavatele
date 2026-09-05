@@ -702,6 +702,9 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
 --pripravit-gb-rejstrik   stáhnout/naimportovat lokální kopii Companies House (UK) a skončit
 --bez-gleif-popisy      nepřekládat kódy GLEIF (rejstřík, právní forma) na text - rychlejší
 --cache SOUBOR          keš odpovědí (výchozí .dodavatele_cache.json.gz)
+--obnovit-nenalezene SOUBOR   dřívější výstup (bez --kompakt) - firmy s minulým
+                        stavem NENALEZENO/OVERIT/CHYBA se vynuceně znovu
+                        dotáží (obejde keš jen pro ně), viz "Poznámky k provozu"
 --sloupec NÁZEV         název sloupce se jménem firmy, když se neurčí sám
 --oddelovac ;           oddělovač pro CSV výstup
 --ua "..."              User-Agent; SEC vyžaduje kontaktní e-mail
@@ -718,7 +721,15 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
 ## Poznámky k provozu
 
 * **Keš** (`.dodavatele_cache.json.gz`) drží odpovědi rejstříků, takže opakovaný
-  běh nad stejným seznamem je téměř okamžitý. Smažte ji, chcete-li čerstvá data.
+  běh nad stejným seznamem je téměř okamžitý. Je trvalá – i výsledek "nic
+  nenalezeno" zůstává uložený navždy, dokud keš nesmažete, takže firma, která
+  se mezitím v rejstříku objevila, by se stejnou keší pořád vracela jako
+  nenalezená.
+* **Obnova jen nenalezených firem** (`--obnovit-nenalezene DŘÍVĚJŠÍ_VÝSTUP`) –
+  řešení právě pro tenhle případ. Vezme dřívější (ne `--kompakt`) výstup,
+  najde v něm firmy se stavem `NENALEZENO`/`OVERIT`/`CHYBA` a jen pro ně
+  vynutí čerstvý dotaz (obejde keš), ostatní firmy zůstanou beze změny a
+  rychle se vezmou z keše – nemusí se tak mazat a přepočítávat celý seznam.
 * **Zatížení rejstříků** – výchozí nastavení (4 vlákna, 0,25 s na server) je
   ohleduplné. Při tisících firem spíš zvyšte `--prodleva`, než abyste přidávali
   vlákna.
