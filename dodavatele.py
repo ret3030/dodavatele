@@ -1194,6 +1194,95 @@ def de_rozloz_reg_cislo(text):
 
 
 # ---------------------------------------------------------------------------
+# Nemecko - OpenRegister.de API (volitelne, vyzaduje vlastni API klic)
+#
+# Na rozdil od lokalni kopie Handelsregisteru (vyse) tohle je placene/
+# kreditove API tretí strany, ktere ale narozdil od samotneho Handelsregisteru
+# vede i skutecny obor cinnosti (WZ2025 - nemecka obdoba NACE) a text
+# "Gegenstand des Unternehmens". Vyzaduje vlastni ucet a API klic
+# (openregister.de, zdarma 500 kreditu/mesic, 10 kreditu/dotaz na detail) -
+# klic se NIKDY neuklada v kodu ani v repozitari, jen se preda pri behu
+# (--de-api-klic, nebo promenna prostredi OPENREGISTER_API_KEY).
+# ---------------------------------------------------------------------------
+
+OPENREGISTER_API = "https://api.openregister.de"
+OPENREGISTER_AUTOCOMPLETE = OPENREGISTER_API + "/v1/autocomplete/company"
+OPENREGISTER_DETAIL = OPENREGISTER_API + "/v1/company/{id}"
+
+
+def _openregister_adresa(adresa):
+    adresa = adresa or {}
+    ulice = " ".join(x for x in (adresa.get("street"),) if x)
+    return ulice, adresa.get("postal_code") or "", adresa.get("city") or ""
+
+
+def _openregister_na_zaznam(polozka):
+    ulice, psc, mesto = _openregister_adresa(polozka.get("address"))
+    return Zaznam(
+        jmeno=polozka.get("name") or "",
+        ulice=ulice, psc=_psc(psc), mesto=mesto, zeme=polozka.get("country") or "DE",
+        reg_cislo=("%s %s" % (polozka.get("register_type") or "",
+                              polozka.get("register_number") or "")).strip(),
+        reg_rejstrik="Handelsregister (%s)" % polozka.get("register_court")
+                    if polozka.get("register_court") else "Handelsregister",
+        pravni_forma=polozka.get("legal_form") or "",
+        aktivni=bool(polozka.get("active", True)),
+        zdroj="OpenRegister.de",
+        odkaz="",
+        poznamka="",
+        identifikator=polozka.get("company_id") or "",   # docasne - viz doplnit_openregister_nace
+    )
+
+
+def _openregister_detail_ocisti(data):
+    return {k: v for k, v in data.items() if k in ("industry_codes", "purpose", "purposes")}
+
+
+def openregister_podle_nazvu(klient, nazev, api_klic, pocet=15):
+    """
+    Vyhledani podle jmena pres OpenRegister.de (autocomplete) - neobsahuje
+    jeste WZ kod (ten je az v detailu jednotlive firmy, viz
+    doplnit_openregister_nace), ale uz obsahuje adresu, pravni formu a text
+    predmetu podnikani (purpose).
+    """
+    if not api_klic:
+        return []
+    url = OPENREGISTER_AUTOCOMPLETE + "?" + urllib.parse.urlencode({"query": nazev})
+    data = json.loads(klient.ziskej(
+        url, hlavicky={"Authorization": "Bearer %s" % api_klic}))
+    vysledky = []
+    for r in (data.get("results") or [])[:pocet]:
+        z = _openregister_na_zaznam(r)
+        z.poznamka = (r.get("purpose") or "")[:300]
+        vysledky.append(z)
+    return vysledky
+
+
+def doplnit_openregister_nace(klient, z, api_klic):
+    """
+    Dotahne WZ2025 kod (nemecka obdoba NACE) pro uz vybranou nejlepsi shodu -
+    autocomplete vyhledavani ho nevraci, je az v detailu jedne konkretni
+    firmy (company_id). Vola se jen jednou, po vyberu nejlepsiho kandidata -
+    ne pro kazdy vraceny kandidat zvlast, aby se zbytecne neplytvalo kredity.
+    """
+    if z.zdroj != "OpenRegister.de" or not z.identifikator or z.nace:
+        return
+    url = OPENREGISTER_DETAIL.format(id=urllib.parse.quote(z.identifikator, safe=""))
+    data = json.loads(klient.ziskej(
+        url, hlavicky={"Authorization": "Bearer %s" % api_klic},
+        ocisti=_openregister_detail_ocisti))
+    kody = ((data.get("industry_codes") or {}).get("WZ2025") or [])
+    if kody:
+        kod = re.sub(r"\D", "", str(kody[0].get("code") or ""))
+        if kod:
+            z.nace = kod
+            z.nace_popis = taxonomie.nazev_nace(kod)
+            z.nace_vse = ",".join(sorted({
+                c for c in (re.sub(r"\D", "", str(k.get("code") or "")) for k in kody) if c}))
+            z.nace_zdroj = "WZ2025 (OpenRegister.de)"
+
+
+# ---------------------------------------------------------------------------
 # Velka Britanie - Companies House (bezplatny bulk export, zadna registrace)
 #
 # Na rozdil od nemeckeho Handelsregisteru obsahuje bulk soubor primo i obor
@@ -2084,7 +2173,9 @@ def zpracuj_radek(vstup, klient, n):
                 zkus(tw_podle_nazvu, nazev, n["pocet"])
             if zeme in ("", "US") and not n["bez_edgar"]:
                 zkus(edgar_podle_nazvu, nazev, n["pocet"])
-            if zeme == "DE" and not n["bez_de"] and os.path.exists(DE_REGISTER_DB):
+            if zeme == "DE" and n["openregister_klic"]:
+                zkus(openregister_podle_nazvu, nazev, n["openregister_klic"], n["pocet"])
+            elif zeme == "DE" and not n["bez_de"] and os.path.exists(DE_REGISTER_DB):
                 zkus(de_podle_nazvu, nazev, n["pocet"])
             if zeme == "GB" and not n["bez_gb"] and os.path.exists(GB_REGISTER_DB):
                 zkus(gb_podle_nazvu, nazev, n["pocet"])
@@ -2151,6 +2242,11 @@ def zpracuj_radek(vstup, klient, n):
                         z.stav = STAV_OVERIT
         if z.stav != STAV_NENALEZENO and not n["bez_sk"]:
             doplnit_sk_nace(klient, z)
+        if z.stav != STAV_NENALEZENO and n["openregister_klic"]:
+            try:
+                doplnit_openregister_nace(klient, z, n["openregister_klic"])
+            except Exception as e:
+                poznamky.append("OpenRegister.de: %s" % e)
         if (z.stav not in (STAV_NENALEZENO, STAV_CHYBA) and not z.nace and not z.obory
                 and z.zdroj != "Wikidata" and not n["bez_wikidata"]):
             try:
@@ -2796,6 +2892,12 @@ def main(argv=None):
     p.add_argument("--pripravit-de-rejstrik", action="store_true",
                    help="stahnout/rozbalit lokalni kopii nemeckeho Handelsregisteru "
                         "(%s) a skoncit" % os.path.basename(DE_REGISTER_DB))
+    p.add_argument("--de-api-klic", default=os.environ.get("OPENREGISTER_API_KEY", ""),
+                   help="API klic pro OpenRegister.de (openregister.de) - placena "
+                        "sluzba se skutecnym oborem cinnosti (WZ2025) pro nemecke firmy; "
+                        "ma prednost pred lokalnim Handelsregisterem. Klic se nikam "
+                        "neuklada, jen se pouzije za behu - lze predat i pres "
+                        "promennou prostredi OPENREGISTER_API_KEY")
     p.add_argument("--bez-gb", action="store_true",
                    help="nepouzivat lokalni kopii Companies House (UK)")
     p.add_argument("--pripravit-gb-rejstrik", action="store_true",
@@ -2869,7 +2971,7 @@ def main(argv=None):
     n = {"pocet": a.pocet, "prah_ok": a.prah_ok, "prah_overit": a.prah_overit,
          "vies": a.vies, "bez_ares": a.bez_ares, "bez_sk": a.bez_sk,
          "bez_fr": a.bez_fr, "bez_sg": a.bez_sg, "bez_tw": a.bez_tw,
-         "bez_de": a.bez_de, "bez_gb": a.bez_gb,
+         "bez_de": a.bez_de, "bez_gb": a.bez_gb, "openregister_klic": a.de_api_klic,
          "bez_gleif": a.bez_gleif, "bez_gleif_popisy": a.bez_gleif_popisy,
          "bez_edgar": a.bez_edgar, "bez_wikidata": a.bez_wikidata,
          "mapa": mapa, "kategorie_ciselnik": ciselnik, "mapa_oboru": mapa_oboru}

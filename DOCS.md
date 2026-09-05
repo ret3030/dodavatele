@@ -341,13 +341,15 @@ divize" - viz `vzor_komparace.csv` pro příklad přesně v tomhle formátu.
 | **ACRA** (data.gov.sg) | Singapur, kompletní | název, adresa, UEN, stav (aktivní/vymazáno) |
 | **GCIS** (data.gcis.nat.gov.tw) | Tchaj-wan, kompletní | název, adresa, daňové číslo, datum vzniku |
 | **Handelsregister** (lokální kopie, `--pripravit-de-rejstrik`) | Německo, ~5,3 mil. firem (data k 2019) | název, adresa, číslo zápisu (HRA/HRB/…), právní forma, stav (aktivní/vymazáno) |
+| **OpenRegister.de** (`--de-api-klic`, placené API) | Německo, živá data | to samé co Handelsregister + skutečný obor činnosti (WZ2025 → NACE) a text předmětu podnikání |
 | **Companies House** (lokální kopie, `--pripravit-gb-rejstrik`) | Velká Británie, ~5 mil. firem (měsíční aktualizace) | název, adresa, číslo firmy, právní forma, SIC 2007 → NACE, stav |
 | **GLEIF** (api.gleif.org) | svět, firmy s LEI (většina větších/kotovaných firem) | název (i v původním jazyce), adresa, národní registrační číslo, právní forma |
 | **SEC EDGAR** (sec.gov) | USA, firmy registrované u SEC | název, adresa, SIC → NACE i NAICS, CIK |
 | **Wikidata** | velké nadnárodní firmy | obor činnosti (viz níže), EU DIČ, LEI, sídlo |
 | **VIES** (`--vies`) | EU | ověření platnosti DIČ |
 
-Vše bez API klíče a bez registrace.
+Vše bez API klíče a bez registrace, kromě OpenRegister.de (volitelné,
+placené, viz "Skutečný NACE u německých firem" níže).
 
 **Poznámka k RPO SR:** vyhledávací pole `fullName` je nečekaně citlivé na
 interpunkci – s čárkou nebo tečkovanou právní formou přímo v zadání
@@ -392,6 +394,38 @@ neaktuální; na rozdíl od ARES/INSEE nejde o živý rejstřík. Číslo zápis
 (např. `HRB 45109`) navíc není celostátně jedinečné - stejné číslo používají
 různé rejstříkové soudy - proto se při zadání jen čísla bez názvu firmy
 může vrátit víc kandidátů k ruční kontrole (stejně jako u GLEIF).
+
+Hlavní limit lokální kopie ale **není stáří dat, ale to, že Handelsregister
+jako takový obor činnosti vůbec nevede** - ani v aktuální podobě. Pro
+skutečný NACE u německých firem je proto potřeba jiný zdroj, viz dále.
+
+#### Skutečný NACE u německých firem - OpenRegister.de (placené API)
+
+Handelsregister (živý ani lokální) obor činnosti neobsahuje vůbec - u
+Německa proto bez dalšího zdroje zbývá jen odhad přes Wikidata (jen velké/
+známé firmy). **OpenRegister.de** je komerční API třetí strany, které vede
+skutečnou klasifikaci **WZ2025** (německá obdoba NACE, stejné číslování)
+a text předmětu podnikání ("Gegenstand") přímo z živého Handelsregisteru:
+
+```bash
+python3 dodavatele.py vstup.csv -o vystup.xlsx --de-api-klic sk_live_...
+# nebo přes proměnnou prostředí, aby klíč nebyl vidět v historii příkazů:
+export OPENREGISTER_API_KEY=sk_live_...
+python3 dodavatele.py vstup.csv -o vystup.xlsx
+```
+
+Když je klíč zadaný, OpenRegister.de se pro německé firmy použije **místo**
+lokální kopie Handelsregisteru (`--bez-de`/lokální DB se tím pádem
+ignorují) - dá totéž co lokální kopie (jméno, adresa, číslo zápisu, právní
+forma) navíc se skutečným NACE. Bez klíče se chování nemění - firmy z DE
+se hledají jako dřív (lokální kopie, pak GLEIF + Wikidata).
+
+**Klíč se nikdy neukládá do repozitáře ani do keše** - předává se jen za
+běhu (parametr, nebo proměnná prostředí), na disk se dostane jedině v keši
+odpovědí samotného rejstříku (`.dodavatele_cache.json.gz`), ne v hlavičce
+dotazu. Nový účet dostává zdarma 500 kreditů/měsíc bez nutnosti platební
+karty (vyhledání jménem 1 kredit, detail firmy se skutečným NACE 10
+kreditů) - to stačí na běžné dávky řádu desítek německých firem.
 
 ### Velká Británie - lokální kopie Companies House
 
@@ -463,7 +497,7 @@ odvětvími, 34 z 37 reálných firem se dohledalo a zařadilo do kategorie):
 | SG | ACRA | – |
 | TW | GCIS | – |
 | US | SEC EDGAR (jen firmy registrované u SEC) | GLEIF + Wikidata |
-| DE | Handelsregister, lokální kopie (`--pripravit-de-rejstrik`, data k 2019) | GLEIF + Wikidata |
+| DE | Handelsregister, lokální kopie (`--pripravit-de-rejstrik`, data k 2019) - bez NACE; se `--de-api-klic` navíc skutečný NACE (OpenRegister.de, placené) | GLEIF + Wikidata |
 | GB | Companies House, lokální kopie (`--pripravit-gb-rejstrik`, měsíční aktualizace) | GLEIF + Wikidata |
 | NL, AT, BE, IT, ES, HU, IE, SE, BG, PL, RO | – | GLEIF + Wikidata |
 | KR, CH, HK, JP, MY, CA, CN, TR | – | GLEIF + Wikidata |
@@ -750,6 +784,9 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
 --vies                  ověřit DIČ v EU (pomalejší, jeden dotaz navíc na firmu)
 --bez-ares/-sk/-fr/-sg/-tw/-de/-gb/-gleif/-edgar/-wikidata   vypnutí jednotlivých zdrojů
 --pripravit-de-rejstrik   stáhnout/rozbalit lokální kopii německého Handelsregisteru a skončit
+--de-api-klic KLIC      API klíč OpenRegister.de - skutečný NACE (WZ2025) pro
+                        německé firmy, viz "Skutečný NACE u německých firem"
+                        (nebo proměnná prostředí OPENREGISTER_API_KEY)
 --pripravit-gb-rejstrik   stáhnout/naimportovat lokální kopii Companies House (UK) a skončit
 --bez-gleif-popisy      nepřekládat kódy GLEIF (rejstřík, právní forma) na text - rychlejší
 --cache SOUBOR          keš odpovědí (výchozí .dodavatele_cache.json.gz)
