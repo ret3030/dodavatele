@@ -133,6 +133,17 @@ mimo načtených kandidátů (`--pocet`) a nikdy se s ní neporovnávalo.
 (město/PSČ) — u firem to adresa jen zpřesňuje, u OSVČ je to prakticky
 jediný způsob, jak zaručit správnou osobu.
 
+**Pozor ale i s doplněnou adresou:** pokud v ARES existuje víc stejnojmenných
+OSVČ a zadaná adresa **nesedí na žádnou z nich** (ani na tu, kterou by
+nástroj jinak vybral jako nejlepší), nástroj to nevezme jako "aspoň nějaká
+shoda" — vrátí rovnou `NENALEZENO` bez propsání dat. Přesná kombinace
+jméno+adresa totiž mezi nalezenými kandidáty vůbec neexistuje, takže by šlo
+jen o tipování, která z několika stejnojmenných osob je ta správná — a cizí
+IČO/adresa v datech by byla horší než prázdný řádek. Tohle rozlišení platí
+jen pro OSVČ (fyzické osoby) — u firem se stejným jménem a nesedící adresou
+zůstává chování beze změny (`VYBRANO`/`OVERIT`), protože název firmy je sám
+o sobě mnohem silnější identifikátor než jméno člověka.
+
 #### Firma se nenajde v ARES (`NENALEZENO` u české firmy)
 
 Když zadané IČO není v hlavním rejstříku ARES (firma z něj vypadla), nástroj

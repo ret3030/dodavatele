@@ -1856,6 +1856,24 @@ def vyber_nejlepsi(kandidati, nazev, prah_ok, prah_overit, zeme=None, adresa=Non
                for (c, s, _), k in ohodnocene[:5] if s > 0.3]
 
     if skore >= prah_ok:
+        # OSVC: kdyz mame vic stejnojmennych osob (aspon jedna dalsi se stejnym
+        # jmenem mezi VSEMI kandidaty, ne jen mezi temi s vysokym skore) a
+        # zadana adresa nesedi ani na tu nejlepe skorujici, nejde jen o "trochu
+        # nejiste" - presna kombinace jmeno+adresa mezi kandidaty vubec neni.
+        # Radeji NENALEZENO, nez tipovat (byt s upozornenim v poznamce), ktery
+        # z nekolika stejnojmennych je ten spravny - propsani cizi adresy/ICO
+        # by bylo horsi nez prazdno. Musi se resit pred VYBRANO/OVERIT - jinak
+        # "srovnatelni" (pocitane jen z podobnosti jmena) skoro vzdy odchyti
+        # tenhle pripad driv a schova ho za VYBRANO.
+        if nejlepsi.pravni_forma in OSVC_PRAVNI_FORMY and adresa and any(adresa.values()):
+            adresa_nesedi = any(d.startswith(("sidlo v", "PSC ")) for d in duvody)
+            stejne_jmeno = sum(
+                1 for k in kandidati
+                if k.pravni_forma in OSVC_PRAVNI_FORMY
+                and normalizuj_nazev(k.jmeno) == normalizuj_nazev(nejlepsi.jmeno))
+            if adresa_nesedi and stejne_jmeno > 1:
+                return None, STAV_NENALEZENO, prehled
+
         # kolik dalsich kandidatu je jmenem stejne dobrych
         srovnatelni = sum(1 for (c, s, _), _ in ohodnocene[1:] if s >= prah_ok)
         if srovnatelni:
@@ -2099,17 +2117,22 @@ def zpracuj_radek(vstup, klient, n):
             zakladni_kod = re.sub(r"\D", "", str(z.nace or ""))
             if zakladni_kod and zakladni_kod in PODPURNE_NACE:
                 z.nace_nejisty = True
+                neurceno = zakladni_kod.strip("0") == ""   # "00"/"0000" - doslova "neurceno"
+                popis_kodu = ("nema v ARES zapsanou zadnou hlavni cinnost (kod %s = neurceno)"
+                             % z.nace if neurceno else
+                             "ma jako hlavni cinnost obecny/podpurny kod %s (napr. "
+                             "pronajem/spravni cinnosti)" % z.nace)
                 if len(set(z.nace_vse.split(","))) > 1:
                     poznamky.append(
-                        "prevazujici NACE %s je obecny kod (napr. pronajem/spravni "
-                        "cinnosti) - zkontrolujte NACE (vsechny), skutecny obor muze "
-                        "byt jiny" % z.nace)
+                        "firma %s - zkontrolujte NACE (vsechny), skutecny obor muze "
+                        "byt jiny" % popis_kodu)
                 else:
+                    duvod = ("firma obor jeste zrejme nenahlasila" if neurceno else
+                             "muze jit o majetkovou/holdingovou firmu se spravnym "
+                             "udajem, nebo jen o formalni registraci")
                     poznamky.append(
-                        "jediny zapsany NACE %s je obecny kod (napr. pronajem/spravni "
-                        "cinnosti) - muze jit o majetkovou/holdingovou firmu se "
-                        "spravnym udajem, nebo o formalni registraci; doporucena "
-                        "kontrola pres --export-nezarazene" % z.nace)
+                        "firma %s (jediny zapsany kod) - %s; doporucena kontrola "
+                        "pres --export-nezarazene" % (popis_kodu, duvod))
                     if z.stav == STAV_OK:
                         z.stav = STAV_OVERIT
         if z.stav != STAV_NENALEZENO and not n["bez_sk"]:
