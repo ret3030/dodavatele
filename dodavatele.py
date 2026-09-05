@@ -1283,6 +1283,86 @@ def doplnit_openregister_nace(klient, z, api_klic):
 
 
 # ---------------------------------------------------------------------------
+# Pobalti + Svedsko/Finsko - Scoris API (volitelne, vyzaduje vlastni API klic)
+#
+# scoris.eu (ne zamenovat s ceskym/litevskym scoris.lt - jine API, jiny klic)
+# pokryva jen SE/FI/EE/LV/LT/GB - u GB uz mame lepsi bezplatny zdroj
+# (Companies House), proto se zde pouziva jen pro SE/FI/EE/LV/LT. Vyhledavani
+# jmenem nevraci adresu ani NACE, jen jmeno+zemi+registracni cislo - detail
+# (a tim i skutecny NACE) se dotahuje az pro jiz vybraneho nejlepsiho
+# kandidata, aby se neplytvalo kredity na kandidaty, kteri nakonec nejsou
+# vybrani.
+# ---------------------------------------------------------------------------
+
+SCORIS_API = "https://scoris.eu"
+SCORIS_SEARCH = SCORIS_API + "/api/v1/company-search/"
+SCORIS_DETAIL = SCORIS_API + "/api/v1/company/{zeme}/{regcode}/"
+SCORIS_ZEME = {"SE", "FI", "EE", "LV", "LT"}
+
+
+def scoris_podle_nazvu(klient, nazev, api_klic, zeme=None, pocet=15):
+    if not api_klic:
+        return []
+    parametry = {"name": nazev, "limit": min(pocet, 100)}
+    if zeme:
+        parametry["country_code"] = zeme
+    url = SCORIS_SEARCH + "?" + urllib.parse.urlencode(parametry)
+    data = json.loads(klient.ziskej(url, hlavicky={"X-API-Key": api_klic}))
+    return [
+        Zaznam(
+            jmeno=r.get("name") or "",
+            zeme=r.get("country_code") or "",
+            reg_cislo=r.get("regcode") or "",
+            reg_rejstrik="obchodni rejstrik (Scoris)",
+            zdroj="Scoris",
+            identifikator="%s:%s" % (r.get("country_code"), r.get("regcode")),
+        )
+        for r in (data or [])[:pocet]
+    ]
+
+
+def _scoris_detail_ocisti(data):
+    return {k: v for k, v in data.items() if k in ("company", "meta")}
+
+
+def doplnit_scoris_detail(klient, z, api_klic):
+    """
+    Dotahne adresu, pravni formu, DIC a skutecny NACE pro uz vybraneho
+    nejlepsiho kandidata - vyhledavani jmenem (scoris_podle_nazvu) samo
+    o sobe vraci jen jmeno/zemi/registracni cislo.
+    """
+    if z.zdroj != "Scoris" or not z.identifikator or z.pravni_forma:
+        return
+    zeme, regcode = z.identifikator.split(":", 1)
+    url = SCORIS_DETAIL.format(zeme=zeme, regcode=urllib.parse.quote(regcode, safe=""))
+    data = json.loads(klient.ziskej(
+        url, hlavicky={"X-API-Key": api_klic}, ocisti=_scoris_detail_ocisti))
+    spol = data.get("company") or {}
+    adresa = spol.get("address") or {}
+    z.psc = adresa.get("postal_code") or z.psc
+    casti = (adresa.get("address") or "").split(",")
+    z.ulice = casti[0].strip()
+    if len(casti) > 1:
+        # posledni cast bývá "PSC MESTO" nebo jen "MESTO" - admin_name1/2
+        # jsou kraj/region, ne mesto (napr. FI "Uusimaa" pro Espoo)
+        posledni = casti[-1].strip()
+        if z.psc and posledni.startswith(z.psc):
+            posledni = posledni[len(z.psc):].strip()
+        z.mesto = posledni or adresa.get("admin_name2") or adresa.get("admin_name1") or z.mesto
+    else:
+        z.mesto = adresa.get("admin_name2") or adresa.get("admin_name1") or z.mesto
+    z.pravni_forma = spol.get("type") or "neurcena"
+    z.dic = z.dic or spol.get("vat_code") or ""
+    nace = ((spol.get("classifications") or {}).get("nace") or {})
+    kod = re.sub(r"\D", "", str(nace.get("nace_code") or ""))
+    if kod:
+        z.nace = kod
+        z.nace_popis = taxonomie.nazev_nace(kod)
+        z.nace_vse = kod
+        z.nace_zdroj = "NACE (Scoris)"
+
+
+# ---------------------------------------------------------------------------
 # Velka Britanie - Companies House (bezplatny bulk export, zadna registrace)
 #
 # Na rozdil od nemeckeho Handelsregisteru obsahuje bulk soubor primo i obor
@@ -2179,6 +2259,8 @@ def zpracuj_radek(vstup, klient, n):
                 zkus(de_podle_nazvu, nazev, n["pocet"])
             if zeme == "GB" and not n["bez_gb"] and os.path.exists(GB_REGISTER_DB):
                 zkus(gb_podle_nazvu, nazev, n["pocet"])
+            if zeme in SCORIS_ZEME and n["scoris_klic"]:
+                zkus(scoris_podle_nazvu, nazev, n["scoris_klic"], zeme, n["pocet"])
             if zeme != "CZ" and not n["bez_gleif"]:
                 zkus(gleif_podle_nazvu, nazev, zeme or None, n["pocet"])
             if zeme != "CZ" and not n["bez_wikidata"]:
@@ -2247,6 +2329,11 @@ def zpracuj_radek(vstup, klient, n):
                 doplnit_openregister_nace(klient, z, n["openregister_klic"])
             except Exception as e:
                 poznamky.append("OpenRegister.de: %s" % e)
+        if z.stav != STAV_NENALEZENO and n["scoris_klic"]:
+            try:
+                doplnit_scoris_detail(klient, z, n["scoris_klic"])
+            except Exception as e:
+                poznamky.append("Scoris: %s" % e)
         if (z.stav not in (STAV_NENALEZENO, STAV_CHYBA) and not z.nace and not z.obory
                 and z.zdroj != "Wikidata" and not n["bez_wikidata"]):
             try:
@@ -2898,6 +2985,10 @@ def main(argv=None):
                         "ma prednost pred lokalnim Handelsregisterem. Klic se nikam "
                         "neuklada, jen se pouzije za behu - lze predat i pres "
                         "promennou prostredi OPENREGISTER_API_KEY")
+    p.add_argument("--scoris-api-klic", default=os.environ.get("SCORIS_API_KEY", ""),
+                   help="API klic pro Scoris (scoris.eu) - placena sluzba se skutecnym "
+                        "NACE pro SE/FI/EE/LV/LT. Klic se nikam neuklada, jen se pouzije "
+                        "za behu - lze predat i pres promennou prostredi SCORIS_API_KEY")
     p.add_argument("--bez-gb", action="store_true",
                    help="nepouzivat lokalni kopii Companies House (UK)")
     p.add_argument("--pripravit-gb-rejstrik", action="store_true",
@@ -2972,6 +3063,7 @@ def main(argv=None):
          "vies": a.vies, "bez_ares": a.bez_ares, "bez_sk": a.bez_sk,
          "bez_fr": a.bez_fr, "bez_sg": a.bez_sg, "bez_tw": a.bez_tw,
          "bez_de": a.bez_de, "bez_gb": a.bez_gb, "openregister_klic": a.de_api_klic,
+         "scoris_klic": a.scoris_api_klic,
          "bez_gleif": a.bez_gleif, "bez_gleif_popisy": a.bez_gleif_popisy,
          "bez_edgar": a.bez_edgar, "bez_wikidata": a.bez_wikidata,
          "mapa": mapa, "kategorie_ciselnik": ciselnik, "mapa_oboru": mapa_oboru}

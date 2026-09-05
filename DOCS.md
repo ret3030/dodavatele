@@ -343,13 +343,15 @@ divize" - viz `vzor_komparace.csv` pro příklad přesně v tomhle formátu.
 | **Handelsregister** (lokální kopie, `--pripravit-de-rejstrik`) | Německo, ~5,3 mil. firem (data k 2019) | název, adresa, číslo zápisu (HRA/HRB/…), právní forma, stav (aktivní/vymazáno) |
 | **OpenRegister.de** (`--de-api-klic`, placené API) | Německo, živá data | to samé co Handelsregister + skutečný obor činnosti (WZ2025 → NACE) a text předmětu podnikání |
 | **Companies House** (lokální kopie, `--pripravit-gb-rejstrik`) | Velká Británie, ~5 mil. firem (měsíční aktualizace) | název, adresa, číslo firmy, právní forma, SIC 2007 → NACE, stav |
+| **Scoris** (`--scoris-api-klic`, placené API) | Švédsko, Finsko, Estonsko, Lotyšsko, Litva, živá data | název, adresa, registrační číslo, DIČ, právní forma, skutečný NACE |
 | **GLEIF** (api.gleif.org) | svět, firmy s LEI (většina větších/kotovaných firem) | název (i v původním jazyce), adresa, národní registrační číslo, právní forma |
 | **SEC EDGAR** (sec.gov) | USA, firmy registrované u SEC | název, adresa, SIC → NACE i NAICS, CIK |
 | **Wikidata** | velké nadnárodní firmy | obor činnosti (viz níže), EU DIČ, LEI, sídlo |
 | **VIES** (`--vies`) | EU | ověření platnosti DIČ |
 
-Vše bez API klíče a bez registrace, kromě OpenRegister.de (volitelné,
-placené, viz "Skutečný NACE u německých firem" níže).
+Vše bez API klíče a bez registrace, kromě OpenRegister.de a Scoris
+(volitelné, placené, viz "Skutečný NACE u německých firem" a "Skutečný
+NACE ve Švédsku/Finsku/Pobaltí" níže).
 
 **Poznámka k RPO SR:** vyhledávací pole `fullName` je nečekaně citlivé na
 interpunkci – s čárkou nebo tečkovanou právní formou přímo v zadání
@@ -445,6 +447,35 @@ python3 dodavatele.py --pripravit-gb-rejstrik
 Bez připravené databáze (`gb_companies_house.db`) se britské firmy hledají
 jen přes GLEIF + Wikidata jako dřív. Vypnout jde ručně přes `--bez-gb`.
 
+### Skutečný NACE ve Švédsku/Finsku/Pobaltí - Scoris (placené API)
+
+Stejný problém jako u Německa - bez skutečného zdroje oboru činnosti se SE/FI/
+EE/LV/LT firmy kategorizují jen přes Wikidata (jen velké/známé firmy).
+**Scoris** (scoris.eu) je komerční API třetí strany se skutečnou klasifikací
+NACE přímo z národních rejstříků těchto pěti zemí (plus UK, tam už ale máme
+lepší bezplatný zdroj - Companies House - takže se přes Scoris nepoužívá):
+
+```bash
+python3 dodavatele.py vstup.csv -o vystup.xlsx --scoris-api-klic klic...
+# nebo pres promennou prostredi:
+export SCORIS_API_KEY=klic...
+python3 dodavatele.py vstup.csv -o vystup.xlsx
+```
+
+**Pozor na dvě různé služby stejného jména** - `scoris.eu` (SE/FI/EE/LV/LT,
+placené přes `--scoris-api-klic`) a `scoris.lt` (jen Litva, jiný účet/klíč,
+zatím nezapojeno) jsou dvě samostatná API se stejným původem, ale jiným
+klíčem i jinou doménou - klíč z jednoho na druhém nefunguje.
+
+Vyhledávání jménem samo o sobě adresu ani NACE nevrací (jen jméno, zemi
+a registrační číslo) - ty se dotáhnou až pro jednoho, už vybraného
+nejlepšího kandidáta, aby se kredity nemrhaly na kandidáty, kteří nakonec
+nejsou vybraní. Free tarif dává 100 kreditů (vyhledání zdarma, detail firmy
+se skutečným NACE 1 kredit) - bez karty.
+
+**Klíč se nikdy neukládá do repozitáře ani do keše** - stejné pravidlo jako
+u OpenRegister.de výše.
+
 ### Jak nástroj hledá dodavatele mimo ČR/SR/FR/SG/TW/DE/GB
 
 Země bez přímo napojeného rejstříku (viz tabulka výše) se hledají přes GLEIF a
@@ -499,7 +530,8 @@ odvětvími, 34 z 37 reálných firem se dohledalo a zařadilo do kategorie):
 | US | SEC EDGAR (jen firmy registrované u SEC) | GLEIF + Wikidata |
 | DE | Handelsregister, lokální kopie (`--pripravit-de-rejstrik`, data k 2019) - bez NACE; se `--de-api-klic` navíc skutečný NACE (OpenRegister.de, placené) | GLEIF + Wikidata |
 | GB | Companies House, lokální kopie (`--pripravit-gb-rejstrik`, měsíční aktualizace) | GLEIF + Wikidata |
-| NL, AT, BE, IT, ES, HU, IE, SE, BG, PL, RO | – | GLEIF + Wikidata |
+| SE, FI, EE, LV, LT | se `--scoris-api-klic` skutečný NACE (Scoris, placené); bez klíče | GLEIF + Wikidata |
+| NL, AT, BE, IT, ES, HU, IE, BG, PL, RO | – | GLEIF + Wikidata |
 | KR, CH, HK, JP, MY, CA, CN, TR | – | GLEIF + Wikidata |
 
 U zemí bez přímého rejstříku (vše kromě CZ/SK/FR/SG/TW/US) závisí přesnost
@@ -788,6 +820,9 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
                         německé firmy, viz "Skutečný NACE u německých firem"
                         (nebo proměnná prostředí OPENREGISTER_API_KEY)
 --pripravit-gb-rejstrik   stáhnout/naimportovat lokální kopii Companies House (UK) a skončit
+--scoris-api-klic KLIC  API klíč Scoris - skutečný NACE pro SE/FI/EE/LV/LT,
+                        viz "Skutečný NACE ve Švédsku/Finsku/Pobaltí"
+                        (nebo proměnná prostředí SCORIS_API_KEY)
 --bez-gleif-popisy      nepřekládat kódy GLEIF (rejstřík, právní forma) na text - rychlejší
 --cache SOUBOR          keš odpovědí (výchozí .dodavatele_cache.json.gz)
 --obnovit-nenalezene SOUBOR   dřívější výstup (bez --kompakt) - firmy s minulým
