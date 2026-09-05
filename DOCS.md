@@ -115,6 +115,21 @@ nerozeznatelní, projeví se to nižším skóre a stavem `OVERIT` s vysvětlen�
 Poznámce (např. „pozor: sídlo v PT místo FR“) — tam ještě stojí za to
 zkontrolovat ručně.
 
+#### Dodavatel je OSVČ (fyzická osoba) zadaná jen jménem
+
+Jméno fyzické osoby není jednoznačný identifikátor tak jako název firmy —
+běžné jméno typu "Jan Novák" má v ARES bez legrace stovky záznamů různých
+lidí. Pokud vstup neobsahuje adresu ani IČO, nástroj takovou shodu (rozpozná
+ji podle kódu právní formy ARES 100–108, tedy fyzická osoba podnikající)
+**nikdy nevyhodnotí jako jistou `OK`**, i kdyby šlo o jediného nalezeného
+kandidáta — dostane `OVERIT` s poznámkou "nalezeno jen podle jména osoby
+(OSVC) bez adresy k rozlišení". Jiná stejnojmenná osoba totiž mohla zůstat
+mimo načtených kandidátů (`--pocet`) a nikdy se s ní neporovnávalo.
+
+**Řešení:** doplňte do vstupu **IČO** (nejjistější) nebo aspoň **adresu**
+(město/PSČ) — u firem to adresa jen zpřesňuje, u OSVČ je to prakticky
+jediný způsob, jak zaručit správnou osobu.
+
 #### Firma se nenajde v ARES (`NENALEZENO` u české firmy)
 
 Když zadané IČO není v hlavním rejstříku ARES (firma z něj vypadla), nástroj

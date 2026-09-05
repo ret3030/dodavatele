@@ -128,6 +128,14 @@ STAV_OVERIT = "OVERIT"
 STAV_NENALEZENO = "NENALEZENO"
 STAV_CHYBA = "CHYBA"
 
+# ARES kody pravni formy pro fyzickou osobu podnikajici (OSVC) - viz RES
+# ciselnik pravnich forem. Jmeno osoby (na rozdil od nazvu firmy) neni
+# jednoznacny identifikator - u bezneho jmena (Jan Novak) ARES bezne eviduje
+# stovky ruznych lidi (napr. "Jan Novak" ma v ARES 428 zaznamu) - proto se
+# shoda podle pouheho jmena OSVC bez adresy/ICO k rozliseni nebere jako OK,
+# viz vyber_nejlepsi().
+OSVC_PRAVNI_FORMY = {"100", "101", "102", "103", "104", "105", "106", "107", "108"}
+
 
 # ---------------------------------------------------------------------------
 # HTTP vrstva: rate limit na host, opakovani pri chybe, cache na disku
@@ -2199,6 +2207,18 @@ def vyber_nejlepsi(kandidati, nazev, prah_ok, prah_overit, zeme=None, adresa=Non
         if duvody:
             nejlepsi.poznamka = "; ".join(p for p in (nejlepsi.poznamka,
                                                       "pozor: " + ", ".join(duvody)) if p)
+            return nejlepsi, STAV_OVERIT, prehled
+        # OSVC nalezena jen podle jmena osoby, bez adresy k rozliseni - jmeno
+        # samo o sobe neni jednoznacne (na rozdil od nazvu firmy), takze i
+        # jediny takto ziskany kandidat neni jisty (viz OSVC_PRAVNI_FORMY) -
+        # jina stejnojmenna osoba mohla byt jen mimo nactenych "pocet" kandidatu.
+        if nejlepsi.pravni_forma in OSVC_PRAVNI_FORMY and not (adresa and any(adresa.values())):
+            nejlepsi.poznamka = "; ".join(p for p in (
+                nejlepsi.poznamka,
+                "pozor: nalezeno jen podle jmena osoby (OSVC) bez adresy k rozliseni - "
+                "u beznych jmen muze v ARES existovat vic stejnojmennych osob, "
+                "doplnte adresu nebo ICO pro jistotu",
+            ) if p)
             return nejlepsi, STAV_OVERIT, prehled
         return nejlepsi, STAV_OK, prehled
     if skore >= prah_overit:
