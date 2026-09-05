@@ -1936,6 +1936,20 @@ def zpracuj_radek(vstup, klient, n):
                 z.hledany_nazev = nazev or ico
                 z.shoda = "100%" if not nazev else "%.0f%%" % (skore_shody(nazev, z.jmeno) * 100)
                 z.stav = STAV_OK
+                # Presne cislo (ICO, nebo ICO odvozene z DIC) muze byt na
+                # vstupu spatne - preklep, spatne zkopirovany radek apod.
+                # Zvlast u OSVC muze byt jinak stejne jmeno zadano se
+                # spravnou adresou, ale s cislem patricim jinemu
+                # stejnojmennemu clovku - bez kontroly adresy by se to
+                # tise vzalo jako jiste OK. Kontroluje se jen kdyz je na
+                # vstupu vubec nejaka adresa k porovnani.
+                adr_bonus, adr_duvod = _shoduje_se_adresa(hledana_adresa, z)
+                if adr_duvod and adr_bonus < 0:
+                    z.stav = STAV_OVERIT
+                    poznamky.append(
+                        "pozor: zadane ICO/DIC bylo v ARES nalezeno, ale zadana "
+                        "adresa neodpovida (%s) - zkontrolujte, jestli cislo "
+                        "patri ke spravne osobe/firme" % adr_duvod)
             except Exception as e:
                 poznamky.append("ARES podle ICO: %s" % e)
                 # subjekt jiz neni v hlavnim indexu ARES - zkusit Verejny

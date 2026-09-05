@@ -61,6 +61,16 @@ VIES je občas dočasně přetížený (hlavně při více souběžných dotazec
 stejný stát) — nástroj to pozná a dotaz sám 5× zopakuje, než to vzdá a
 přejde na hledání jménem.
 
+**Přesné číslo (IČO/DIČ) na vstupu může být samo o sobě špatně** – překlep,
+špatně zkopírovaný řádek v tabulce apod. Pokud je na stejném řádku vyplněná
+i adresa (ulice/PSČ/město) a jasně neodpovídá tomu, co se pod daným
+IČO/DIČ v rejstříku skutečně najde, nástroj takovou shodu nebere jako
+jistou `OK`, ale dá `OVERIT` s poznámkou a **zkusí to navíc dohledat i podle
+jména a adresy** – u běžných jmen (typicky OSVČ) to dokáže samo najít
+správnou osobu, i když číslo na vstupu patřilo někomu jinému stejného
+jména. Bez zadané adresy tohle rozpoznat nejde – čím víc údajů dáte, tím
+spolehlivější výsledek.
+
 ## Výstup
 
 Sloupce podle zadání: `Jméno | Ulice | PSČ | Město | Země | IČO | DIČ | NACE`,
