@@ -426,9 +426,11 @@ class Zaznam:
 # ---------------------------------------------------------------------------
 
 # Cinnosti, ktere ma zapsanou temer kazda firma a hlavni obor neurcuji.
-PODPURNE_NACE = {"00", "0000", "68", "682", "6820", "68200", "70", "702", "7010", "7022",
-                 "74", "749", "7490", "77", "82", "829", "8299", "46", "461", "4619",
-                 "469", "4690", "47", "471", "4778", "479", "4799", "52", "5210"}
+# Kody podle CZ-NACE 2025 (viz komentar u ares_prevazujici_nace) - par
+# tridit se cislem oproti CZ-NACE 2008 presunulo, viz jednotlive zmeny nize.
+PODPURNE_NACE = {"00", "0000", "68", "682", "6820", "68200", "70", "7010", "7020",
+                 "74", "7499", "77", "82", "8299", "46", "461", "4619",
+                 "469", "4690", "47", "471", "4778", "4791", "4792", "52", "5210"}
 
 
 def _je_podpurny(kod):
@@ -536,6 +538,19 @@ def ares_prevazujici_nace(klient, ico):
     Seznam czNace2008 je v ARES serazeny vzestupne, ne podle vyznamu. Zdroj RES
     ale vede prevazujici (hlavni) cinnost subjektu - tu pouzijeme prednostne.
 
+    RES vraci prevazujici cinnost hned ve dvou klasifikacnich soustavach:
+    "czNacePrevazujici" (CZ-NACE 2025 = NACE Rev. 2.1, zavazna revize EU
+    statistiky od 1.1.2025, v RES vychozi od 1.1.2026) a "czNacePrevazujici2008"
+    (starsi CZ-NACE 2008 = NACE Rev. 2, ktere RES drzi soubezne jen po
+    prechodne obdobi, cca 4 roky od zavedeni). Preferuje se novejsi 2025
+    soustava - na ni je postavena i nase vlastni taxonomie.NACE_MAPA. Nejde
+    o "cerstvejsi hodnotu tehoz cisla" - jde o dve ruzne klasifikacni
+    soustavy, kde stejne cislo muze v kazde znamenat neco jineho (napr.
+    trida 58.12 byla v 2008 "vydavani adresaru", v 2025 uz "vydavani novin") -
+    proto se nemixuji, jen se bere jedna nebo druha cela hodnota naraz.
+    2008 pole zustava jen jako zaloha pro pripad, ze by 2025 pole u
+    konkretniho zaznamu chybelo.
+
     "00"/"0000" znamena u RES "neurceno" (subjekt nema prevazujici cinnost
     formalne nastavenou - typicky OSVC s vice zivnostmi bez oznacene hlavni)
     a neni to skutecny NACE kod - takovy zaznam se ignoruje, jinak by prepsal
@@ -544,7 +559,7 @@ def ares_prevazujici_nace(klient, ico):
     ico = re.sub(r"\D", "", str(ico)).zfill(8)
     data = json.loads(klient.ziskej(ARES_RES.format(ico=ico), ocisti=_ares_ocisti))
     for zaznam in data.get("zaznamy", []):
-        nace = zaznam.get("czNacePrevazujici2008") or zaznam.get("czNacePrevazujici")
+        nace = zaznam.get("czNacePrevazujici") or zaznam.get("czNacePrevazujici2008")
         cislice = re.sub(r"\D", "", str(nace or ""))
         if cislice and cislice.strip("0"):
             return str(nace)
