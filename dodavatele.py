@@ -2301,7 +2301,16 @@ def zpracuj_radek(vstup, klient, n):
                 zkus(edgar_podle_nazvu, nazev, n["pocet"])
             if zeme == "DE" and n["openregister_klic"]:
                 zkus(openregister_podle_nazvu, nazev, n["openregister_klic"], n["pocet"])
-            elif zeme == "DE" and not n["bez_de"] and os.path.exists(DE_REGISTER_DB):
+            # DULEZITE: kontrola "stav == STAV_NENALEZENO", ne proste druhe
+            # "if" bez podminky - kdyby se lokalni DB zkousela vzdy vedle
+            # OpenRegisteru, mohla by ho v zkus() prebit jen diky vyssimu
+            # skore shody jmena, i kdyz OpenRegister uz nasel spravnou firmu
+            # se skutecnym NACE (lokalni DB zadny NACE nema). Lokalni DB se
+            # proto zkousi jen kdyz OpenRegister.de nenasel vubec nic - napr.
+            # kdyz dosly kredity/klic je neplatny - jinak by firma bez teto
+            # zalohy zustala cela nenalezena, i kdyz ji mame lokalne k dispozici.
+            if (zeme == "DE" and stav == STAV_NENALEZENO
+                    and not n["bez_de"] and os.path.exists(DE_REGISTER_DB)):
                 zkus(de_podle_nazvu, nazev, n["pocet"])
             if zeme == "GB" and not n["bez_gb"] and os.path.exists(GB_REGISTER_DB):
                 zkus(gb_podle_nazvu, nazev, n["pocet"])
