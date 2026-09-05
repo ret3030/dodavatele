@@ -51,10 +51,17 @@ ZDROJE = [
 
 
 def vychozi_argumenty():
-    """Stejne vychozi hodnoty jako ma CLI (main() v dodavatele.py)."""
+    """
+    Stejne vychozi hodnoty jako ma CLI (main() v dodavatele.py). export_overeni/
+    export_davka/overeni_mapa jsou zamerne CLI-only funkce (plosne LLM overeni
+    kategorie muze prepsat i dosud spravnou kategorii, viz DOCS.md) - GUI pro
+    ne nema ovladaci prvky, ale spustit() na tyhle atributy sahaje vzdy, takze
+    tu musi byt aspon prazdne/vychozi, jinak by beh z GUI spadl na AttributeError.
+    """
     return argparse.Namespace(
         vstup=None, vystup="dodavatele_vystup.xlsx", sloupec=None, oddelovac=";",
         kompakt=False, jen_id=False, export_nezarazene=None, nace_mapa=None,
+        export_overeni=None, export_davka=None, overeni_mapa=None,
         workers=4, prodleva=0.25, pocet=30, prah_ok=0.90, prah_overit=0.72,
         vies=False, bez_ares=False, bez_sk=False, bez_fr=False, bez_sg=False,
         bez_tw=False, bez_de=False, de_api_klic="", scoris_api_klic="",
