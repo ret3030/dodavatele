@@ -1014,6 +1014,14 @@ def edgar_podle_nazvu(klient, nazev, pocet=10):
             m = re.match(r"(.*?)\s*\(CIK (\d+)\)", titul.text.strip())
             if m:
                 vysledky.append(_edgar_na_zaznam(entry, m.group(2), m.group(1)))
+    for z in vysledky:
+        if not z.jmeno:
+            # U hromadneho vyhledavani podle jmena SEC u firem s vic
+            # registrovanymi subjekty (napr. vic dcerinych spolecnosti
+            # jedne skupiny) vraci zaznam bez <conformed-name> vubec -
+            # bez jmena by kandidat dostal 0% shodu a jinak spravny
+            # CIK/SIC (napr. skutecny obor cinnosti) by se tise zahodil.
+            z.jmeno = nazev
     return vysledky
 
 
@@ -2107,18 +2115,22 @@ def zpracuj_radek(vstup, klient, n):
                 z.stav = STAV_OK
                 # Presne cislo (ICO, nebo ICO odvozene z DIC) muze byt na
                 # vstupu spatne - preklep, spatne zkopirovany radek apod.
-                # Zvlast u OSVC muze byt jinak stejne jmeno zadano se
-                # spravnou adresou, ale s cislem patricim jinemu
-                # stejnojmennemu clovku - bez kontroly adresy by se to
-                # tise vzalo jako jiste OK. Kontroluje se jen kdyz je na
-                # vstupu vubec nejaka adresa k porovnani.
-                adr_bonus, adr_duvod = _shoduje_se_adresa(hledana_adresa, z)
-                if adr_duvod and adr_bonus < 0:
-                    z.stav = STAV_OVERIT
-                    poznamky.append(
-                        "pozor: zadane ICO/DIC bylo v ARES nalezeno, ale zadana "
-                        "adresa neodpovida (%s) - zkontrolujte, jestli cislo "
-                        "patri ke spravne osobe/firme" % adr_duvod)
+                # U OSVC muze byt jinak stejne jmeno zadano se spravnou
+                # adresou, ale s cislem patricim jinemu stejnojmennemu
+                # clovku - bez kontroly adresy by se to tise vzalo jako
+                # jiste OK. Kontroluje se JEN u OSVC (fyzickych osob) -
+                # u firem je bezne, ze provozni/korespondencni adresa na
+                # vstupu neodpovida formalnimu sidlu v ARES, a takovy
+                # nesoulad nic neznamena (na rozdil od skutecne jine
+                # osoby/firmy u shodneho jmena).
+                if z.pravni_forma in OSVC_PRAVNI_FORMY:
+                    adr_bonus, adr_duvod = _shoduje_se_adresa(hledana_adresa, z)
+                    if adr_duvod and adr_bonus < 0:
+                        z.stav = STAV_OVERIT
+                        poznamky.append(
+                            "pozor: zadane ICO/DIC bylo v ARES nalezeno, ale zadana "
+                            "adresa neodpovida (%s) - zkontrolujte, jestli cislo "
+                            "patri ke spravne osobe" % adr_duvod)
             except Exception as e:
                 poznamky.append("ARES podle ICO: %s" % e)
                 # subjekt jiz neni v hlavnim indexu ARES - zkusit Verejny
