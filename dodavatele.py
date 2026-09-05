@@ -3048,6 +3048,25 @@ def main(argv=None):
     if not a.vstup:
         p.error("chybi vstupni soubor (nebo pouzijte --dump-taxonomy)")
 
+    try:
+        spustit(a)
+    except RuntimeError as e:
+        sys.exit(str(e))
+    return 0
+
+
+def spustit(a, na_radek=None):
+    """
+    Provede plne obohaceni podle `a` (argparse.Namespace, nebo jakykoli
+    objekt se stejnymi atributy jako CLI parametry main() - viz gui.py,
+    ktery si vlastni Namespace staví rucne) a vrati seznam zpracovanych
+    Zaznamu. Sdilene jadro pro CLI (main()) i pro desktopove GUI (gui.py),
+    aby se logika behu nemusela udrzovat na dvou mistech.
+
+    `na_radek(hotovo, celkem, zaznam)` se zavola po zpracovani kazdeho
+    radku (navic k prubeznemu vypisu na stderr) - GUI si tim aktualizuje
+    progress bar bez nutnosti parsovat konzolovy vystup.
+    """
     mapa, ciselnik, mapa_oboru = None, None, None
     if a.taxonomy:
         with open(a.taxonomy, encoding="utf-8") as f:
@@ -3055,7 +3074,7 @@ def main(argv=None):
 
     radky = nacti_vstup(a.vstup, a.sloupec)
     if not radky:
-        sys.exit("Ve vstupu %s nejsou zadne pouzitelne radky." % a.vstup)
+        raise RuntimeError("Ve vstupu %s nejsou zadne pouzitelne radky." % a.vstup)
     print("Nacteno %d radku z %s" % (len(radky), a.vstup), file=sys.stderr)
 
     klient = Klient(cache_soubor=a.cache or None, prodleva=a.prodleva, ua=a.ua)
@@ -3094,6 +3113,8 @@ def main(argv=None):
             print("  [%d/%d] %-42.42s -> %-11s %s" % (
                 hotovo[0], len(radky), z.hledany_nazev, z.stav,
                 "%s %s" % (z.kod_kategorie, z.kategorie)), file=sys.stderr)
+            if na_radek is not None:
+                na_radek(hotovo[0], len(radky), z)
         return z
 
     with ThreadPoolExecutor(max_workers=max(1, a.workers)) as ex:
@@ -3132,7 +3153,7 @@ def main(argv=None):
     if k_kontrole:
         print("K rucni kontrole (%d): %s" % (
             len(k_kontrole), ", ".join(z.hledany_nazev for z in k_kontrole[:10])), file=sys.stderr)
-    return 0
+    return zaznamy
 
 
 if __name__ == "__main__":
