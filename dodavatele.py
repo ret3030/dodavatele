@@ -483,7 +483,12 @@ def _psc(hodnota):
 def _ares_na_zaznam(s):
     sidlo = s.get("sidlo") or {}
     registrace = s.get("seznamRegistraci") or {}
-    kody = s.get("czNace2008") or s.get("czNace") or []
+    # "czNace" = CZ-NACE 2025 (nova revize), "czNace2008" = starsi CZ-NACE
+    # 2008 - stejna prednost nove revize jako u ares_prevazujici_nace vyse,
+    # aby sloupec NACE (vsechny) nesl kody ve stejne soustave, jakou pouziva
+    # vlastni taxonomie.NACE_MAPA (jinak by tu zustaly zastarale kody i pote,
+    # co uz byla prevazujici cinnost spravne prepsana na novou revizi).
+    kody = s.get("czNace") or s.get("czNace2008") or []
     nace = vyber_hlavni_nace(kody)
     ico = s.get("ico") or ""
     return Zaznam(
