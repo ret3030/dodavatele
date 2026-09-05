@@ -431,6 +431,20 @@ PODPURNE_NACE = {"00", "0000", "68", "682", "6820", "68200", "70", "702", "7010"
                  "469", "4690", "47", "471", "4778", "479", "4799", "52", "5210"}
 
 
+def _je_podpurny(kod):
+    """
+    ARES obcas dopluje kod nulami na delsi tvar (napr. trida "4690" jako
+    petimistne "46900") - kontroluje se i tohle prodlouzeni o nuly navic,
+    ne jen presna shoda. NEJDE o shodu podle libovolne predpony - kod
+    "7021" (PR agentura) nesmi spadnout pod obecne "70" jen proto, ze
+    zacina stejne, proto se kontroluje jen doplneni same nulami.
+    """
+    if kod in PODPURNE_NACE:
+        return True
+    return any(kod.startswith(p) and set(kod[len(p):]) <= {"0"}
+               for p in PODPURNE_NACE if len(p) < len(kod))
+
+
 def vyber_hlavni_nace(kody):
     """
     ARES vraci vsechny registrovane cinnosti bez oznaceni hlavni. Bereme prvni
@@ -438,7 +452,7 @@ def vyber_hlavni_nace(kody):
     """
     if not kody:
         return ""
-    hlavni = [k for k in kody if k not in PODPURNE_NACE]
+    hlavni = [k for k in kody if not _je_podpurny(k)]
     return (hlavni or kody)[0]
 
 
@@ -2314,7 +2328,7 @@ def zpracuj_radek(vstup, klient, n):
             # kontrole (--export-nezarazene zahrne i tyto zaznamy, ne jen
             # XXX-00, viz nace_nejisty).
             zakladni_kod = re.sub(r"\D", "", str(z.nace or ""))
-            if zakladni_kod and zakladni_kod in PODPURNE_NACE:
+            if zakladni_kod and _je_podpurny(zakladni_kod):
                 z.nace_nejisty = True
                 neurceno = zakladni_kod.strip("0") == ""   # "00"/"0000" - doslova "neurceno"
                 popis_kodu = ("nema v ARES zapsanou zadnou hlavni cinnost (kod %s = neurceno)"
