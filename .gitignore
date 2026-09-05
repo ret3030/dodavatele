@@ -6,3 +6,6 @@ vystup*.xlsx
 vystup*.csv
 de_handelsregister.db*
 gb_companies_house.db*
+build/
+dist/
+*.spec

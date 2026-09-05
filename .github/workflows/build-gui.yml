@@ -1,0 +1,57 @@
+name: Build desktop GUI
+
+# Sestavi desktopovou appku (gui.py) do jednoho spustitelneho souboru pro
+# Windows a macOS pres PyInstaller - PyInstaller neumi cross-build, proto
+# bezi zvlast na windows-latest a macos-latest. Vysledne soubory se objevi
+# jako artefakty tohoto behu (zalozka Actions -> konkretni beh -> Artifacts).
+on:
+  workflow_dispatch:
+  push:
+    branches: [gui-desktop]
+    paths:
+      - "gui.py"
+      - "dodavatele.py"
+      - "taxonomie.py"
+      - ".github/workflows/build-gui.yml"
+
+jobs:
+  build:
+    strategy:
+      matrix:
+        os: [windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Instalovat zavislosti
+        run: python -m pip install --upgrade pip pyinstaller openpyxl
+
+      - name: Sestavit (Windows - jeden .exe)
+        if: runner.os == 'Windows'
+        run: pyinstaller --onefile --windowed --name Dodavatele gui.py
+
+      - name: Sestavit (macOS - .app balicek)
+        if: runner.os == 'macOS'
+        run: pyinstaller --windowed --name Dodavatele gui.py
+
+      - name: Zabalit macOS .app do zipu
+        if: runner.os == 'macOS'
+        run: |
+          cd dist
+          zip -r Dodavatele-macOS.zip Dodavatele.app
+
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'Windows'
+        with:
+          name: Dodavatele-Windows
+          path: dist/Dodavatele.exe
+
+      - uses: actions/upload-artifact@v4
+        if: runner.os == 'macOS'
+        with:
+          name: Dodavatele-macOS
+          path: dist/Dodavatele-macOS.zip
