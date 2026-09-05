@@ -242,6 +242,15 @@ python3 dodavatele.py --komparace vystup_s_kolegovym_sloupcem.xlsx \
     --komparace-sloupec "Kolegův NACE"
 ```
 
+Nebo přes `python3 dodavatele.py` → volba **3) Porovnat NACE se souborem od
+kolegy/AI** v průvodci. Ukázkový soubor `vzor_komparace.csv` (sloupce
+`Jméno;Země;NACE;Komparace`) demonstruje typický výsledek – kolegův/AI odhad
+se často trefí jen na hrubou kategorii nebo úplně mine:
+
+```bash
+python3 dodavatele.py --komparace vzor_komparace.csv --komparace-sloupec Komparace
+```
+
 Řádky se berou 1:1 podle pozice (žádné párování podle jména/IČO — soubor je
 už náš vlastní výstup jen s přidaným sloupcem navíc). Shoda se počítá na
 úrovni **NACE divize** (první 2 číslice) — odpouští drobné rozdíly
@@ -331,6 +340,9 @@ python3 dodavatele.py vstup.csv -o vystup.xlsx
 # 2. krok - doplnit Gegenstand pro německé řádky ve vystup.xlsx
 python3 dodavatele.py --de-gegenstand vystup.xlsx
 ```
+
+Druhý krok jde spustit i přes `python3 dodavatele.py` → volba **2) Doplnit
+"Gegenstand des Unternehmens"** v průvodci, ať nemusíte pamatovat přepínač.
 
 Vyžaduje připravenou lokální kopii Handelsregisteru (`--pripravit-de-rejstrik`)
 - z ní se dohledá soud potřebný k jednoznačnému výběru správného řádku na

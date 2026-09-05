@@ -3000,25 +3000,57 @@ def _najdi_vstupni_soubory():
                   and f.lower() not in _NEZAJIMAVE_SOUBORY)
 
 
+def _vyber_soubor(vyzva):
+    """Nabidne k vyberu CSV/XLSX/TXT soubory nalezene ve slozce (cislem),
+    nebo necha zadat cestu rucne - sdileno mezi vsemi rezimy pruvodce."""
+    kandidati = _najdi_vstupni_soubory()
+    soubor = ""
+    if kandidati:
+        print("Nalezene soubory ve slozce:")
+        for i, f in enumerate(kandidati, 1):
+            print("  %d) %s" % (i, f))
+        volba = input("%s - cislo souboru, nebo zadejte jinou cestu: " % vyzva).strip()
+        if volba.isdigit() and 1 <= int(volba) <= len(kandidati):
+            soubor = kandidati[int(volba) - 1]
+        else:
+            soubor = volba
+    while not soubor or not os.path.exists(soubor):
+        soubor = input("%s%s: " % (
+            vyzva, " - soubor neexistuje, zkuste znovu" if soubor else "")).strip()
+    return soubor
+
+
 def spustit_pruvodce():
     """Sestavi seznam argumentu (jako by prisly z prikazove radky) na zaklade
     par jednoduchych otazek - misto aby si uzivatel musel pamatovat prepinace."""
     print("=== Pruvodce zpracovanim dodavatelu (Enter = vychozi hodnota) ===\n")
 
-    kandidati = _najdi_vstupni_soubory()
-    vstup = ""
-    if kandidati:
-        print("Nalezene soubory ve slozce:")
-        for i, f in enumerate(kandidati, 1):
-            print("  %d) %s" % (i, f))
-        volba = input("Cislo souboru, nebo zadejte jinou cestu: ").strip()
-        if volba.isdigit() and 1 <= int(volba) <= len(kandidati):
-            vstup = kandidati[int(volba) - 1]
-        else:
-            vstup = volba
-    while not vstup or not os.path.exists(vstup):
-        vstup = input("Cesta ke vstupnimu souboru (CSV/XLSX/TXT)%s: " % (
-            " - soubor neexistuje, zkuste znovu" if vstup else "")).strip()
+    print("Co chcete udelat?")
+    print("  1) Zpracovat seznam dodavatelu (bezny beh)")
+    print("  2) Doplnit \"Gegenstand des Unternehmens\" pro nemecke firmy "
+          "v uz zpracovanem vystupu (--de-gegenstand)")
+    print("  3) Porovnat NACE se souborem od kolegy/AI (--komparace)")
+    volba_rezimu = input("Volba [1]: ").strip()
+
+    if volba_rezimu == "2":
+        soubor = _vyber_soubor(
+            "Soubor s uz zpracovanymi nemeckymi firmami (vystup z beznaho behu)")
+        print("\nPripomenuti: limit portalu je ~60 dotazu/h, pocitejte s ~4 min/firmu.")
+        argv = ["--de-gegenstand", soubor]
+        print("\nSpoustim: python3 dodavatele.py " + " ".join(argv) + "\n")
+        return argv
+
+    if volba_rezimu == "3":
+        soubor = _vyber_soubor("Soubor s pridanym sloupcem od kolegy/AI")
+        sloupec = _zeptej_se("Nazev sloupce s kolegovym NACE kodem", "Komparace")
+        nas_sloupec = _zeptej_se("Nazev naseho sloupce s NACE", "NACE")
+        argv = ["--komparace", soubor, "--komparace-sloupec", sloupec]
+        if nas_sloupec != "NACE":
+            argv += ["--komparace-nas-sloupec", nas_sloupec]
+        print("\nSpoustim: python3 dodavatele.py " + " ".join(argv) + "\n")
+        return argv
+
+    vstup = _vyber_soubor("Cesta ke vstupnimu souboru (CSV/XLSX/TXT)")
 
     zaklad = os.path.splitext(os.path.basename(vstup))[0]
     vystup = _zeptej_se("Kam ulozit vysledek", "vystup_%s.xlsx" % zaklad)
@@ -3055,6 +3087,9 @@ def spustit_pruvodce():
             argv += ["--kategorie-mapa", mapa_soubor]
 
     print("\nSpoustim: python3 dodavatele.py " + " ".join(argv) + "\n")
+    print("Tip: nemecke firmy bez oboru muzete pozdeji doplnit pruvodcem znovu "
+          "(volba 2 - Gegenstand), nebo je porovnat se souborem od kolegy "
+          "(volba 3 - Komparace).", file=sys.stderr)
     return argv
 
 
