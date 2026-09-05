@@ -24,8 +24,9 @@ Vstupem je jakýkoli seznam firem (`.csv`, `.xlsx` nebo `.txt`) – stačí slou
 s názvem, IČO/DIČ/adresa jsou nepovinné, ale zpřesní a zrychlí hledání.
 Hlavičku sloupců pozná automaticky, česky i anglicky. Ukázka: `vzor_dodavatele.csv`.
 
-Výstup obsahuje `Jméno | Ulice | PSČ | Město | Země | IČO | DIČ | NACE |
-Kód kategorie | Kategorie dodavatele` a kontrolní sloupce navíc – hlavně
+Výstup obsahuje `Jméno | Ulice | PSČ | Město | Země | IČO | DIČ |
+Kód kategorie | Kategorie dodavatele` a kontrolní sloupce navíc (vč. NACE
+(všechny)) – hlavně
 **Stav** (`OK` / `VYBRANO` / `OVERIT` / `NENALEZENO`), který říká, jak moc
 danému řádku věřit. XLSX má navíc dva přehledové listy s číselníkem kategorií
 a číselníkem NACE.
