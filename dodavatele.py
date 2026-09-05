@@ -12,6 +12,7 @@ Zdroje (vse bez API klice):
   ARES     ares.gov.cz            CR - plny rejstrik vc. NACE a DIC
   RPO SR   api.statistics.sk      SR - registr pravnickych osob
   GLEIF    api.gleif.org          svet - entity s LEI, narodni registracni cislo
+Handelsregister offeneregister.de  DE - lokalni kopie (otevrena data, k 2019)
   SEC      sec.gov                US - spolecnosti registrovane u SEC (+ SIC)
   Wikidata wikidata.org           zalozni zdroj oboru, DIC a sidla pro velke firmy
   VIES     ec.europa.eu           overeni DIC v ramci EU
@@ -24,9 +25,13 @@ from __future__ import annotations
 import argparse
 import csv
 import gzip
+import html
+import http.cookiejar
+import io
 import json
 import os
 import re
+import sqlite3
 import ssl
 import sys
 import threading
@@ -36,6 +41,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+import zipfile
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 from difflib import SequenceMatcher
@@ -380,6 +386,7 @@ class Zaznam:
     lei: str = ""
     reg_cislo: str = ""
     reg_rejstrik: str = ""
+    rpo_id: str = ""    # interni ID v RPO SR pro dohledani SK NACE (viz doplnit_sk_nace)
     identifikator: str = ""
     pravni_forma: str = ""
     datum_vzniku: str = ""
@@ -568,10 +575,19 @@ def _sk_platny(polozky):
 
 
 def rpo_sk_podle_nazvu(klient, nazev, pocet=10):
-    url = RPO_SK + "?" + urllib.parse.urlencode({"fullName": nazev, "limit": pocet})
+    """
+    Vyhledavaci pole RPO SR (fullName) je na interpunkci prekvapive citlive -
+    s carkou pred pravni formou ("Firma, a.s.") nebo s teckovanou zkratkou
+    ("Firma a.s." i "Firma a. s.") vraci 0 vysledku, zatimco bez pravni formy
+    ("Firma") normalne najde. Dotaz se proto posila v ocistene podobe
+    (normalizuj_nazev) - presnost vyberu spravneho zaznamu resi az nasledne
+    porovnani skore_shody s puvodnim (neocistenym) nazvem.
+    """
+    dotaz = normalizuj_nazev(nazev) or nazev
+    url = RPO_SK + "?" + urllib.parse.urlencode({"fullName": dotaz, "limit": pocet})
     data = json.loads(klient.ziskej(url, ocisti=lambda d: {"results": [
         {k: v for k, v in r.items()
-         if k in ("fullNames", "addresses", "identifiers", "establishment", "termination")}
+         if k in ("id", "fullNames", "addresses", "identifiers", "establishment", "termination")}
         for r in d.get("results", [])]}))
     vysledky = []
     for r in data.get("results", []):
@@ -591,6 +607,7 @@ def rpo_sk_podle_nazvu(klient, nazev, pocet=10):
             dic="SK%s" % ico if ico else "",
             reg_cislo=ico,
             reg_rejstrik="RPO SR",
+            rpo_id=str(r.get("id") or ""),
             datum_vzniku=r.get("establishment") or "",
             aktivni=not r.get("termination"),
             zdroj="RPO SR",
@@ -598,6 +615,46 @@ def rpo_sk_podle_nazvu(klient, nazev, pocet=10):
             poznamka="zanikl %s" % r.get("termination") if r.get("termination") else "",
         ))
     return vysledky
+
+
+RPO_SK_DETAIL = "https://api.statistics.sk/rpo/v1/entity/{id}"
+
+
+def _rpo_sk_detail_ocisti(data):
+    return {k: v for k, v in data.items() if k in ("statisticalCodes", "legalForms")}
+
+
+def rpo_sk_detail(klient, entity_id):
+    """
+    Vyhledavaci endpoint RPO SR (rpo_sk_podle_nazvu) vraci jen jmeno/adresu/ICO -
+    hlavni ekonomicka cinnost (SK NACE, stejne cislovani jako CZ-NACE - obojí
+    je narodni provedeni NACE Rev. 2) a pravni forma jsou az na urovni
+    jednotliveho zaznamu (RPO SR ji vede jako soucast statistickych kodu,
+    aktualizovanych Statistickym uradem SR).
+    """
+    data = json.loads(klient.ziskej(
+        RPO_SK_DETAIL.format(id=entity_id), ocisti=_rpo_sk_detail_ocisti))
+    hlavni = (data.get("statisticalCodes") or {}).get("mainActivity") or {}
+    forma = _sk_platny(data.get("legalForms")) or {}
+    return {
+        "nace": str(hlavni.get("code") or ""),
+        "pravni_forma": (forma.get("value") or {}).get("value") or "",
+    }
+
+
+def doplnit_sk_nace(klient, z):
+    """Doplni SK NACE hlavni cinnosti a pravni formu z detailu RPO SR."""
+    if z.zdroj != "RPO SR" or not z.rpo_id or z.nace:
+        return
+    try:
+        detail = rpo_sk_detail(klient, z.rpo_id)
+    except Exception:
+        return
+    if detail["nace"]:
+        z.nace = detail["nace"]
+        z.nace_popis = taxonomie.nazev_nace(detail["nace"])
+    if detail["pravni_forma"] and not z.pravni_forma:
+        z.pravni_forma = detail["pravni_forma"]
 
 
 # ---------------------------------------------------------------------------
@@ -956,6 +1013,654 @@ def edgar_podle_cik(klient, cik):
 
 
 # ---------------------------------------------------------------------------
+# Nemecko - Handelsregister pres lokalni kopii OffeneRegister.de
+#
+# GLEIF obsahuje jen firmy s LEI (povinne hlavne pro ucastniky financnich
+# trhu), takze bezna mala nemecka GmbH/UG v nem typicky vubec neni. Nemecko
+# nema oficialni verejne API k Handelsregisteru - jedina otevrena alternativa
+# je bulk export OpenCorporates zverejnovany projektem OffeneRegister.de
+# (OKF Deutschland). Jeho zive dotazovaci API (db.offeneregister.de) je
+# dlouhodobe nedostupne (padly backend), proto se pouziva primo stazitelna
+# SQLite kopie s FTS5 indexem (daten.offeneregister.de) - viz
+# de_pripravit_databazi(). Data jsou sbirana do zacatku 2019 a dal se
+# neaktualizuji, takze u aktivity/noveho jednatele pocitejte s tim, ze
+# nemusi byt aktualni - na rozdil od ARES/INSEE tu nejde o zivy rejstrik.
+# ---------------------------------------------------------------------------
+
+DE_REGISTER_URL = "https://daten.offeneregister.de/openregister.db.gz"
+DE_REGISTER_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "de_handelsregister.db")
+
+# Serazeno od nejdelsich k nejkratsim, aby se napr. "GmbH & Co. KG" nerozpoznalo
+# jen jako "KG".
+DE_PRAVNI_FORMY = (
+    "UG (haftungsbeschränkt) & Co. KG", "GmbH & Co. KGaA", "GmbH & Co. KG",
+    "AG & Co. KG", "UG (haftungsbeschränkt)", "gGmbH", "GmbH", "KGaA",
+    "OHG", "PartG", "GbR", "e.K.", "eK", "e.G.", "eG", "e.V.", "eV",
+    "mbH", "AG", "KG", "SE",
+)
+
+_DE_LOCAL = threading.local()
+
+
+def de_pripravit_databazi(force=False):
+    """
+    Stahne (~740 MB) a rozbali (~2,6 GB) lokalni SQLite kopii nemeckeho
+    Handelsregisteru z daten.offeneregister.de (OpenCorporates/OKF
+    Deutschland, licence CC BY 4.0). Jednorazova priprava pred prvnim
+    pouzitim --bez-de neaktivniho behu.
+    """
+    if os.path.exists(DE_REGISTER_DB) and not force:
+        print("%s uz existuje, preskakuji stahovani (spustte se --force pro "
+              "znovustazeni)" % DE_REGISTER_DB, file=sys.stderr)
+        return
+    gz_cesta = DE_REGISTER_DB + ".gz"
+    print("Stahuji %s (~740 MB)..." % DE_REGISTER_URL, file=sys.stderr)
+    with urllib.request.urlopen(DE_REGISTER_URL, timeout=120) as odpoved, \
+            open(gz_cesta, "wb") as f:
+        while True:
+            blok = odpoved.read(1024 * 1024)
+            if not blok:
+                break
+            f.write(blok)
+    print("Rozbaluji do %s (~2,6 GB)..." % DE_REGISTER_DB, file=sys.stderr)
+    with gzip.open(gz_cesta, "rb") as f_in, open(DE_REGISTER_DB, "wb") as f_out:
+        while True:
+            blok = f_in.read(1024 * 1024)
+            if not blok:
+                break
+            f_out.write(blok)
+    os.remove(gz_cesta)
+    print("Hotovo -> %s" % DE_REGISTER_DB, file=sys.stderr)
+
+
+def _de_pripojeni():
+    if not os.path.exists(DE_REGISTER_DB):
+        raise RuntimeError(
+            "chybi %s - spustte 'python3 dodavatele.py --pripravit-de-rejstrik'"
+            % os.path.basename(DE_REGISTER_DB))
+    spojeni = getattr(_DE_LOCAL, "spojeni", None)
+    if spojeni is None:
+        spojeni = sqlite3.connect(
+            "file:%s?mode=ro" % DE_REGISTER_DB, uri=True, check_same_thread=False)
+        _DE_LOCAL.spojeni = spojeni
+    return spojeni
+
+
+def _de_pravni_forma(jmeno):
+    for forma in DE_PRAVNI_FORMY:
+        if jmeno.endswith(forma):
+            return forma
+    return ""
+
+
+# "Ulice cislo, PSC Mesto." - format adres v datech OpenCorporates. Cast
+# firem ma adresu neuplnou (jen ulice, bez PSC/mesta) - v tom pripade zustane
+# cely retezec v ulici a psc/mesto prazdne.
+_DE_ADRESA_RE = re.compile(r"^(?P<ulice>.*?),\s*(?P<psc>\d{5})\s+(?P<mesto>.*?)\.?\s*$")
+
+
+def _de_adresa(retezec):
+    m = _DE_ADRESA_RE.match((retezec or "").strip())
+    if not m:
+        return (retezec or "").rstrip("., ").strip(), "", ""
+    return m.group("ulice").strip(), m.group("psc"), m.group("mesto").strip()
+
+
+_DE_SLOUPCE = ("company_number", "name", "registered_address", "current_status",
+               "register_art", "register_nummer")
+
+
+def _de_na_zaznam(radek):
+    company_number, name, registered_address, current_status, register_art, \
+        register_nummer = radek
+    ulice, psc, mesto = _de_adresa(registered_address)
+    aktivni = current_status == "currently registered"
+    return Zaznam(
+        jmeno=name or "",
+        ulice=ulice, psc=psc, mesto=mesto, zeme="DE",
+        reg_cislo=("%s %s" % (register_art, register_nummer)).strip()
+                  or company_number,
+        reg_rejstrik="Handelsregister",
+        pravni_forma=_de_pravni_forma(name or ""),
+        aktivni=aktivni,
+        zdroj="OffeneRegister.de (data k 2019)",
+        poznamka="vymazana/zanikla firma (Handelsregister, stav k 2019)"
+                 if not aktivni else "",
+    )
+
+
+def de_podle_nazvu(klient, nazev, pocet=15):
+    """
+    Fulltextove hledani v lokalni kopii Handelsregisteru (FTS5, ~5,3 mil.
+    firem vsech velikosti vc. malych GmbH/UG bez LEI).
+    """
+    dotaz = " ".join(re.findall(r"\w+", nazev, re.UNICODE))
+    if not dotaz:
+        return []
+    spojeni = _de_pripojeni()
+    kurzor = spojeni.execute(
+        "SELECT c.%s FROM company_fts f JOIN company c ON c.id = f.rowid "
+        "WHERE company_fts MATCH ? ORDER BY bm25(company_fts) LIMIT ?"
+        % ", c.".join(_DE_SLOUPCE),
+        (dotaz, pocet))
+    return [_de_na_zaznam(r) for r in kurzor.fetchall()]
+
+
+def de_podle_registru(register_art, register_nummer):
+    """
+    Presny dotaz na cislo zapisu (napr. HRB 150148). Cislo samo o sobe neni
+    jednoznacne - stejne cislo pouzivaji ruzne rejstrikove soudy - proto se
+    (stejne jako u GLEIF narodniho cisla) muze vratit vic kandidatu k
+    rozliseni podle nazvu/adresy.
+    """
+    spojeni = _de_pripojeni()
+    kurzor = spojeni.execute(
+        "SELECT c.%s FROM company c WHERE c.register_art = ? "
+        "AND c.register_nummer = ?" % ", c.".join(_DE_SLOUPCE),
+        (register_art, register_nummer))
+    return [_de_na_zaznam(r) for r in kurzor.fetchall()]
+
+
+_DE_REG_CISLO_RE = re.compile(r"\b(HRA|HRB|GnR|PR|VR)\s*0*(\d+)\b", re.IGNORECASE)
+
+
+def de_rozloz_reg_cislo(text):
+    """Vytahne (druh, cislo) z retezce jako 'HRB 150148' nebo 'HRB150148'."""
+    m = _DE_REG_CISLO_RE.search(text or "")
+    return (m.group(1).upper(), m.group(2)) if m else (None, None)
+
+
+def de_registrar(register_art, register_nummer, jmeno=None):
+    """
+    Dohleda soud (registrar), u ktereho je zapis veden - lokalni kopie
+    Handelsregisteru to vi, portal handelsregister.de vsak vyzaduje presne
+    "Amtsgericht X" k jednoznacnemu vyberu radku ve vysledcich vyhledavani
+    (viz de_gegenstand_pro_firmu). Kdyz je zadan i jmeno, prednostne se
+    pouzije k rozliseni v pripade, ze stejne cislo ma vic soudu.
+    """
+    spojeni = _de_pripojeni()
+    if jmeno:
+        r = spojeni.execute(
+            "SELECT registrar FROM company WHERE register_art = ? AND register_nummer = ? "
+            "AND name = ? LIMIT 1", (register_art, register_nummer, jmeno)).fetchone()
+        if r:
+            return r[0]
+    r = spojeni.execute(
+        "SELECT registrar FROM company WHERE register_art = ? AND register_nummer = ? LIMIT 1",
+        (register_art, register_nummer)).fetchone()
+    return r[0] if r else None
+
+
+# ---------------------------------------------------------------------------
+# Nemecko - "Gegenstand des Unternehmens" primo z handelsregister.de
+#
+# Lokalni kopie Handelsregisteru (vyse) obor cinnosti vubec nenese - jedine
+# misto, kde je "Gegenstand des Unternehmens" (predmet podnikani, volny text)
+# k dispozici, je aktualni vypis (dokument "AD") primo z portalu
+# handelsregister.de. Ten nema API - je to stara JSF/PrimeFaces aplikace se
+# session postbacky (viewstate), kterou tato sekce rucne replikuje pres
+# urllib + cookiejar (viz prieskum v teto konverzaci - zadna knihovna typu
+# mechanize/BeautifulSoup neni potreba, staci regex nad znamou sablonou).
+#
+# DULEZITE - Nutzungsordnung portalu povoluje max. 60 dotazu/hodinu, pri
+# prekroceni hrozi dle FAQ portalu i trestni odpovednost (§303a/b StGB
+# - neopravnene menenim/ziskavanim dat). Kazdy HTTP pozadavek na tuto
+# domenu proto ceka aspon HR_PRODLEVA (61 s) od predchoziho - pro davku
+# vice firem pocitejte s ~4 min/firmu (4 pozadavky: uvodni stranka,
+# rozsirene hledani, vyhledani, stazeni dokumentu). Zamerne se nedela jedna
+# sdilena session pro vice firem za sebou - server casto invaliduje starsi
+# JSF view po del a delce necinnosti, takze by to bylo krehcí, ne rychlejsi.
+#
+# Ziskany text se NEPREKLADA na kategorii automaticky - dava se jako dalsi
+# sloupec/kontext pro rucni/LLM zarazeni (--export-nezarazene), stejnym
+# zpusobem, jakym zbytek nastroje zamerne nehada kategorii z textu.
+# ---------------------------------------------------------------------------
+
+HR_ZAKLAD = "https://www.handelsregister.de"
+HR_WELCOME = HR_ZAKLAD + "/rp_web/welcome.xhtml"
+HR_PRODLEVA = 61.0   # min. odstup mezi pozadavky na handelsregister.de (limit 60/h)
+
+_HR_ZAMEK = threading.Lock()
+_HR_POSLEDNI = [0.0]
+
+
+def _hr_cekej():
+    with _HR_ZAMEK:
+        ted = time.monotonic()
+        cekat = HR_PRODLEVA - (ted - _HR_POSLEDNI[0])
+        _HR_POSLEDNI[0] = max(ted, _HR_POSLEDNI[0] + HR_PRODLEVA)
+    if cekat > 0:
+        time.sleep(cekat)
+
+
+def hr_session():
+    """Cookie-aware opener - kazda firma dostane vlastni cerstvou relaci
+    (viz poznamka o JSF view expiraci vyse)."""
+    cj = http.cookiejar.CookieJar()
+    opener = urllib.request.build_opener(urllib.request.HTTPCookieProcessor(cj))
+    opener.addheaders = [("User-Agent", UA)]
+    return opener
+
+
+def _hr_pozadavek(opener, url, data=None, referer=None):
+    _hr_cekej()
+    hlavicky = {"Referer": referer} if referer else {}
+    telo = urllib.parse.urlencode(data).encode("utf-8") if data is not None else None
+    req = urllib.request.Request(url, data=telo, headers=hlavicky)
+    with opener.open(req, timeout=30) as odp:
+        return odp.read(), odp.geturl(), dict(odp.headers)
+
+
+_HR_VIEWSTATE_RE = re.compile(r'name="javax\.faces\.ViewState"[^>]*value="([^"]*)"')
+
+
+def _hr_viewstate(html_text):
+    m = _HR_VIEWSTATE_RE.search(html_text)
+    if not m:
+        raise RuntimeError("javax.faces.ViewState nenalezen - zmenila se struktura portalu")
+    return m.group(1)
+
+
+_HR_ERWEITERT_ODKAZ_RE = re.compile(
+    r"title=\"Erweiterte Suche\"[^>]*onclick=\"[^\"]*addSubmitParam\('headerForm',"
+    r"\{'([^']+)':'\1','target':'erweiterteSucheLink'\}\)")
+
+
+def hr_otevri_rozsirene_hledani(opener):
+    """
+    Uvodni stranka + preklik na "Erweiterte Suche" - stejny postback jako
+    v prohlizeci po kliknuti v menu. ID parametru v onclick atributu
+    ("j_idt49" apod.) je JSF auto-generovane komponentove ID, ktere se meni
+    mezi relacemi - musi se precist z aktualne nactene stranky, ne napevno
+    (jinak postback trefi jiny odkaz v menu a skonci uplne jinde).
+    """
+    telo, _, _ = _hr_pozadavek(opener, HR_WELCOME)
+    uvod = telo.decode("utf-8", errors="replace")
+    m = _HR_ERWEITERT_ODKAZ_RE.search(uvod)
+    if not m:
+        raise RuntimeError(
+            "odkaz 'Erweiterte Suche' na uvodni strance nenalezen - zmenila se struktura portalu")
+    param = m.group(1)
+    telo, url, _ = _hr_pozadavek(opener, HR_WELCOME, referer=HR_WELCOME, data={
+        "headerForm": "headerForm", param: param,
+        "target": "erweiterteSucheLink", "javax.faces.ViewState": _hr_viewstate(uvod),
+    })
+    return telo.decode("utf-8", errors="replace"), url
+
+
+_HR_TYP_KOD = {"all": "1", "min": "2", "exact": "3"}
+
+
+def hr_hledej(opener, html_vysledku, url, nazev, typ="all"):
+    """
+    Odesle formular rozsirene hledani (pole "Firma oder Schlagworter").
+    typ musi zustat "all" (obsahuje vsechna klicova slova), pokud se
+    nezadava zaroven i rejstrik/soud/pravni forma/zeme - "min" ("aspon
+    jedno slovo") portal odmita chybou, kdyz je pouzity samotny, bez
+    dalsiho filtru.
+    """
+    telo, vysledek_url, _ = _hr_pozadavek(opener, url, referer=url, data={
+        "form": "form", "suchTyp": "e",
+        "form:schlagwoerter": nazev, "form:schlagwortOptionen": _HR_TYP_KOD[typ],
+        "form:btnSuche": "form:btnSuche",
+        "javax.faces.ViewState": _hr_viewstate(html_vysledku),
+    })
+    return telo.decode("utf-8", errors="replace"), vysledek_url
+
+
+_HR_GERICHT_RE = re.compile(r"Amtsgericht\s+([^<]+?)\s+(HRA|HRB|GnR|VR|PR)\s*(\w+)")
+_HR_NAZEV_RE = re.compile(r'marginLeft20">([^<]*)<')
+_HR_DOKUMENT_RE = re.compile(
+    r"addSubmitParam\('ergebnissForm',\{'([^']+)':'\1'\}\)\.submit\('ergebnissForm'\);"
+    r'return false;"><span[^>]*>(AD|CD|HD)</span>')
+
+
+def hr_rozeber_vysledky(html_vysledku):
+    """
+    Rozdeli vysledkovou tabulku na jednotlive radky (kazdy zacina
+    data-ri="N") a z kazdeho vytahne soud/cislo zapisu, jmeno a skryte
+    parametry k postbacku pro stazeni dokumentu AD/CD/HD.
+    """
+    znacky = [m.start() for m in re.finditer(r'data-ri="\d+"', html_vysledku)]
+    znacky.append(len(html_vysledku))
+    vysledky = []
+    for i in range(len(znacky) - 1):
+        blok = html_vysledku[znacky[i]:znacky[i + 1]]
+        g = _HR_GERICHT_RE.search(blok)
+        n = _HR_NAZEV_RE.search(blok)
+        if not g or not n:
+            continue
+        dokumenty = {typ: odkaz for odkaz, typ in _HR_DOKUMENT_RE.findall(blok)}
+        vysledky.append({
+            "soud": g.group(1).strip(),
+            "register_art": g.group(2).upper(),
+            "register_nummer": g.group(3),
+            "jmeno": html.unescape(n.group(1)).strip(),
+            "dokumenty": dokumenty,
+        })
+    return vysledky
+
+
+def hr_stahni_dokument(opener, url, html_vysledku, odkaz_id):
+    """Postback na konkretni dokument (napr. AD) - vraci obsah souboru (PDF)."""
+    telo, _, hlavicky = _hr_pozadavek(opener, url, referer=url, data={
+        "ergebnissForm": "ergebnissForm",
+        "javax.faces.ViewState": _hr_viewstate(html_vysledku),
+        odkaz_id: odkaz_id,
+    })
+    typ = (hlavicky.get("Content-Type") or "").upper()
+    if "PDF" not in typ and "OCTET-STREAM" not in typ:
+        raise RuntimeError("neocekavana odpoved (%s) - dokument se nepodarilo stahnout" % typ)
+    return telo
+
+
+_HR_GEGENSTAND_RE = re.compile(
+    r"Gegenstand des Unternehmens:\s*\n+(.*?)\n\s*(?:\d+\.\s|[a-z]\)\s)", re.S)
+
+
+def gegenstand_z_pdf(pdf_bajty):
+    """Vytahne text 'Gegenstand des Unternehmens' z PDF vypisu (dokument AD)."""
+    try:
+        import pypdf
+    except ImportError:
+        raise RuntimeError(
+            "pro cteni PDF z Handelsregisteru nainstalujte pypdf:  pip install pypdf")
+    cteni = pypdf.PdfReader(io.BytesIO(pdf_bajty))
+    text = "\n".join(strana.extract_text() or "" for strana in cteni.pages)
+    m = _HR_GEGENSTAND_RE.search(text)
+    if not m:
+        return ""
+    return re.sub(r"\s+", " ", m.group(1)).strip()
+
+
+def de_gegenstand_pro_firmu(nazev, register_art, register_nummer):
+    """
+    Kompletni beh pro jednu firmu: uvodni stranka -> rozsirene hledani ->
+    vyhledani podle jmena -> vyber radku podle register_art/register_nummer
+    (uz zname z lokalni kopie Handelsregisteru, viz de_registrar) -> stazeni
+    dokumentu AD -> vytazeni "Gegenstand des Unternehmens". Vraci text nebo
+    vyvola RuntimeError s popisem, co se nepovedlo (zadny vysledek, chybejici
+    dokument AD, cizi format odpovedi apod.) - volajici (zpracuj_de_gegenstand)
+    chybu zaznamena u dane firmy a pokracuje dal.
+    """
+    opener = hr_session()
+    html_rozsirene, url_rozsirene = hr_otevri_rozsirene_hledani(opener)
+    html_vysledku, url_vysledku = hr_hledej(opener, html_rozsirene, url_rozsirene, nazev)
+    kandidati = hr_rozeber_vysledky(html_vysledku)
+    if not kandidati:
+        raise RuntimeError("vyhledavani '%s' na handelsregister.de nevratilo zadny vysledek" % nazev)
+    shoda = next((k for k in kandidati
+                  if k["register_art"] == register_art and k["register_nummer"] == register_nummer),
+                 None)
+    if shoda is None:
+        raise RuntimeError(
+            "mezi %d vysledky pro '%s' zadny neodpovida %s %s" % (
+                len(kandidati), nazev, register_art, register_nummer))
+    odkaz_ad = shoda["dokumenty"].get("AD")
+    if not odkaz_ad:
+        raise RuntimeError("nalezena firma nema k dispozici dokument AD (aktualni vypis)")
+    pdf = hr_stahni_dokument(opener, url_vysledku, html_vysledku, odkaz_ad)
+    gegenstand = gegenstand_z_pdf(pdf)
+    if not gegenstand:
+        raise RuntimeError("dokument AD stazen, ale 'Gegenstand des Unternehmens' se v nem "
+                           "nepodarilo najit (zmenil se format vypisu?)")
+    return gegenstand
+
+
+def zpracuj_de_gegenstand(cesta_vstup, cesta_vystup, sloupec_jmeno="Jméno", sloupec_zeme="Země",
+                          sloupec_reg_cislo="Registrační číslo"):
+    """
+    Doplni sloupec 'Gegenstand (Handelsregister)' pro nemecke firmy v jiz
+    existujicim vystupu tohoto nastroje. Bezi vzdy sekvencne (bez ohledu na
+    --workers) a respektuje HR_PRODLEVA - viz sekce vyse. Vyzaduje pripravenou
+    lokalni kopii Handelsregisteru (--pripravit-de-rejstrik), odkud se dohleda
+    soud potrebny k jednoznacnemu vyberu spravneho radku na portalu.
+    """
+    hlavicka, radky = nacti_tabulku(cesta_vstup)
+    i_jmeno = _najdi_sloupec(hlavicka, sloupec_jmeno)
+    i_zeme = _najdi_sloupec(hlavicka, sloupec_zeme)
+    i_reg = _najdi_sloupec(hlavicka, sloupec_reg_cislo)
+
+    de_radky = [r for r in radky if len(r) > i_zeme and (r[i_zeme] or "").strip().upper() == "DE"]
+    print("Nemeckych firem ve vstupu: %d (odhad casu: ~%.0f min)" % (
+        len(de_radky), len(de_radky) * 4 * HR_PRODLEVA / 60.0), file=sys.stderr)
+
+    nova_hlavicka = hlavicka + [
+        "Gegenstand (Handelsregister)", "NACE (odhad z Gegenstand)",
+        "Kód kategorie (odhad z Gegenstand)", "Kategorie dodavatele (odhad z Gegenstand)",
+    ]
+    nove_radky = []
+    hotovo = chyby = odhadnuto = 0
+    for i, r in enumerate(radky):
+        r = list(r) + [""] * (len(hlavicka) - len(r))
+        vysledek, nace_odhad, kod_odhad, kat_odhad = "", "", "", ""
+        if r[i_zeme].strip().upper() == "DE":
+            jmeno = r[i_jmeno]
+            druh, cislo = de_rozloz_reg_cislo(r[i_reg])
+            if not druh:
+                vysledek = "PRESKOCENO: chybi register. cislo (HRB/HRA) ve sloupci '%s'" % sloupec_reg_cislo
+            else:
+                try:
+                    vysledek = de_gegenstand_pro_firmu(jmeno, druh, cislo)
+                    hotovo += 1
+                    nace_odhad = taxonomie.nace_z_gegenstand(vysledek)
+                    if nace_odhad:
+                        k = taxonomie.zarad(nace=nace_odhad)
+                        kod_odhad, kat_odhad = k["kod"], k["kategorie"]
+                        odhadnuto += 1
+                    print("  [%d/%d] %s -> %s%s" % (
+                        hotovo, len(de_radky), jmeno, vysledek[:70],
+                        "  [odhad: %s %s]" % (kod_odhad, kat_odhad) if kod_odhad else ""),
+                        file=sys.stderr)
+                except Exception as e:
+                    vysledek = "CHYBA: %s" % e
+                    chyby += 1
+                    print("  [chyba] %s -> %s" % (jmeno, e), file=sys.stderr)
+        nove_radky.append(r + [vysledek, nace_odhad, kod_odhad, kat_odhad])
+
+    zapis_tabulku(nova_hlavicka, nove_radky, cesta_vystup)
+    print("Hotovo: %d nalezeno (z toho %d s odhadem kategorie z klicovych slov), "
+          "%d chyb -> %s" % (hotovo, odhadnuto, chyby, cesta_vystup), file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
+# Velka Britanie - Companies House (bezplatny bulk export, zadna registrace)
+#
+# Na rozdil od nemeckeho Handelsregisteru obsahuje bulk soubor primo i obor
+# cinnosti (UK SIC 2007 - stejna urovnova struktura jako NACE Rev. 2, prvni
+# 2 cislice = divize se stejnym vyznamem), takze pro UK neni potreba fallback
+# na Wikidata jen kvuli oboru - jen na samotne dohledani firmy. Soubor se
+# aktualizuje mesicne (nahran kolem zacatku mesice), zadny API klic ani
+# registrace neni potreba - viz http://download.companieshouse.gov.uk/en_output.html
+# ---------------------------------------------------------------------------
+
+GB_REGISTER_URL_VZOR = "http://download.companieshouse.gov.uk/BasicCompanyDataAsOneFile-%s-01.zip"
+GB_REGISTER_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                               "gb_companies_house.db")
+
+# (nazev sloupce v CSV, nazev sloupce v nasi SQLite tabulce)
+_GB_SLOUPCE_CSV = (
+    ("CompanyNumber", "company_number"), ("CompanyName", "name"),
+    ("CompanyStatus", "status"), ("CompanyCategory", "category"),
+    ("IncorporationDate", "incorporation_date"),
+    ("RegAddress.AddressLine1", "address1"), ("RegAddress.AddressLine2", "address2"),
+    ("RegAddress.PostTown", "post_town"), ("RegAddress.PostCode", "post_code"),
+    ("SICCode.SicText_1", "sic1"), ("SICCode.SicText_2", "sic2"),
+    ("SICCode.SicText_3", "sic3"), ("SICCode.SicText_4", "sic4"),
+)
+_GB_SLOUPCE = tuple(nazev_db for _, nazev_db in _GB_SLOUPCE_CSV)
+
+_GB_LOCAL = threading.local()
+
+
+def _gb_najdi_aktualni_url():
+    """Soubor je pojmenovany podle mesice publikace a bezici mesic jeste
+    nemusi byt nahrany - zkusi aktualni mesic, pak jeden zpet."""
+    ted = time.gmtime()
+    rok, mesic = ted.tm_year, ted.tm_mon
+    for _ in range(2):
+        url = GB_REGISTER_URL_VZOR % ("%04d-%02d" % (rok, mesic))
+        try:
+            urllib.request.urlopen(
+                urllib.request.Request(url, method="HEAD"), timeout=20).close()
+            return url
+        except urllib.error.HTTPError:
+            mesic -= 1
+            if mesic <= 0:
+                mesic, rok = 12, rok - 1
+    raise RuntimeError(
+        "aktualni soubor Companies House se nepodarilo najit (zkuseny posledni "
+        "2 mesice) - zkontrolujte http://download.companieshouse.gov.uk/en_output.html")
+
+
+def _gb_importuj_csv(f, cesta_db):
+    """Naimportuje bulk CSV do nove SQLite s FTS5 indexem nad nazvem firmy.
+    FTS index se stavi az po hromadnem vlozeni dat (rebuild) - podstatne
+    rychlejsi nez prubezna udrzba indexu pri ~5 mil. radcich."""
+    if os.path.exists(cesta_db):
+        os.remove(cesta_db)
+    spojeni = sqlite3.connect(cesta_db)
+    spojeni.execute("PRAGMA synchronous=OFF")
+    spojeni.execute("PRAGMA journal_mode=MEMORY")
+    spojeni.execute("CREATE TABLE company (id INTEGER PRIMARY KEY, %s)"
+                    % ", ".join("%s TEXT" % s for s in _GB_SLOUPCE))
+
+    cteni = csv.reader(f)
+    hlavicka = [h.strip() for h in next(cteni)]
+    try:
+        indexy = [hlavicka.index(nazev_csv) for nazev_csv, _ in _GB_SLOUPCE_CSV]
+    except ValueError as e:
+        raise RuntimeError(
+            "Companies House CSV nema ocekavany sloupec (%s) - format souboru "
+            "se zjevne zmenil" % e)
+
+    vlozit = "INSERT INTO company (%s) VALUES (%s)" % (
+        ", ".join(_GB_SLOUPCE), ", ".join("?" * len(_GB_SLOUPCE)))
+    davka = []
+    with spojeni:
+        for radek in cteni:
+            davka.append(tuple(radek[i] if i < len(radek) else "" for i in indexy))
+            if len(davka) >= 5000:
+                spojeni.executemany(vlozit, davka)
+                davka.clear()
+        if davka:
+            spojeni.executemany(vlozit, davka)
+
+    spojeni.execute(
+        "CREATE VIRTUAL TABLE company_fts USING FTS5(name, content='company', "
+        "content_rowid='id')")
+    spojeni.execute("INSERT INTO company_fts(company_fts) VALUES ('rebuild')")
+    spojeni.commit()
+    spojeni.close()
+
+
+def gb_pripravit_databazi(force=False):
+    """
+    Stahne mesicni bulk export Companies House (~500 MB zip, ~5 mil. firem
+    vc. SIC/oboru cinnosti) a naimportuje ho do lokalni SQLite s FTS5 indexem -
+    zadny API klic ani registrace neni potreba.
+    """
+    if os.path.exists(GB_REGISTER_DB) and not force:
+        print("%s uz existuje, preskakuji stahovani (smazte soubor a spustte "
+              "znovu pro aktualizaci)" % GB_REGISTER_DB, file=sys.stderr)
+        return
+    url = _gb_najdi_aktualni_url()
+    zip_cesta = GB_REGISTER_DB + ".zip"
+    print("Stahuji %s (~500 MB)..." % url, file=sys.stderr)
+    with urllib.request.urlopen(url, timeout=120) as odpoved, open(zip_cesta, "wb") as f:
+        while True:
+            blok = odpoved.read(1024 * 1024)
+            if not blok:
+                break
+            f.write(blok)
+    print("Rozbaluji a importuji do %s..." % GB_REGISTER_DB, file=sys.stderr)
+    with zipfile.ZipFile(zip_cesta) as z:
+        nazev_csv = next(n for n in z.namelist() if n.lower().endswith(".csv"))
+        with z.open(nazev_csv) as f_bin:
+            _gb_importuj_csv(io.TextIOWrapper(f_bin, encoding="utf-8", errors="replace"),
+                             GB_REGISTER_DB)
+    os.remove(zip_cesta)
+    print("Hotovo -> %s" % GB_REGISTER_DB, file=sys.stderr)
+
+
+def _gb_pripojeni():
+    if not os.path.exists(GB_REGISTER_DB):
+        raise RuntimeError(
+            "chybi %s - spustte 'python3 dodavatele.py --pripravit-gb-rejstrik'"
+            % os.path.basename(GB_REGISTER_DB))
+    spojeni = getattr(_GB_LOCAL, "spojeni", None)
+    if spojeni is None:
+        spojeni = sqlite3.connect(
+            "file:%s?mode=ro" % GB_REGISTER_DB, uri=True, check_same_thread=False)
+        _GB_LOCAL.spojeni = spojeni
+    return spojeni
+
+
+_GB_SIC_RE = re.compile(r"^\s*(\d{4,5})")
+
+
+def _gb_nace_ze_sic(sic_text):
+    """'62020 - Information technology consultancy activities' -> '62020'."""
+    m = _GB_SIC_RE.match(sic_text or "")
+    return m.group(1) if m else ""
+
+
+def _gb_na_zaznam(radek):
+    (company_number, name, status, category, incorporation_date,
+     address1, address2, post_town, post_code, sic1, sic2, sic3, sic4) = radek
+    ulice = ", ".join(x for x in (address1, address2) if x)
+    nace = _gb_nace_ze_sic(sic1)
+    nace_vse = ",".join(sorted({c for c in (
+        _gb_nace_ze_sic(sic1), _gb_nace_ze_sic(sic2),
+        _gb_nace_ze_sic(sic3), _gb_nace_ze_sic(sic4)) if c}))
+    aktivni = (status or "").strip().lower() == "active"
+    return Zaznam(
+        jmeno=name or "",
+        ulice=ulice, psc=post_code or "", mesto=post_town or "", zeme="GB",
+        reg_cislo=company_number or "",
+        reg_rejstrik="Companies House",
+        pravni_forma=category or "",
+        nace=nace,
+        nace_popis=taxonomie.nazev_nace(nace),
+        nace_vse=nace_vse,
+        nace_zdroj="UK SIC 2007 (Companies House)" if nace else "",
+        datum_vzniku=incorporation_date or "",
+        aktivni=aktivni,
+        zdroj="Companies House",
+        odkaz="https://find-and-update.company-information.service.gov.uk/company/%s"
+              % company_number if company_number else "",
+        poznamka="" if aktivni else "stav v Companies House: %s" % status,
+    )
+
+
+def gb_podle_nazvu(klient, nazev, pocet=15):
+    """Fulltextove hledani v lokalni kopii Companies House (FTS5, ~5 mil. firem)."""
+    dotaz = " ".join(re.findall(r"\w+", nazev, re.UNICODE))
+    if not dotaz:
+        return []
+    spojeni = _gb_pripojeni()
+    kurzor = spojeni.execute(
+        "SELECT c.%s FROM company_fts f JOIN company c ON c.id = f.rowid "
+        "WHERE company_fts MATCH ? ORDER BY bm25(company_fts) LIMIT ?"
+        % ", c.".join(_GB_SLOUPCE),
+        (dotaz, pocet))
+    return [_gb_na_zaznam(r) for r in kurzor.fetchall()]
+
+
+def gb_podle_cisla(company_number):
+    """Presny dotaz na registracni cislo (Company Number) - jednoznacne, na
+    rozdil od nemeckeho HRB/HRA cislo v UK neni sdilene mezi ruznymi soudy."""
+    spojeni = _gb_pripojeni()
+    kurzor = spojeni.execute(
+        "SELECT c.%s FROM company c WHERE c.company_number = ?"
+        % ", c.".join(_GB_SLOUPCE),
+        (company_number.strip().upper(),))
+    radek = kurzor.fetchone()
+    return _gb_na_zaznam(radek) if radek else None
+
+
+# ---------------------------------------------------------------------------
 # Francie - Recherche d'entreprises (INSEE/INPI, data.gouv.fr)
 # ---------------------------------------------------------------------------
 
@@ -1270,6 +1975,64 @@ def vies_over(klient, dic, pokusy=5):
 
 
 # ---------------------------------------------------------------------------
+# Rumunsko - ANAF (doplneni CAEN kodu k jiz zname CUI/DIC)
+#
+# Oficialni bezklicove API rumunske danove spravy - obdoba VIES, ale navic
+# vraci i cod_CAEN (rumunsky NACE) a plnou adresu sidla. Na rozdil od
+# ostatnich narodnich zdroju v tomto souboru NEJDE hledat podle jmena, jen
+# presnym dotazem na uz zname CUI - stejne omezeni jako VIES. Pouziva se
+# proto jen jako doplnek k VIES (sekce 1c v zpracuj_radek), ne jako
+# samostatny zdroj pro vyhledavani jmenem.
+#
+# POZOR: nelze overit z prostredi, kde tento kod vznikl - endpoint vracel
+# 404 na vsech vyzkousenych verzich API (v7/v8/v9), patrne geo/WAF blokace
+# datacenterove IP. Implementace vychazi z oficialni dokumentace
+# (static.anaf.ro/static/10/Anaf/Informatii_R/Servicii_web/doc_WS_V7.txt).
+# Pred spolehnutim se na tento zdroj otestujte prvnim skutecnym dotazem
+# z bezneho pripojeni.
+# ---------------------------------------------------------------------------
+
+ANAF_TVA_API = "https://webservicesp.anaf.ro/PlatitorTvaRest/api/v7/ws/tva"
+
+
+def _anaf_ocisti(data):
+    def zmensi(polozka):
+        return {k: v for k, v in polozka.items()
+                if k in ("date_generale", "adresa_sediu_social")}
+    return {"cod": data.get("cod"), "found": [zmensi(p) for p in data.get("found", [])]}
+
+
+def anaf_podle_cui(klient, cui):
+    """
+    Vrati dict s obory/adresou pro dane CUI (rumunske DIC/danove cislo, bez
+    prefixu "RO"), nebo None, kdyz ANAF subjekt nezna. `cui` muze byt cele
+    DIC (napr. "RO14056826") i holy CUI - necislovy obsah se ignoruje.
+    """
+    cislice = re.sub(r"\D", "", str(cui or ""))
+    if not cislice:
+        return None
+    data = json.loads(klient.ziskej(
+        ANAF_TVA_API,
+        json_body=[{"cui": int(cislice), "data": time.strftime("%Y-%m-%d")}],
+        ocisti=_anaf_ocisti))
+    nalezeno = data.get("found") or []
+    if not nalezeno:
+        return None
+    obecne = nalezeno[0].get("date_generale") or {}
+    adresa = nalezeno[0].get("adresa_sediu_social") or {}
+    return {
+        "jmeno": obecne.get("denumire") or "",
+        "nace": re.sub(r"\D", "", str(obecne.get("cod_CAEN") or "")),
+        "reg_cislo": obecne.get("nrRegCom") or "",
+        "aktivni": (obecne.get("stare_inregistrare") or "").strip().lower() != "radiata",
+        "ulice": " ".join(x for x in (
+            adresa.get("sdenumire_Strada"), adresa.get("snumar_Strada")) if x),
+        "psc": adresa.get("scod_Postal") or "",
+        "mesto": adresa.get("sdenumire_Localitate") or "",
+    }
+
+
+# ---------------------------------------------------------------------------
 # Odkaz na rucni dohledani - zeme bez napojeneho rejstriku ani u GLEIF/Wikidat
 # ---------------------------------------------------------------------------
 
@@ -1502,6 +2265,13 @@ def zpracuj_radek(vstup, klient, n):
                 elif zeme == "SG" and not n["bez_sg"]:
                     nalezeny = sg_podle_uen(klient, ico.upper())
                     kandidati = [nalezeny] if nalezeny else []
+                elif zeme == "DE" and not n["bez_de"] and os.path.exists(DE_REGISTER_DB):
+                    druh, cislo = de_rozloz_reg_cislo(ico)
+                    if druh:
+                        kandidati = de_podle_registru(druh, cislo)
+                elif zeme == "GB" and not n["bez_gb"] and os.path.exists(GB_REGISTER_DB):
+                    nalezeny = gb_podle_cisla(ico)
+                    kandidati = [nalezeny] if nalezeny else []
                 if not kandidati and not n["bez_gleif"]:
                     if re.fullmatch(r"[A-Za-z0-9]{20}", ico):
                         nalezeny = gleif_podle_lei(klient, ico.upper())
@@ -1560,6 +2330,25 @@ def zpracuj_radek(vstup, klient, n):
             except Exception as e:
                 poznamky.append("VIES (hledani podle DIC): %s" % e)
 
+        # 1d) Rumunsko - VIES samo o sobe NACE neda, ANAF ano (viz sekce
+        # "Rumunsko - ANAF" vyse) - doplni se jen kdyz uz mame zname CUI
+        # a jeste chybi obor
+        if z.stav == STAV_OK and z.zeme == "RO" and not z.nace and not n["bez_ro"]:
+            try:
+                a = anaf_podle_cui(klient, z.dic or dic)
+                if a:
+                    if a["nace"]:
+                        z.nace = a["nace"]
+                        z.nace_popis = taxonomie.nazev_nace(a["nace"])
+                    if a["reg_cislo"] and not z.reg_cislo:
+                        z.reg_cislo = a["reg_cislo"]
+                        z.reg_rejstrik = "ONRC"
+                    if not z.ulice and a["ulice"]:
+                        z.ulice, z.psc, z.mesto = a["ulice"], a["psc"], a["mesto"]
+                    poznamky.append("obor doplnen z ANAF")
+            except Exception as e:
+                poznamky.append("ANAF (doplneni CAEN): %s" % e)
+
         # 2) hledani podle nazvu
         if z.stav != STAV_OK and nazev:
             nejlepsi, stav, prehled, nej_skore = None, STAV_NENALEZENO, [], -1.0
@@ -1599,6 +2388,10 @@ def zpracuj_radek(vstup, klient, n):
                 zkus(tw_podle_nazvu, nazev, n["pocet"])
             if zeme in ("", "US") and not n["bez_edgar"]:
                 zkus(edgar_podle_nazvu, nazev, n["pocet"])
+            if zeme == "DE" and not n["bez_de"] and os.path.exists(DE_REGISTER_DB):
+                zkus(de_podle_nazvu, nazev, n["pocet"])
+            if zeme == "GB" and not n["bez_gb"] and os.path.exists(GB_REGISTER_DB):
+                zkus(gb_podle_nazvu, nazev, n["pocet"])
             if zeme != "CZ" and not n["bez_gleif"]:
                 zkus(gleif_podle_nazvu, nazev, zeme or None, n["pocet"])
             if zeme != "CZ" and not n["bez_wikidata"]:
@@ -1642,6 +2435,8 @@ def zpracuj_radek(vstup, klient, n):
                     "prevazujici NACE %s je obecny kod (napr. pronajem/spravni "
                     "cinnosti) - zkontrolujte NACE (vsechny), skutecny obor muze "
                     "byt jiny" % z.nace)
+        if z.stav != STAV_NENALEZENO and not n["bez_sk"]:
+            doplnit_sk_nace(klient, z)
         if (z.stav not in (STAV_NENALEZENO, STAV_CHYBA) and not z.nace and not z.obory
                 and z.zdroj != "Wikidata" and not n["bez_wikidata"]):
             try:
@@ -1862,7 +2657,10 @@ SIRKY = {"Jméno": 40, "Ulice": 30, "PSČ": 9, "Město": 20, "Země": 7, "IČO":
          "NACE - zdroj": 22, "Klasifikace (US NAICS)": 34,
          "Datum vzniku": 13, "DIČ ověřeno (VIES)": 16, "NACE (všechny)": 30,
          "Odkaz na rejstřík": 46, "Poznámka": 70,
-         "Název": 34, "Nalezené jméno": 34, "Typ čísla / rejstřík": 20}
+         "Název": 34, "Nalezené jméno": 34, "Typ čísla / rejstřík": 20,
+         "Shoda NACE (divize)": 20, "Gegenstand (Handelsregister)": 70,
+         "NACE (odhad z Gegenstand)": 15, "Kód kategorie (odhad z Gegenstand)": 15,
+         "Kategorie dodavatele (odhad z Gegenstand)": 42}
 
 
 # ---------------------------------------------------------------------------
@@ -1957,6 +2755,25 @@ def pouzij_kategorie_mapu(zaznamy, mapa, kategorie_ciselnik=None):
     return zmeny
 
 
+def _stylizuj_hlavicku_xlsx(ws, hlavicka, sirky=None):
+    """Spolecny vzhled hlavicky pro vsechny XLSX vystupy - tucne bile pismo na
+    tmavem podkladu, zamrazeny prvni radek, autofilter, sirky sloupcu podle SIRKY."""
+    from openpyxl.styles import Font, PatternFill, Alignment
+    from openpyxl.utils import get_column_letter
+    sirky = sirky if sirky is not None else SIRKY
+    hlavicka_font = Font(bold=True, color="FFFFFF")
+    vypln = PatternFill("solid", fgColor="2E4A62")
+    for b in ws[1]:
+        b.font = hlavicka_font
+        b.fill = vypln
+        b.alignment = Alignment(vertical="center", wrap_text=True)
+    ws.freeze_panes = "A2"
+    ws.auto_filter.ref = ws.dimensions
+    for i, n in enumerate(hlavicka, 1):
+        ws.column_dimensions[get_column_letter(i)].width = sirky.get(n, 16)
+    return hlavicka_font, vypln
+
+
 def zapis_vystup(zaznamy, cesta, oddelovac=";", kompakt=False, jen_id=False):
     if jen_id:
         sloupce = SLOUPCE_ID
@@ -1986,16 +2803,7 @@ def zapis_vystup(zaznamy, cesta, oddelovac=";", kompakt=False, jen_id=False):
     ws.append(hlavicka)
     for r in radky:
         ws.append(r)
-    hlavicka_font = Font(bold=True, color="FFFFFF")
-    vypln = PatternFill("solid", fgColor="2E4A62")
-    for b in ws[1]:
-        b.font = hlavicka_font
-        b.fill = vypln
-        b.alignment = Alignment(vertical="center", wrap_text=True)
-    ws.freeze_panes = "A2"
-    ws.auto_filter.ref = ws.dimensions
-    for i, n in enumerate(hlavicka, 1):
-        ws.column_dimensions[get_column_letter(i)].width = SIRKY.get(n, 16)
+    hlavicka_font, vypln = _stylizuj_hlavicku_xlsx(ws, hlavicka)
 
     # druhy list: ciselnik pouzite taxonomie (nema smysl v rezimu --jen-id,
     # kde jde jen o dohledani identifikacniho cisla, ne o zarazeni)
@@ -2014,7 +2822,240 @@ def zapis_vystup(zaznamy, cesta, oddelovac=";", kompakt=False, jen_id=False):
         for i, s in enumerate((14, 28, 48, 16), 1):
             ws2.column_dimensions[get_column_letter(i)].width = s
 
+        # treti list: ciselnik CZ-NACE divizi (2 cislice) - aby si klient mohl
+        # dohledat, co ktery kod ve sloupci NACE znamena, bez hledani mimo sesit
+        ws3 = wb.create_sheet("Číselník NACE")
+        ws3.append(["Kód (divize)", "Název"])
+        for kod, nazev in taxonomie.prehled_nace_divizi():
+            ws3.append([kod, nazev])
+        for b in ws3[1]:
+            b.font = hlavicka_font
+            b.fill = vypln
+        ws3.freeze_panes = "A2"
+        for i, s in enumerate((14, 60), 1):
+            ws3.column_dimensions[get_column_letter(i)].width = s
+
     wb.save(cesta)
+
+
+# ---------------------------------------------------------------------------
+# Komparace NACE s externim zdrojem (napr. rucni/AI doplneni od kolegy) -
+# porovna nas sloupec NACE se sloupcem, ktery nekdo dalsi pridal do jiz
+# vygenerovaneho vystupu. Na rozdil od nacti_vstup() nic ze vstupu nezahazuje -
+# potrebujeme zachovat i sloupce, o kterych nastroj sam o sobe nic nevi.
+# ---------------------------------------------------------------------------
+
+def nacti_tabulku(cesta):
+    """Precte XLSX/CSV beze schematu - vrati (hlavicka, radky), vsechny sloupce
+    tak, jak jsou, vc. tech, ktere nacti_vstup() by jako neznamy zahodil."""
+    pripona = os.path.splitext(cesta)[1].lower()
+
+    if pripona in (".xlsx", ".xlsm"):
+        try:
+            from openpyxl import load_workbook
+        except ImportError:
+            sys.exit("Pro cteni XLSX nainstalujte openpyxl:  pip install openpyxl")
+        ws = load_workbook(cesta, read_only=True, data_only=True).active
+        it = ws.iter_rows(values_only=True)
+        hlavicka = [str(c) if c is not None else "" for c in next(it, [])]
+        radky = [["" if c is None else str(c).strip() for c in r] for r in it]
+        return hlavicka, radky
+
+    with open(cesta, encoding="utf-8-sig", newline="") as f:
+        vzorek = f.read(4096)
+        f.seek(0)
+        try:
+            dialekt = csv.Sniffer().sniff(vzorek, delimiters=";,\t|")
+        except csv.Error:
+            dialekt = csv.excel
+            dialekt.delimiter = ";"
+        r = list(csv.reader(f, dialect=dialekt))
+    if not r:
+        return [], []
+    return r[0], r[1:]
+
+
+def zapis_tabulku(hlavicka, radky, cesta):
+    """Zapise obecnou tabulku (hlavicka + radky) do XLSX/CSV se stejnym
+    vzhledem hlavicky jako zapis_vystup()."""
+    if os.path.splitext(cesta)[1].lower() != ".xlsx":
+        with open(cesta, "w", encoding="utf-8-sig", newline="") as f:
+            w = csv.writer(f, delimiter=";")
+            w.writerow(hlavicka)
+            w.writerows(radky)
+        return
+
+    try:
+        from openpyxl import Workbook
+    except ImportError:
+        sys.exit("Pro zapis XLSX nainstalujte openpyxl:  pip install openpyxl\n"
+                 "(nebo zvolte vystup s priponou .csv)")
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Komparace"
+    ws.append(hlavicka)
+    for r in radky:
+        ws.append(r)
+    _stylizuj_hlavicku_xlsx(ws, hlavicka)
+    wb.save(cesta)
+
+
+def porovnej_nace_divize(a, b):
+    """
+    Porovna dva NACE kody na urovni divize (prvni 2 cislice) - odpousti rozdily
+    v detailnejsi urovni mezi dvema ruznymi zdroji. Vraci True/False, nebo
+    None, kdyz jedne ze stran kod chybi (nelze vyhodnotit).
+    """
+    ca = re.sub(r"\D", "", str(a or ""))[:2]
+    cb = re.sub(r"\D", "", str(b or ""))[:2]
+    if not ca or not cb:
+        return None
+    return ca == cb
+
+
+def _najdi_sloupec(hlavicka, nazev):
+    try:
+        return hlavicka.index(nazev)
+    except ValueError:
+        raise SystemExit(
+            "sloupec '%s' ve vstupu nenalezen - existujici sloupce: %s"
+            % (nazev, ", ".join(hlavicka)))
+
+
+def zpracuj_komparaci(cesta_vstup, sloupec_kolega, cesta_vystup, sloupec_nas="NACE"):
+    """
+    Porovna nas sloupec NACE se sloupcem, ktery do jiz vygenerovaneho vystupu
+    pridal nekdo dalsi (napr. rucni/AI doplneni od kolegy) - radky se berou
+    1:1 podle pozice, zadne parovani podle jmena/ICO (soubor uz je nas vlastni
+    vystup jen s pridanym sloupcem navic). Shoda se pocita na urovni NACE
+    divize (prvni 2 cislice), viz porovnej_nace_divize().
+    """
+    hlavicka, radky = nacti_tabulku(cesta_vstup)
+    i_nas = _najdi_sloupec(hlavicka, sloupec_nas)
+    i_kolega = _najdi_sloupec(hlavicka, sloupec_kolega)
+
+    nova_hlavicka = hlavicka + ["Shoda NACE (divize)"]
+    nove_radky = []
+    celkem = shoda = nesoulad = chybi_nas = chybi_kolega = 0
+    for r in radky:
+        r = list(r) + [""] * (len(hlavicka) - len(r))    # kratsi radky (prazdne bunky na konci)
+        celkem += 1
+        kod_nas = r[i_nas] if i_nas < len(r) else ""
+        kod_kolega = r[i_kolega] if i_kolega < len(r) else ""
+        vysledek = porovnej_nace_divize(kod_nas, kod_kolega)
+        if vysledek is None:
+            znacka = ""
+            if not re.sub(r"\D", "", str(kod_nas or "")):
+                chybi_nas += 1
+            if not re.sub(r"\D", "", str(kod_kolega or "")):
+                chybi_kolega += 1
+        elif vysledek:
+            znacka = "ANO"
+            shoda += 1
+        else:
+            znacka = "NE"
+            nesoulad += 1
+        nove_radky.append(r + [znacka])
+
+    zapis_tabulku(nova_hlavicka, nove_radky, cesta_vystup)
+
+    srovnatelnych = shoda + nesoulad
+    print("Komparace NACE (uroven divize): %d radku celkem, %d srovnatelnych "
+          "(obe strany maji kod)" % (celkem, srovnatelnych), file=sys.stderr)
+    if srovnatelnych:
+        print("  shoda: %d/%d (%.0f %%)" % (
+            shoda, srovnatelnych, 100.0 * shoda / srovnatelnych), file=sys.stderr)
+    if chybi_nas:
+        print("  bez NACE u nas: %d" % chybi_nas, file=sys.stderr)
+    if chybi_kolega:
+        print("  bez NACE ve sloupci '%s': %d" % (sloupec_kolega, chybi_kolega), file=sys.stderr)
+    print("Vysledek -> %s" % cesta_vystup, file=sys.stderr)
+
+
+# ---------------------------------------------------------------------------
+# Interaktivni pruvodce - misto pamatovani si prepinacu se nastroj na par
+# veci zepta primo v terminalu. Spusti se automaticky, kdyz uzivatel nezada
+# zadne argumenty (nebo explicitne pres --pruvodce).
+# ---------------------------------------------------------------------------
+
+def _zeptej_se(otazka, vychozi=""):
+    odpoved = input("%s%s: " % (otazka, " [%s]" % vychozi if vychozi else "")).strip()
+    return odpoved or vychozi
+
+
+def _ano(otazka, vychozi=False):
+    znacka = "A/n" if vychozi else "a/N"
+    odpoved = input("%s (%s): " % (otazka, znacka)).strip().lower()
+    return vychozi if not odpoved else odpoved in ("a", "y", "ano", "yes")
+
+
+_NEZAJIMAVE_SOUBORY = {"requirements.txt", "readme.txt"}
+
+
+def _najdi_vstupni_soubory():
+    pripony = (".csv", ".xlsx", ".txt")
+    return sorted(f for f in os.listdir(".")
+                  if f.lower().endswith(pripony) and not f.lower().startswith("vystup")
+                  and not f.lower().startswith("export_")
+                  and f.lower() not in _NEZAJIMAVE_SOUBORY)
+
+
+def spustit_pruvodce():
+    """Sestavi seznam argumentu (jako by prisly z prikazove radky) na zaklade
+    par jednoduchych otazek - misto aby si uzivatel musel pamatovat prepinace."""
+    print("=== Pruvodce zpracovanim dodavatelu (Enter = vychozi hodnota) ===\n")
+
+    kandidati = _najdi_vstupni_soubory()
+    vstup = ""
+    if kandidati:
+        print("Nalezene soubory ve slozce:")
+        for i, f in enumerate(kandidati, 1):
+            print("  %d) %s" % (i, f))
+        volba = input("Cislo souboru, nebo zadejte jinou cestu: ").strip()
+        if volba.isdigit() and 1 <= int(volba) <= len(kandidati):
+            vstup = kandidati[int(volba) - 1]
+        else:
+            vstup = volba
+    while not vstup or not os.path.exists(vstup):
+        vstup = input("Cesta ke vstupnimu souboru (CSV/XLSX/TXT)%s: " % (
+            " - soubor neexistuje, zkuste znovu" if vstup else "")).strip()
+
+    zaklad = os.path.splitext(os.path.basename(vstup))[0]
+    vystup = _zeptej_se("Kam ulozit vysledek", "vystup_%s.xlsx" % zaklad)
+
+    argv = [vstup, "-o", vystup]
+
+    if _ano("Overit DIC pres VIES (o neco pomalejsi, jeden dotaz navic na firmu)?"):
+        argv.append("--vies")
+
+    if os.path.exists(DE_REGISTER_DB):
+        print("Lokalni nemecky Handelsregister je pripraveny, pouzije se automaticky "
+              "pro nemecke firmy.")
+    elif _ano("Nemecky Handelsregister jeste neni stazeny (~740 MB, jednorazove) "
+              "- stahnout ted?"):
+        de_pripravit_databazi()
+    else:
+        print("V poradku - nemecke firmy se budou hledat jen pres GLEIF/Wikidata "
+              "(u malych firem mene presne).")
+
+    if _ano("Rychly rezim - jen dohledat ICO/registracni cislo bez zarazeni "
+            "do kategorii?"):
+        argv.append("--jen-id")
+    else:
+        if _ano("Po dokonceni exportovat firmy bez kategorie pro LLM chat "
+                "(ChatGPT/Copilot)?", vychozi=True):
+            export_soubor = _zeptej_se("Kam ulozit export pro LLM",
+                                        "export_llm_%s.txt" % zaklad)
+            argv += ["--export-nezarazene", export_soubor]
+
+        mapa_soubor = _zeptej_se(
+            "Mate uz CSV s rucnim zarazenim od LLM z predchoziho behu? "
+            "(Enter = preskocit)")
+        if mapa_soubor:
+            argv += ["--kategorie-mapa", mapa_soubor]
+
+    print("\nSpoustim: python3 dodavatele.py " + " ".join(argv) + "\n")
+    return argv
 
 
 # ---------------------------------------------------------------------------
@@ -2022,17 +3063,25 @@ def zapis_vystup(zaznamy, cesta, oddelovac=";", kompakt=False, jen_id=False):
 # ---------------------------------------------------------------------------
 
 def main(argv=None):
+    puvodni_argv = list(sys.argv[1:] if argv is None else argv)
+    if not puvodni_argv or "--pruvodce" in puvodni_argv:
+        puvodni_argv = spustit_pruvodce()
+
     p = argparse.ArgumentParser(
         description="Obohaceni seznamu dodavatelu z verejnych rejstriku "
                     "(ARES, RPO SR, GLEIF, SEC EDGAR, Wikidata, VIES).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""priklady:
+  python3 dodavatele.py                                    # interaktivni pruvodce
   python3 dodavatele.py dodavatele.csv -o vystup.xlsx
   python3 dodavatele.py seznam.txt -o vystup.csv --vies --workers 6
   python3 dodavatele.py --dump-taxonomy taxonomie.json     # export k uprave
   python3 dodavatele.py vstup.csv --taxonomy taxonomie.json
 """)
     p.add_argument("vstup", nargs="?", help="CSV / XLSX / TXT se seznamem firem")
+    p.add_argument("--pruvodce", action="store_true",
+                   help="spustit interaktivniho pruvodce (napovida otazkami misto "
+                        "prepinacu) - stane se i bez argumentu")
     p.add_argument("-o", "--vystup", default="dodavatele_vystup.xlsx",
                    help="vystupni soubor .xlsx nebo .csv (vychozi: %(default)s)")
     p.add_argument("--sloupec", help="nazev sloupce se jmenem firmy, pokud se neurci automaticky")
@@ -2061,6 +3110,18 @@ def main(argv=None):
     p.add_argument("--bez-fr", action="store_true")
     p.add_argument("--bez-sg", action="store_true")
     p.add_argument("--bez-tw", action="store_true")
+    p.add_argument("--bez-de", action="store_true",
+                   help="nepouzivat lokalni kopii nemeckeho Handelsregisteru")
+    p.add_argument("--pripravit-de-rejstrik", action="store_true",
+                   help="stahnout/rozbalit lokalni kopii nemeckeho Handelsregisteru "
+                        "(%s) a skoncit" % os.path.basename(DE_REGISTER_DB))
+    p.add_argument("--bez-gb", action="store_true",
+                   help="nepouzivat lokalni kopii Companies House (UK)")
+    p.add_argument("--bez-ro", action="store_true",
+                   help="nedoplnovat CAEN kod (rumunsky NACE) pres ANAF")
+    p.add_argument("--pripravit-gb-rejstrik", action="store_true",
+                   help="stahnout/naimportovat lokalni kopii Companies House "
+                        "(%s) a skoncit" % os.path.basename(GB_REGISTER_DB))
     p.add_argument("--bez-gleif", action="store_true")
     p.add_argument("--bez-gleif-popisy", action="store_true",
                    help="nepřekládat kódy GLEIF (rejstřík, právní forma) na text - rychlejší")
@@ -2071,13 +3132,53 @@ def main(argv=None):
     p.add_argument("--taxonomy", help="JSON soubor s vlastni taxonomii")
     p.add_argument("--dump-taxonomy", metavar="SOUBOR",
                    help="zapsat vestavenou taxonomii do JSON a skoncit")
+    p.add_argument("--komparace", metavar="SOUBOR",
+                   help="porovnat NACE se sloupcem, ktery nekdo pridal do jiz "
+                        "vygenerovaneho vystupu (napr. rucni/AI doplneni od kolegy) - "
+                        "vyzaduje --komparace-sloupec, jen porovna a skonci")
+    p.add_argument("--komparace-sloupec", metavar="NAZEV",
+                   help="nazev sloupce v --komparace souboru s porovnavanym NACE kodem")
+    p.add_argument("--komparace-nas-sloupec", metavar="NAZEV", default="NACE",
+                   help="nazev naseho sloupce s NACE kodem (vychozi: NACE)")
+    p.add_argument("--komparace-vystup", metavar="SOUBOR",
+                   help="kam zapsat vysledek komparace (vychozi: <--komparace>_komparace.<pripona>)")
+    p.add_argument("--de-gegenstand", metavar="SOUBOR",
+                   help="doplnit 'Gegenstand des Unternehmens' (predmet podnikani) primo "
+                        "z handelsregister.de pro nemecke firmy v jiz vygenerovanem vystupu "
+                        "- bezi sekvencne, limit portalu ~60 dotazu/h (~4 min/firmu), jen "
+                        "doplni a skonci")
+    p.add_argument("--de-gegenstand-vystup", metavar="SOUBOR",
+                   help="kam zapsat vysledek (vychozi: <--de-gegenstand>_gegenstand.<pripona>)")
     p.add_argument("--ua", default=UA, help="hlavicka User-Agent (SEC vyzaduje kontakt)")
-    a = p.parse_args(argv)
+    a = p.parse_args(puvodni_argv)
 
     if a.dump_taxonomy:
         with open(a.dump_taxonomy, "w", encoding="utf-8") as f:
             json.dump(taxonomie.jako_json(), f, ensure_ascii=False, indent=2)
         print("Taxonomie zapsana do %s" % a.dump_taxonomy)
+        return 0
+
+    if a.komparace:
+        if not a.komparace_sloupec:
+            p.error("--komparace vyzaduje --komparace-sloupec")
+        zaklad, pripona = os.path.splitext(a.komparace)
+        vystup = a.komparace_vystup or ("%s_komparace%s" % (zaklad, pripona or ".xlsx"))
+        zpracuj_komparaci(a.komparace, a.komparace_sloupec, vystup,
+                          sloupec_nas=a.komparace_nas_sloupec)
+        return 0
+
+    if a.de_gegenstand:
+        zaklad, pripona = os.path.splitext(a.de_gegenstand)
+        vystup = a.de_gegenstand_vystup or ("%s_gegenstand%s" % (zaklad, pripona or ".xlsx"))
+        zpracuj_de_gegenstand(a.de_gegenstand, vystup)
+        return 0
+
+    if a.pripravit_de_rejstrik:
+        de_pripravit_databazi()
+        return 0
+
+    if a.pripravit_gb_rejstrik:
+        gb_pripravit_databazi()
         return 0
 
     if not a.vstup:
@@ -2097,6 +3198,7 @@ def main(argv=None):
     n = {"pocet": a.pocet, "prah_ok": a.prah_ok, "prah_overit": a.prah_overit,
          "vies": a.vies, "bez_ares": a.bez_ares, "bez_sk": a.bez_sk,
          "bez_fr": a.bez_fr, "bez_sg": a.bez_sg, "bez_tw": a.bez_tw,
+         "bez_de": a.bez_de, "bez_gb": a.bez_gb, "bez_ro": a.bez_ro,
          "bez_gleif": a.bez_gleif, "bez_gleif_popisy": a.bez_gleif_popisy,
          "bez_edgar": a.bez_edgar, "bez_wikidata": a.bez_wikidata,
          "mapa": mapa, "kategorie_ciselnik": ciselnik, "mapa_oboru": mapa_oboru}

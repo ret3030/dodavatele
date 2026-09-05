@@ -4,3 +4,5 @@ __pycache__/
 *.tmp
 vystup*.xlsx
 vystup*.csv
+de_handelsregister.db*
+gb_companies_house.db*
