@@ -156,6 +156,13 @@ VYCHOZI_KOD = "XXX-00"
 # Mapa NACE -> kod kategorie (prefix; delsi prefix vyhrava)
 # ---------------------------------------------------------------------------
 
+# Postaveno na NACE Rev. 2.1 / CZ-NACE 2025 (zavazna pro EU statistiku od
+# 1.1.2025, v ARES vychozi od 1.1.2026 - viz komentar u ares_prevazujici_nace
+# v dodavatele.py). Vetsina divizi ma stejne cislo a rozsah jako v predchozi
+# revizi NACE Rev. 2 / CZ-NACE 2008, proto tabulka funguje i pro zdroje, ktere
+# jeste hlasi stara cisla (napr. francouzske INSEE/NAF k 2026 stale vraci
+# 2008-style kody) - konflikt hrozi jen u par explicitne vyznacenych kodu
+# nize, kde revize 2025 cislo skutecne presunula/zmenila vyznam.
 NACE_MAPA = {
     # Zemedelstvi, lesnictvi, tezba
     "01": "MAT-09", "02": "MAT-11", "03": "MAT-09",
@@ -178,31 +185,45 @@ NACE_MAPA = {
     "3521": "ENE-01", "3522": "ENE-01", "3523": "ENE-01", "3530": "ENE-02",
     "36": "ENE-04", "37": "ENE-04",
     "38": "ODP-01", "39": "ODP-03",
-    # ODP-02 (skartace a likvidace nosicu dat) nema vlastni NACE kod - 38.31
-    # je demontaz vraku (auta/lode), ne likvidace dat - dosazitelne jen rucne
+    # ODP-02 (skartace a likvidace nosicu dat) nema vlastni NACE kod v zadne
+    # revizi - 38.31 je spalovani odpadu, ne likvidace dat - dosazitelne jen rucne
 
     # Stavebnictvi
     "41": "STA-01", "42": "STA-02", "43": "STA-03", "4321": "STA-04", "4322": "FAC-03",
 
-    # Obchod
-    "45": "OBC-03", "46": "OBC-01",
-    "4651": "ICT-07", "4652": "ICT-08", "4666": "FAC-06", "4671": "ENE-03",
-    "4646": "ZDR-03", "4649": "OBC-01", "4665": "FAC-07",
-    "47": "OBC-02", "4741": "ICT-07", "4773": "ZDR-03",
+    # Obchod - divize 45 (motorova vozidla) v revizi 2025 zanikla: prodej a
+    # servis vozidel se presunul jinam (viz nize 467/478/953)
+    "46": "OBC-01", "47": "OBC-02",
+    "467": "OBC-03",     # 46.7 Velkoobchod s motorovymi vozidly/motocykly (byv. cast divize 45)
+    "478": "OBC-03",     # 47.8 Maloobchod s motorovymi vozidly/motocykly (byv. cast divize 45)
+    "4650": "ICT-07",    # 46.50 Velkoobchod s pocitacovym a komunikacnim zarizenim (2008: zvlast 4651/4652)
+    "4740": "ICT-07",    # 47.40 Maloobchod s pocitacovym a komunikacnim zarizenim (2008: 4741)
+    "4646": "ZDR-03", "4773": "ZDR-03",
+    "4647": "FAC-07",    # 46.47 Velkoobchod s nabytkem... (2008: 4665)
+    "4681": "ENE-03",    # 46.81 Velkoobchod s pevnymi/kapalnymi/plynnymi palivy (2008: 4671 - presunuto ze skupiny 46.7 do 46.8)
 
     # Doprava a skladovani
     "49": "LOG-01", "50": "LOG-02", "51": "LOG-02",
-    "52": "LOG-04", "5229": "LOG-03", "53": "LOG-05",
+    "52": "LOG-04", "53": "LOG-05",
+    "5225": "LOG-03",    # 52.25 Logisticke cinnosti (nova samostatna trida v revizi 2025)
+    "5226": "LOG-03",    # 52.26 Ostatni podpurne cinnosti pro dopravu (2008: 5229)
+    "5229": "LOG-03",    # stejny vyznam jako 5226, jen podle stareho cislovani (INSEE aj.)
 
     # Ubytovani a stravovani
     "55": "FAC-08", "56": "FAC-04",
 
     # Informacni a komunikacni cinnosti
     "58": "MKT-03", "581": "MKT-03", "582": "ICT-02",
-    "5811": "MKT-03", "5813": "MKT-03", "5814": "MKT-03", "5829": "ICT-02",
+    # 58.12/58.13 (noviny/casopisy) v revizi 2025 prohodily cisla oproti 2008
+    # (2008: 5813=noviny; 2025: 5812=noviny, 5813=casopisy) - nevadi, oboji
+    # spada pod "581" skupinu se stejnou kategorii MKT-03
     "59": "MKT-05", "60": "MKT-05", "61": "ICT-09",
     "62": "ICT-05", "6201": "ICT-01", "6202": "ICT-05", "6203": "ICT-04", "6209": "ICT-04",
-    "63": "ICT-03", "6311": "ICT-03", "6312": "ICT-12", "639": "MKT-02", "6391": "MKT-05",
+    "63": "ICT-03",
+    "6391": "ICT-12",    # 63.91 Cinnosti webovych vyhledavacich portalu (2025 - v 2008 tu byly tiskove agentury, viz nize)
+    # Tiskove agentury/zurnalistika (2008: 6391) se v revizi 2025 presunuly
+    # primo do divize 60 (60.31 Cinnosti zpravodajskych kancelari a agentur)
+    # - uz pokryto obecnym "60"->MKT-05 vyse, zadny zvlastni zaznam netreba
 
     # Finance a pojisteni
     "64": "FIN-05", "6419": "FIN-01", "6491": "FIN-04", "6492": "FIN-04",
@@ -213,30 +234,40 @@ NACE_MAPA = {
 
     # Profesni, vedecke a technicke cinnosti
     "69": "PRO-01", "6910": "PRO-01", "6920": "PRO-02",
-    "70": "PRO-04", "7021": "MKT-01", "7022": "PRO-04",
+    "70": "PRO-04",
     "71": "PRO-05", "7111": "PRO-05", "7112": "PRO-05", "7120": "PRO-06",
-    "72": "PRO-07", "73": "MKT-01", "7311": "MKT-01", "7312": "MKT-01", "732": "MKT-02",
-    "74": "PRO-09", "7410": "MKT-01", "7420": "MKT-03", "7430": "PRO-08", "7490": "PRO-09",
+    "72": "PRO-07",
+    "73": "MKT-01", "7311": "MKT-01", "7312": "MKT-01", "732": "MKT-02",
+    "733": "MKT-01",     # 73.3 Vztahy s verejnosti (PR) - nova skupina v revizi 2025 (2008: PR bylo pod 70.21)
+    "74": "PRO-09", "741": "MKT-01", "7420": "MKT-03", "7430": "PRO-08", "749": "PRO-09",
     "75": "ZDR-05",
 
     # Administrativni a podpurne cinnosti
     "77": "TEC-06", "7733": "ICT-07", "7735": "LOG-02",
-    "78": "HR-01", "7810": "HR-01", "7820": "HR-02", "7830": "HR-02",
+    "78": "HR-01", "7810": "HR-01", "7820": "HR-02",
+    # 78.3 (ostatni poskytovani lidskych zdroju) v revizi 2025 zaniklo,
+    # slouceno do 78.2 - jiz pokryto vyse
     "79": "FAC-08",
-    "80": "SEC-01", "8020": "SEC-02",
-    "81": "FAC-02", "8121": "FAC-01", "8122": "FAC-01", "8129": "FAC-01", "8130": "FAC-02",
-    "82": "ICT-10", "8211": "ICT-10", "8219": "MKT-03", "8220": "ICT-10",
+    "80": "SEC-01",
+    "8001": "SEC-01",    # 80.01 Patraci cinnosti a soukrome bezpecnostni agentury
+    "8009": "SEC-02",    # 80.09 Bezpecnostni cinnosti j.n. (2008: 8020) - technicke zabezpeceni
+    "81": "FAC-02", "8121": "FAC-01", "8122": "FAC-01", "8123": "FAC-01", "8130": "FAC-02",
+    "82": "ICT-10", "8210": "ICT-10", "8220": "ICT-10",
     "8230": "MKT-04", "8291": "FIN-06", "8292": "MAT-04", "8299": "ICT-10",
 
     # Verejna sprava, vzdelavani, zdravotnictvi
     "84": "VER-01", "85": "HR-04", "8510": "VER-03", "8520": "VER-03",
     "853": "VER-03", "854": "VER-03", "8559": "HR-04",
-    "86": "ZDR-01", "8690": "ZDR-02", "87": "ZDR-04", "88": "ZDR-04",
+    "86": "ZDR-01", "8691": "ZDR-02", "87": "ZDR-04", "88": "ZDR-04",
 
     # Ostatni
     "90": "OST-01", "91": "OST-01", "92": "OST-01", "93": "OST-01",
-    "94": "VER-02", "95": "ICT-11", "9511": "ICT-11", "9512": "ICT-11", "952": "OST-02",
-    "96": "OST-02", "97": "OST-02", "99": "VER-02",
+    "94": "VER-02",
+    "95": "ICT-11",      # bezpecnostni sit pro cokoli neupresnene nize
+    "9510": "ICT-11",    # 95.10 Opravy pocitacu a komunikacnich zarizeni (2008: zvlast 9511/9512)
+    "952": "OST-02",     # 95.2 Opravy vyrobku pro osobni potrebu/domacnost
+    "953": "OBC-03",     # 95.3 Opravy motorovych vozidel a motocyklu - nova cast divize 95 (byv. cast divize 45)
+    "96": "OST-02", "97": "OST-02", "98": "OST-02", "99": "VER-02",
 }
 
 
@@ -246,54 +277,61 @@ NACE_MAPA = {
 # Nazvy NACE divizi (2 mistne) - pro citelnost vystupu
 # ---------------------------------------------------------------------------
 
+# Podle CZ-NACE 2025 (viz komentar u NACE_MAPA vyse)
 NACE_DIVIZE = {
-    "01": "Rostlinna a zivocisna vyroba, myslivost", "02": "Lesnictvi a tezba dreva",
-    "03": "Rybolov a akvakultura", "05": "Tezba a uprava cerneho a hnedeho uhli",
-    "06": "Tezba ropy a zemniho plynu", "07": "Tezba a uprava rud",
-    "08": "Ostatni tezba a dobyvani", "09": "Podpurne cinnosti pri tezbe",
+    "01": "Rostlinna a zivocisna vyroba, myslivost a souvisejici cinnosti", "02": "Lesnictvi a tezba dreva",
+    "03": "Rybolov a akvakultura", "05": "Tezba cerneho a hnedeho uhli",
+    "06": "Tezba ropy a zemniho plynu", "07": "Tezba rud",
+    "08": "Tezba a dobyvani ostatnich nerostnych surovin", "09": "Podpurne cinnosti pro tezbu a dobyvani nerostnych surovin",
     "10": "Vyroba potravinarskych vyrobku", "11": "Vyroba napoju",
-    "12": "Vyroba tabakovych vyrobku", "13": "Vyroba textilii", "14": "Vyroba odevu",
-    "15": "Vyroba usni a souvisejicich vyrobku", "16": "Zpracovani dreva",
-    "17": "Vyroba papiru a vyrobku z papiru", "18": "Tisk a rozmnozovani nahranych nosicu",
-    "19": "Vyroba koksu a rafinovanych ropnych produktu", "20": "Vyroba chemickych latek a pripravku",
-    "21": "Vyroba zakladnich farmaceutickych vyrobku", "22": "Vyroba pryzovych a plastovych vyrobku",
-    "23": "Vyroba ostatnich nekovovych mineralnich vyrobku", "24": "Vyroba a hutni zpracovani kovu",
-    "25": "Vyroba kovovych konstrukci a kovodelnych vyrobku",
-    "26": "Vyroba pocitacu, elektronickych a optickych pristroju",
-    "27": "Vyroba elektrickych zarizeni", "28": "Vyroba stroju a zarizeni j. n.",
-    "29": "Vyroba motorovych vozidel a jejich dilu", "30": "Vyroba ostatnich dopravnich prostredku",
-    "31": "Vyroba nabytku", "32": "Ostatni zpracovatelsky prumysl",
-    "33": "Opravy a instalace stroju a zarizeni", "35": "Vyroba a rozvod elektriny, plynu a tepla",
-    "36": "Shromazdovani, uprava a rozvod vody", "37": "Cinnosti souvisejici s odpadnimi vodami",
-    "38": "Shromazdovani, sber a odstranovani odpadu", "39": "Sanace a jine cinnosti s odpady",
-    "41": "Vystavba budov", "42": "Inzenyrske stavitelstvi", "43": "Specializovane stavebni cinnosti",
-    "45": "Velkoobchod, maloobchod a opravy motorovych vozidel",
-    "46": "Velkoobchod, krome motorovych vozidel", "47": "Maloobchod, krome motorovych vozidel",
-    "49": "Pozemni a potrubni doprava", "50": "Vodni doprava", "51": "Letecka doprava",
-    "52": "Skladovani a vedlejsi cinnosti v doprave", "53": "Postovni a kurynske cinnosti",
-    "55": "Ubytovani", "56": "Stravovani a pohostinstvi", "58": "Vydavatelske cinnosti",
-    "59": "Cinnosti v oblasti filmu, videa a hudby", "60": "Tvorba programu a vysilani",
-    "61": "Telekomunikacni cinnosti", "62": "Cinnosti v oblasti informacnich technologii",
-    "63": "Informacni cinnosti (hosting, zpracovani dat, portaly)",
-    "64": "Financni zprostredkovani, krome pojistovnictvi",
-    "65": "Pojisteni, zajisteni a penzijni fondy", "66": "Ostatni financni cinnosti",
+    "12": "Vyroba tabakovych vyrobku", "13": "Vyroba textilii",
+    "14": "Vyroba odevu", "15": "Vyroba usni a souvisejicich vyrobku z jakychkoli materialu",
+    "16": "Zpracovani dreva, vyroba drevenych, korkovych, proutenych a slamenych vyrobku, krome nabytku", "17": "Vyroba papiru a vyrobku z papiru",
+    "18": "Tisk a rozmnozovani nahranych nosicu", "19": "Vyroba koksu a rafinovanych ropnych produktu",
+    "20": "Vyroba chemickych latek a chemickych vyrobku", "21": "Vyroba zakladnich farmaceutickych vyrobku a farmaceutickych pripravku",
+    "22": "Vyroba pryzovych a plastovych vyrobku", "23": "Vyroba ostatnich nekovovych mineralnich vyrobku",
+    "24": "Vyroba zakladnich kovu", "25": "Vyroba kovovych vyrobku, krome stroju a zarizeni",
+    "26": "Vyroba pocitacu a elektronickych a optickych pristroju a zarizeni", "27": "Vyroba elektrickych zarizeni",
+    "28": "Vyroba stroju a zarizeni j. n.", "29": "Vyroba motorovych vozidel, privesu a navesu",
+    "30": "Vyroba ostatnich dopravnich prostredku a zarizeni", "31": "Vyroba nabytku",
+    "32": "Ostatni zpracovatelsky prumysl", "33": "Opravy, udrzba a instalace stroju a zarizeni",
+    "35": "Dodavani elektriny, plynu, pary a klimatizovaneho vzduchu", "36": "Shromazdovani, uprava a distribuce vody",
+    "37": "Cinnosti souvisejici s odpadnimi vodami", "38": "Sber odpadu, zpracovani odpadu k dalsimu vyuziti a odstranovani odpadu",
+    "39": "Sanace a jine cinnosti souvisejici s odpady", "41": "Vystavba bytovych a nebytovych budov",
+    "42": "Vystavba inzenyrskych del", "43": "Specializovane stavebni cinnosti",
+    "46": "Velkoobchod", "47": "Maloobchod",
+    "49": "Pozemni a potrubni doprava", "50": "Vodni doprava",
+    "51": "Letecka doprava", "52": "Skladovani a podpurne cinnosti pro dopravu",
+    "53": "Postovni a kuryrni cinnosti", "55": "Poskytovani ubytovani",
+    "56": "Poskytovani stravovani a podavani napoju", "58": "Vydavatelske cinnosti",
+    "59": "Cinnosti v oblasti filmu, videozaznamu a televiznich poradu, porizovani zvukovych nahravek a hudebni vydavatelske cinnosti",
+    "60": "Tvorba programu, vysilani, cinnosti zpravodajskych tiskovych kancelari a agentur a ostatni cinnosti souvisejici s distribuci obsahu",
+    "61": "Telekomunikacni cinnosti", "62": "Pocitacove programovani, poradenstvi a souvisejici cinnosti",
+    "63": "Poskytovani pocitacove infrastruktury, zpracovani dat, hosting a ostatni informacni cinnosti",
+    "64": "Financni cinnosti, krome pojistovani a penzijniho financovani",
+    "65": "Pojistovaci a zajistovaci cinnosti, penzijni financovani, krome povinneho socialniho zabezpeceni",
+    "66": "Pomocne cinnosti k financnim a pojistovacim cinnostem",
     "68": "Cinnosti v oblasti nemovitosti", "69": "Pravni a ucetnicke cinnosti",
-    "70": "Cinnosti vedeni podniku, poradenstvi v oblasti rizeni",
-    "71": "Architektonicke a inzenyrske cinnosti, technicke zkousky",
-    "72": "Vyzkum a vyvoj", "73": "Reklama a pruzkum trhu",
-    "74": "Ostatni profesni, vedecke a technicke cinnosti", "75": "Veterinarni cinnosti",
-    "77": "Pronajem a operativni leasing", "78": "Cinnosti souvisejici se zamestnanim",
-    "79": "Cinnosti cestovnich agentur a kancelari", "80": "Bezpecnostni a patraci cinnosti",
+    "70": "Cinnosti rizeni podniku a poradenstvi v oblasti podnikani",
+    "71": "Architektonicke a inzenyrske cinnosti; technicke zkousky a analyzy",
+    "72": "Vyzkum a vyvoj", "73": "Cinnosti v oblasti reklamy, pruzkumu trhu a vztahu s verejnosti",
+    "74": "Ostatni odborne, vedecke a technicke cinnosti", "75": "Veterinarni cinnosti",
+    "77": "Cinnosti v oblasti pronajmu a leasingu", "78": "Cinnosti souvisejici se zamestnanim",
+    "79": "Cinnosti cestovnich agentur, kancelari a ostatni rezervacni a souvisejici cinnosti",
+    "80": "Patraci a bezpecnostni cinnosti",
     "81": "Cinnosti souvisejici se stavbami a upravou krajiny",
-    "82": "Administrativni a podpurne cinnosti pro podnikani",
-    "84": "Verejna sprava a obrana", "85": "Vzdelavani", "86": "Zdravotni pece",
-    "87": "Pobytove sluzby socialni pece", "88": "Ambulantni a terenni socialni sluzby",
-    "90": "Tvurci, umelecke a zabavni cinnosti", "91": "Cinnosti knihoven, archivu a muzei",
-    "92": "Cinnosti heren, kasin a sazkovych kancelari", "93": "Sportovni a rekreacni cinnosti",
-    "94": "Cinnosti organizaci sdruzujicich osoby se spolecnymi zajmy",
-    "95": "Opravy pocitacu a vyrobku pro osobni potrebu",
-    "96": "Poskytovani ostatnich osobnich sluzeb", "97": "Cinnosti domacnosti jako zamestnavatelu",
-    "99": "Cinnosti exteritorialnich organizaci",
+    "82": "Administrativni, kancelarske a jine podpurne cinnosti pro podnikani",
+    "84": "Cinnosti v oblasti verejne spravy, obrany a povinneho socialniho zabezpeceni", "85": "Vzdelavani",
+    "86": "Zdravotni pece", "87": "Pobytove sluzby socialni pece",
+    "88": "Ambulantni nebo terenni socialni sluzby", "90": "Umelecka tvorba a cinnosti v oblasti scenickych umeni",
+    "91": "Cinnosti knihoven, archivu, muzei a jinych kulturnich zarizeni", "92": "Cinnosti heren, kasin a sazkovych kancelari",
+    "93": "Cinnosti v oblasti sportu, zabavy a rekreace",
+    "94": "Cinnosti organizaci sdruzujicich osoby za ucelem prosazovani spolecnych a verejnych zajmu",
+    "95": "Opravy a udrzba pocitacu, vyrobku pro osobni potrebu a prevazne pro domacnost a motorovych vozidel a motocyklu",
+    "96": "Poskytovani osobnich sluzeb",
+    "97": "Cinnosti domacnosti jako zamestnavatelu domaciho personalu",
+    "98": "Cinnosti domacnosti produkujicich blize neurcene vyrobky a sluzby pro vlastni potrebu",
+    "99": "Cinnosti exteritorialnich organizaci a instituci",
 }
 
 # Hrube mapovani US SIC -> NACE (pro data ze SEC EDGAR)

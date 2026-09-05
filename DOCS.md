@@ -633,9 +633,11 @@ v 17 skupinách. Kód kategorie je zkratka skupiny + pořadové číslo.
 Zařazení probíhá v tomto pořadí:
 
 1. **podle NACE** – u českých firem se použije *převažující činnost* z registru
-   RES (pole `czNacePrevazujici2008`). Seznam všech NACE, který ARES vrací,
-   je řazen vzestupně podle kódu, ne podle významu, takže se na jeho pořadí
-   nedá spolehnout – proto ten druhý dotaz.
+   RES (pole `czNacePrevazujici` = CZ-NACE 2025/NACE Rev. 2.1, závazná revize
+   EU statistiky od 1.1.2025, v RES výchozí od 1.1.2026 – viz "Přechod na
+   NACE Rev. 2.1" níže). Seznam všech NACE, který ARES vrací, je řazen
+   vzestupně podle kódu, ne podle významu, takže se na jeho pořadí nedá
+   spolehnout – proto ten druhý dotaz.
 2. **podle oboru z Wikidat** (strukturovaný QID) – když NACE není.
 3. `XXX-00 Nezařazeno` – vyžaduje ruční doplnění. Sloupec **Zařazeno podle**
    říká, která z cest se uplatnila.
@@ -643,6 +645,29 @@ Zařazení probíhá v tomto pořadí:
 Kategorie se záměrně nehádá z klíčových slov v názvu firmy — jen ze
 skutečných údajů (NACE nebo strukturovaný obor), viz vysvětlení výše
 u zahraničních dodavatelů.
+
+### Přechod na NACE Rev. 2.1 (CZ-NACE 2025)
+
+Evropská klasifikace ekonomických činností prošla koncem roku 2024 revizí –
+**NACE Rev. 2.1** (nařízení EU 2023/137) je závazná pro evropské statistiky
+od 1. 1. 2025 a ARES podle ní uvádí *převažující činnost* jako výchozí od
+1. 1. 2026. Nejde o kosmetickou aktualizaci – revize skutečně přečíslovala
+a přeskupila část tříd (např. **divize 45 zanikla úplně** – prodej vozidel
+se přesunul pod divize 46/47, servis vozidel pod divizi 95; třídy pro
+vydávání novin/časopisů si navzájem prohodily čísla; tiskové agentury se
+přesunuly z informačních činností do divize vysílání), takže stejné číslo
+může ve staré a nové revizi znamenat něco úplně jiného.
+
+Tabulka `taxonomie.NACE_MAPA` je od této verze postavená na **nové** revizi
+(zdroj: oficiální struktura ČSÚ). Naprostá většina kódů má stejné číslo
+i význam v obou revizích, takže tabulka funguje i pro zdroje, které ještě
+posílají čísla podle staré revize (k datu psaní tohoto textu např.
+francouzské INSEE) – konflikt hrozí jen u malé skupiny kódů, které revize
+skutečně přečíslovala; ty jsou v `taxonomie.py` označené komentářem.
+
+ARES drží obě revize souběžně (pole `czNacePrevazujici` = nová, 2025;
+`czNacePrevazujici2008` = stará, dobíhající) ještě přechodné období
+(řádově 4 roky od zavedení) – nástroj bere přednostně novou.
 
 ### Úprava taxonomie
 
