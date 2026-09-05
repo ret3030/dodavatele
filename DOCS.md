@@ -72,6 +72,9 @@ pro kontrolu (`--kompakt` je vypne):
   a jméno rejstříku, u kterého je vedeno.
 * **NACE - zdroj** – rozlišuje skutečný NACE z rejstříku (ARES, INSEE) od
   odhadu z oboru na Wikidatech, který je méně přesný.
+* **NACE (LLM)** – vyplní se jen po použití `--nace-mapa` (viz "Ruční
+  zařazení" níže) - NACE kód, který k firmě dohledal člověk/LLM chat, vedle
+  skutečného kódu z rejstříku ve sloupci NACE.
 * **Klasifikace (US NAICS)** – u amerických dodavatelů severoamerická obdoba
   NACE (NACE se u USA jen odhaduje pro účely vlastní taxonomie).
 
@@ -160,11 +163,15 @@ Dvě situace, kdy to přesto nesedí:
   firma opravdu žádný použitelný kód nemá.
 * **Převažující činnost je obecný/podpůrný kód** (např. `6820` pronájem
   nemovitostí — mnoho firem ho má zapsaný jen jako formální rezervu při
-  založení, ne jako skutečnou náplň podnikání). Nástroj takový kód
-  nepřehazuje za jiný ze seznamu (bylo by to hádání), ale doplní do
-  **Poznámky** upozornění „převažující NACE je obecný kód… zkontrolujte
-  NACE (všechny)“ — v tom sloupci najdete i ostatní zapsané obory
-  k ručnímu porovnání se skutečnou činností firmy.
+  založení, ne jako skutečnou náplň podnikání; jiné firmy jsou naopak čistě
+  majetková/holdingová entita v rámci skupiny, kde je "pronájem" fakticky
+  správný údaj, i když název firmy evokuje jiný byznys operující firmy ve
+  skupině). Nástroj takový kód nepřehazuje za jiný ani nehádá z názvu firmy
+  (obojí by bylo hádání bez záruky) — pokud má firma zapsaný i jiný kód,
+  doplní do **Poznámky** upozornění a odkáže na sloupec **NACE (všechny)**
+  k ručnímu porovnání. Pokud je to **jediný** zapsaný kód, nemá se s čím
+  porovnat — řádek dostane stav `OVERIT` a firma se automaticky zařadí i do
+  `--export-nezarazene` (viz níže), i když formálně kategorii má.
 
 #### Firma se nenajde v zemi bez napojeného rejstříku
 
@@ -217,33 +224,56 @@ rozhodnout, která firma je ta správná.
 
 ## Ruční zařazení nekategorizovaných firem přes LLM chat (--export-nezarazene)
 
-Firmy, které nemají NACE ani obor z Wikidat, skončí v `XXX-00 Nezařazeno`
-(viz [Taxonomie kategorií](#taxonomie-kategorií) níže — nástroj kategorii
-záměrně nehádá z ničeho nepodloženého). Pokud máte přístup k firemnímu LLM
-chatu (MS Copilot, ChatGPT…) jen jako k webovému rozhraní, bez API klíče,
-dá se k doplnění použít stejný dvoukrokový princip jako u `--jen-id`:
+Firmy, které nemají spolehlivý obor, skončí buď v `XXX-00 Nezařazeno` (žádný
+NACE ani obor z Wikidat), nebo dostanou kategorii ze samotného obecného/
+podpůrného NACE kódu, ale se stavem `OVERIT` (viz "Firma má v ARES víc oborů
+podnikání" výše — nástroj kategorii záměrně nehádá z ničeho nepodloženého,
+viz [Taxonomie kategorií](#taxonomie-kategorií)). Pokud máte přístup
+k firemnímu LLM chatu (MS Copilot, ChatGPT…) jen jako k webovému rozhraní,
+bez API klíče, dá se k doplnění použít stejný dvoukrokový princip jako
+u `--jen-id`:
 
 ```bash
-# 1. krok - normální běh + export nekategorizovaných firem pro chat
+# 1. krok - normální běh + export nekategorizovaných/nejistých firem pro chat
 python3 dodavatele.py vstup.csv -o vystup.xlsx --export-nezarazene nezarazene.txt
 
 # --> obsah nezarazene.txt vložit do Copilotu/ChatGPT, odpověď uložit
-#     jako CSV (Název;Kód kategorie;Zdůvodnění), např. odpoved.csv
+#     jako CSV (Název;NACE kód;Zdůvodnění), např. odpoved.csv
 
-# 2. krok - stejný běh znovu, tentokrát s ručním zařazením
-python3 dodavatele.py vstup.csv -o vystup.xlsx --kategorie-mapa odpoved.csv
+# 2. krok - stejný běh znovu, tentokrát s doplněným NACE
+python3 dodavatele.py vstup.csv -o vystup.xlsx --nace-mapa odpoved.csv
 ```
 
-`--export-nezarazene` vypíše číselník všech kategorií a seznam nekategorizovaných
-firem (se zemí a adresou, je-li známá, pro kontext) do textového souboru
-připraveného na vložení do chatu i s instrukcí a požadovaným formátem odpovědi.
-`--kategorie-mapa` pak načte odpověď z chatu (soubor `Název;Kód kategorie[;…]`)
-a aplikuje ji na firmy, které jsou pořád `XXX-00` — nedotkne se řádků, které
-už kategorii mají z NACE nebo Wikidat. Takto přiřazené řádky mají ve sloupci
-**Zařazeno podle** hodnotu `rucne (LLM)`, takže je vždy vidět, co je ověřený
-fakt z rejstříku a co ruční/AI odhad ke kontrole.
+**Proč se LLM ptáme na NACE, ne rovnou na naši kategorii:** aby LLM správně
+vybral jednu z ~95 vlastních kategorií, musel by napřed pochopit celou naši
+taxonomii jen z jednoho výpisu v promptu - reálný prostor pro chybu.
+Standardní NACE klasifikaci LLM naopak dobře zná ze svých trénovacích dat,
+takže dohledání skutečného oboru je pro něj spolehlivější úkol. Kategorii
+z jeho odpovědi pak dopočítá **stejný ověřený mechanismus**
+(`taxonomie.zarad()`), jaký se používá pro skutečný NACE z rejstříku - LLM
+tak nikdy sám nevymýšlí kód naší kategorie, jen NACE.
 
-Žádný nový závislost, API klíč ani automatizace prohlížeče — jen soubor
+`--export-nezarazene` vypíše seznam takových firem (se zemí, adresou a - u
+firem jen s podpůrným NACE - i tím stávajícím kódem pro kontext) do
+textového souboru připraveného na vložení do chatu i s instrukcí a
+požadovaným formátem odpovědi. `--nace-mapa` pak načte odpověď z chatu
+(soubor `Název;NACE[;…]`), pro každou firmu dopočítá kategorii přes
+`taxonomie.zarad()` a zapíše i samotný LLM kód do nového sloupce
+**NACE (LLM)** - takže je vždy vidět, jaký kód LLM navrhl, vedle skutečného
+kódu z rejstříku ve sloupci **NACE**. Sloupec **Zařazeno podle** dostane
+hodnotu `rucne (LLM pres NACE)`, takže je vždy jasné, co je ověřený fakt
+z rejstříku a co ruční/AI odhad ke kontrole. Řádky, kde LLM napsal
+"neznámo" (nebo cokoli bez rozpoznatelných číslic), zůstanou beze změny.
+
+Protože teď máte v jednom souboru vedle sebe **NACE** (rejstřík) i
+**NACE (LLM)**, jde je rovnou porovnat stejným nástrojem jako cizí
+zdroj - viz `--komparace` níže:
+
+```bash
+python3 dodavatele.py --komparace vystup.xlsx --komparace-sloupec "NACE (LLM)"
+```
+
+Žádná nová závislost, API klíč ani automatizace prohlížeče — jen soubor
 na kopírování mezi nástrojem a chatem, který už máte k dispozici.
 
 ## Komparace NACE s externím zdrojem (--komparace)
@@ -689,8 +719,8 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
 -o, --vystup SOUBOR     .xlsx nebo .csv (výchozí dodavatele_vystup.xlsx)
 --kompakt               jen základní sloupce
 --jen-id                jen dohledat IČO/registrační číslo, viz "Dohledání identifikátoru"
---export-nezarazene SOUBOR   export nekategorizovaných firem pro LLM chat, viz "Ruční zařazení"
---kategorie-mapa SOUBOR      aplikovat ruční zařazení (odpověď z LLM chatu) na výstup
+--export-nezarazene SOUBOR   export nekategorizovaných/nejistých firem pro LLM chat, viz "Ruční zařazení"
+--nace-mapa SOUBOR      aplikovat rucne/LLM dohledany NACE (odpověď z LLM chatu) na výstup
 --workers N             souběžné dotazy (výchozí 4)
 --prodleva S            minimální odstup dotazů na jeden server (výchozí 0.25 s)
 --pocet N               kolik kandidátů z rejstříku načíst (výchozí 30)
