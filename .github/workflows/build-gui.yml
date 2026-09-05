@@ -2,8 +2,10 @@ name: Build desktop GUI
 
 # Sestavi desktopovou appku (gui.py) do jednoho spustitelneho souboru pro
 # Windows a macOS pres PyInstaller - PyInstaller neumi cross-build, proto
-# bezi zvlast na windows-latest a macos-latest. Vysledne soubory se objevi
-# jako artefakty tohoto behu (zalozka Actions -> konkretni beh -> Artifacts).
+# bezi zvlast na windows-latest a macos-latest. Vysledne soubory se navic
+# (job "release" nize) zabali do GitHub Release s pevnym tagem "gui-latest" -
+# na rozdil od Artifacts (zalozka Actions) jde stahnout bez prihlaseni do
+# GitHub uctu a bez expirace, coz je nutne pro kolegy bez vlastniho uctu.
 on:
   workflow_dispatch:
   push:
@@ -13,6 +15,9 @@ on:
       - "dodavatele.py"
       - "taxonomie.py"
       - ".github/workflows/build-gui.yml"
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -55,3 +60,26 @@ jobs:
         with:
           name: Dodavatele-macOS
           path: dist/Dodavatele-macOS.zip
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: stazeno
+
+      - name: Zverejnit/aktualizovat verejny Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: gui-latest
+          name: "Dodavatelé – desktopová appka (nejnovější sestavení)"
+          body: >
+            Automaticky sestaveno z branche `gui-desktop`, commit ${{ github.sha }}.
+            Windows: stáhněte `Dodavatele.exe` a spusťte (SmartScreen: "Další
+            informace" → "Přesto spustit"). macOS: stáhněte a rozbalte
+            `Dodavatele-macOS.zip`, pravým tlačítkem na `Dodavatele.app` →
+            Otevřít (napoprvé kvůli Gatekeeperu).
+          files: |
+            stazeno/Dodavatele-Windows/Dodavatele.exe
+            stazeno/Dodavatele-macOS/Dodavatele-macOS.zip

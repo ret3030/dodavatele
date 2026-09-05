@@ -9,11 +9,20 @@ Vytvořil: Robert Plevač (robert.plevac@cz.ey.com), EY s.r.o., IČO 26705338.
 
 ## Jak appku dostat hotovou (bez buildování)
 
-Nejjednodušší cesta: záložka **Actions** tohoto repozitáře → workflow
-**Build desktop GUI** → poslední úspěšný běh → sekce **Artifacts** dole →
-stáhnout `Dodavatele-Windows` nebo `Dodavatele-macOS`. Workflow se spustí
-sám při každé změně `gui.py`/`dodavatele.py` na této branchi, nebo ručně
-tlačítkem "Run workflow".
+**Stálý odkaz ke stažení (doporučeno pro kolegy):**
+https://github.com/ret3030/dodavatele/releases/tag/gui-latest
+
+Vždy obsahuje poslední úspěšně sestavenou verzi z branche `gui-desktop`
+(`Dodavatele.exe` pro Windows, `Dodavatele-macOS.zip` pro macOS) - stažení
+funguje **bez přihlášení do GitHub účtu** a odkaz se při dalších verzích
+nemění. Aktualizuje se automaticky při každé změně `gui.py`/`dodavatele.py`
+na této branchi.
+
+Alternativa (vyžaduje přihlášený GitHub účet): záložka **Actions** →
+workflow **Build desktop GUI** → poslední úspěšný běh → sekce **Artifacts**
+dole. Na rozdíl od Release tyhle soubory po čase automaticky mizí a ke
+stažení je nutné být přihlášený - pro rozesílání kolegům použijte raději
+odkaz na Release výše.
 
 Na macOS je potřeba po rozbalení zipu appku poprvé spustit přes pravé
 tlačítko → Otevřít (Gatekeeper jinak nepodepsanou appku odmítne spustit
