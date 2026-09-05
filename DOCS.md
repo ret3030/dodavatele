@@ -257,10 +257,9 @@ python3 dodavatele.py --komparace vystup_s_kolegovym_sloupcem.xlsx \
     --komparace-sloupec "Kolegův NACE"
 ```
 
-Nebo přes `python3 dodavatele.py` → volba **3) Porovnat NACE se souborem od
-kolegy/AI** v průvodci. Ukázkový soubor `vzor_komparace.csv` (sloupce
-`Jméno;Země;NACE;Komparace`) demonstruje typický výsledek – kolegův/AI odhad
-se často trefí jen na hrubou kategorii nebo úplně mine:
+Ukázkový soubor `vzor_komparace.csv` (sloupce `Jméno;Země;NACE;Komparace`)
+demonstruje typický výsledek – kolegův/AI odhad se často trefí jen na
+hrubou kategorii nebo úplně mine:
 
 ```bash
 python3 dodavatele.py --komparace vzor_komparace.csv --komparace-sloupec Komparace
@@ -296,7 +295,6 @@ divize" - viz `vzor_komparace.csv` pro příklad přesně v tomhle formátu.
 | **SEC EDGAR** (sec.gov) | USA, firmy registrované u SEC | název, adresa, SIC → NACE i NAICS, CIK |
 | **Wikidata** | velké nadnárodní firmy | obor činnosti (viz níže), EU DIČ, LEI, sídlo |
 | **VIES** (`--vies`) | EU | ověření platnosti DIČ |
-| **ANAF** (webservicesp.anaf.ro) | Rumunsko, jen podle už známého DIČ | CAEN → NACE, adresa, registrační číslo (ONRC) - nelze hledat podle jména |
 
 Vše bez API klíče a bez registrace.
 
@@ -343,58 +341,6 @@ neaktuální; na rozdíl od ARES/INSEE nejde o živý rejstřík. Číslo zápis
 (např. `HRB 45109`) navíc není celostátně jedinečné - stejné číslo používají
 různé rejstříkové soudy - proto se při zadání jen čísla bez názvu firmy
 může vrátit víc kandidátů k ruční kontrole (stejně jako u GLEIF).
-
-### Německo - "Gegenstand des Unternehmens" (--de-gegenstand)
-
-Lokální kopie Handelsregisteru výše nenese obor činnosti vůbec - německý
-rejstřík ho jako kód nevede (na rozdíl od ČR/SR). Jediné místo, kde je
-skutečný **předmět podnikání jako volný text** k dispozici, je aktuální výpis
-(dokument „AD") přímo z portálu `handelsregister.de`. Ten nemá API - je to
-stará JSF aplikace se session postbacky, kterou `--de-gegenstand` replikuje
-přes `urllib` (žádná nová závislost na scraping knihovně, jen `pypdf` pro
-čtení staženého PDF výpisu).
-
-```bash
-# 1. krok - normální běh, ať máme německé firmy identifikované (jméno + HRB/HRA)
-python3 dodavatele.py vstup.csv -o vystup.xlsx
-
-# 2. krok - doplnit Gegenstand pro německé řádky ve vystup.xlsx
-python3 dodavatele.py --de-gegenstand vystup.xlsx
-```
-
-Druhý krok jde spustit i přes `python3 dodavatele.py` → volba **2) Doplnit
-"Gegenstand des Unternehmens"** v průvodci, ať nemusíte pamatovat přepínač.
-
-Vyžaduje připravenou lokální kopii Handelsregisteru (`--pripravit-de-rejstrik`)
-- z ní se dohledá soud potřebný k jednoznačnému výběru správného řádku na
-portálu (číslo zápisu samo o sobě není jedinečné, viz výše).
-
-**Důležité omezení:**
-* Podmínky použití portálu povolují max. **60 dotazů/hodinu** (dle FAQ portálu
-  hrozí při překročení i trestní odpovědnost dle §303a/b StGB) - běh proto
-  vždy jede sekvenčně (bez ohledu na `--workers`) s pevnou prodlevou, počítejte
-  s **~4 minutami na firmu** (4 požadavky: úvod, rozšířené hledání, vyhledání,
-  stažení dokumentu).
-* Text se přidá jako nový sloupec „Gegenstand (Handelsregister)" do
-  výstupního souboru (`<--de-gegenstand>_gegenstand.<přípona>`) - použitelný
-  i jako kontext pro ruční/LLM zařazení (`--export-nezarazene`), pokud
-  automatický odhad níže nic nenajde.
-* **Navíc se zkouší automatický odhad kategorie z klíčových frází v textu**
-  (`taxonomie.nace_z_gegenstand()`) - sloupce „NACE (odhad z Gegenstand)",
-  „Kód kategorie (odhad z Gegenstand)", „Kategorie dodavatele (odhad z
-  Gegenstand)". Na rozdíl od zbytku nástroje, který kategorii z volného textu
-  záměrně nehádá (viz výše), je tohle vyslovně vyžádaná výjimka - Gegenstand
-  je ale povinná právní formulace předmětu podnikání ze společenské smlouvy,
-  ne jen název firmy, takže je nesrovnatelně informativnější. I tak jde jen
-  o shodu klíčových frází, ne skutečný kód z rejstříku - slovník
-  (`GEGENSTAND_KLICOVA_SLOVA` v `taxonomie.py`) je záměrně malý a používá jen
-  konkrétní, jednoznačné fráze (např. "steuerberatung", "gebäudereinigung"),
-  ne obecná slova jako "Herstellung und Vertrieb" nebo "Produktion von", která
-  se objevují skoro v každém Gegenstand bez ohledu na skutečný obor - takové
-  fráze by vedly k nahodilé, ničím nepodložené kategorii (ověřeno na adidas
-  AG: bez konkrétního produktu ve frázi raději žádný odhad než jistý špatný).
-  Pokrývá tak jen menšinu běžných oborů, u zbytku sloupce zůstanou prázdné.
-* Vyžaduje `pip install pypdf` (v `requirements.txt`).
 
 ### Velká Británie - lokální kopie Companies House
 
@@ -445,9 +391,7 @@ firem jen přibližně dopočítává pro účely vlastní taxonomie.
 * GLEIF obsahuje jen entity s LEI, takže řada firem střední velikosti tam
   není (typicky se dohledají přes Wikidata, ale s méně přesnými daty).
   Pro takové dodavatele doplňte IČO/VAT do vstupu, nebo počítejte se stavem
-  `NENALEZENO`/`OVERIT` a ručním doplněním. **U Německa** navíc zkuste
-  `--de-gegenstand` (viz výše) - dá skutečný předmět podnikání i pro malé
-  firmy bez Wikidata záznamu, jen pomaleji (limit portálu ~60 dotazů/h).
+  `NENALEZENO`/`OVERIT` a ručním doplněním.
 * Sloupec **NACE - zdroj** říká, jestli je NACE skutečný údaj z rejstříku,
   nebo jen odhad z oboru na Wikidatech („odhad z oboru (Wikidata)“) — u
   odhadu počítejte s nižší přesností než u NACE z ARES/INSEE.
@@ -492,13 +436,12 @@ u DE (`--pripravit-de-rejstrik`) a GB (`--pripravit-gb-rejstrik`):
   ale vyžaduje jednorázovou registraci e-mailu na
   `kbopub.economie.fgov.be/kbo-open-data` – zatím nezapojeno, čeká na vyřízení
   přístupu.
-* **RO** (ANAF) – oficiální bezklíčové API `webservicesp.anaf.ro` vrací podle
-  zadaného CUI (DIČ) i CAEN kód (rumunský NACE) a adresu - nejde ale hledat
-  podle jména, jen doplnit obor k už známému DIČ (proto zapojeno jako
-  doplněk k VIES, ne jako samostatný zdroj - `--bez-ro` pro vypnutí).
-  **Nebylo možné ověřit** z prostředí, kde vznikl - endpoint vracel 404
-  (patrně geo/WAF blokace), implementace vychází z oficiální dokumentace.
-  Ověřte prvním skutečným během na RO firmě se známým DIČ.
+* **RO** (ANAF) – oficiální bezklíčové API `webservicesp.anaf.ro` umí podle
+  zadaného CUI (DIČ) vrátit i CAEN kód (rumunský NACE) a adresu - nejde ale
+  hledat podle jména, jen doplnit obor k už známému DIČ. Zkoušená
+  implementace navíc nešla z tohoto prostředí vůbec ověřit (endpoint vracel
+  404, patrně geo/WAF blokace) - zatím nezapojeno, dokud to nepůjde
+  spolehlivě otestovat.
 * **PL** (GUS REGON/BIR1.1) – bezplatný `USER_KEY` na vyžádání e-mailem,
   rozhraní je ale staré SOAP se session přihlášením - zatím nezapojeno,
   nejnáročnější na implementaci ze čtveřice výše.
@@ -754,7 +697,7 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
 --prah-ok 0.90          skóre shody názvu pro automatické přijetí
 --prah-overit 0.72      pod tímto skóre je záznam nenalezený
 --vies                  ověřit DIČ v EU (pomalejší, jeden dotaz navíc na firmu)
---bez-ares/-sk/-fr/-sg/-tw/-de/-gb/-ro/-gleif/-edgar/-wikidata   vypnutí jednotlivých zdrojů
+--bez-ares/-sk/-fr/-sg/-tw/-de/-gb/-gleif/-edgar/-wikidata   vypnutí jednotlivých zdrojů
 --pripravit-de-rejstrik   stáhnout/rozbalit lokální kopii německého Handelsregisteru a skončit
 --pripravit-gb-rejstrik   stáhnout/naimportovat lokální kopii Companies House (UK) a skončit
 --bez-gleif-popisy      nepřekládat kódy GLEIF (rejstřík, právní forma) na text - rychlejší
@@ -770,14 +713,6 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
 --komparace-sloupec NÁZEV      název porovnávaného sloupce v --komparace souboru
 --komparace-nas-sloupec NÁZEV  název našeho sloupce s NACE (výchozí: NACE)
 --komparace-vystup SOUBOR      kam zapsat výsledek (výchozí: <--komparace>_komparace.<přípona>)
-
---de-gegenstand SOUBOR    doplnit "Gegenstand des Unternehmens" z handelsregister.de
-                          pro německé firmy v už vygenerovaném výstupu (viz výše) -
-                          sekvenční běh, ~4 min/firmu, jen doplní a skončí
---de-gegenstand-vystup SOUBOR  kam zapsat výsledek (výchozí: <--de-gegenstand>_gegenstand.<přípona>)
-
---pruvodce              spustit interaktivního průvodce (napovídá otázkami místo
-                        přepínačů) - stane se i bez zadání žádných argumentů
 ```
 
 ## Poznámky k provozu

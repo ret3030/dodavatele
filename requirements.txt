@@ -1,5 +1,3 @@
 # Skript bezi na cistem Pythonu 3.9+ bez zavislosti.
 # openpyxl je potreba pouze pro cteni a zapis XLSX (vystup .csv ho nevyzaduje).
 openpyxl>=3.1
-# pypdf je potreba jen pro --de-gegenstand (cteni PDF vypisu z handelsregister.de).
-pypdf>=4.0
