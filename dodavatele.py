@@ -2900,17 +2900,38 @@ def zapis_tabulku(hlavicka, radky, cesta):
     wb.save(cesta)
 
 
+_NACE_KOD_RE = re.compile(r"\b\d+(?:\.\d+)?\b")
+
+
+def _nace_divize_vsechny(text):
+    """
+    Vytahne vsechny NACE divize (prvni 2 cislice kazdeho kodu) z textu.
+    Sloupec od kolegy/AI casto neni "holy" kod, ale text jako
+    '26.11 Vyroba počítačů... + 46.52 Velkoobchod s počítači' - s teckovanou
+    notaci i s vic kody v jedne bunce najednou (kdyz Gegenstand/popis pokryva
+    vic cinnosti). Bere se mnozina vsech nalezenych divizi, ne jen prvni.
+    """
+    divize = set()
+    for kod in _NACE_KOD_RE.findall(str(text or "")):
+        cislice = kod.replace(".", "")
+        if cislice:
+            divize.add(cislice[:2])
+    return divize
+
+
 def porovnej_nace_divize(a, b):
     """
-    Porovna dva NACE kody na urovni divize (prvni 2 cislice) - odpousti rozdily
-    v detailnejsi urovni mezi dvema ruznymi zdroji. Vraci True/False, nebo
-    None, kdyz jedne ze stran kod chybi (nelze vyhodnotit).
+    Porovna dva NACE udaje na urovni divize (prvni 2 cislice) - odpousti
+    rozdily v detailnejsi urovni mezi dvema ruznymi zdroji i teckovanou
+    notaci/popisny text (viz _nace_divize_vsechny). Shoda = aspon jedna
+    spolecna divize. Vraci True/False, nebo None, kdyz jedne ze stran
+    zadny rozpoznatelny kod chybi (nelze vyhodnotit).
     """
-    ca = re.sub(r"\D", "", str(a or ""))[:2]
-    cb = re.sub(r"\D", "", str(b or ""))[:2]
-    if not ca or not cb:
+    da = _nace_divize_vsechny(a)
+    db = _nace_divize_vsechny(b)
+    if not da or not db:
         return None
-    return ca == cb
+    return bool(da & db)
 
 
 def _najdi_sloupec(hlavicka, nazev):
@@ -2945,9 +2966,9 @@ def zpracuj_komparaci(cesta_vstup, sloupec_kolega, cesta_vystup, sloupec_nas="NA
         vysledek = porovnej_nace_divize(kod_nas, kod_kolega)
         if vysledek is None:
             znacka = ""
-            if not re.sub(r"\D", "", str(kod_nas or "")):
+            if not _nace_divize_vsechny(kod_nas):
                 chybi_nas += 1
-            if not re.sub(r"\D", "", str(kod_kolega or "")):
+            if not _nace_divize_vsechny(kod_kolega):
                 chybi_kolega += 1
         elif vysledek:
             znacka = "ANO"

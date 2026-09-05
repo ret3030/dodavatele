@@ -1,15 +1,15 @@
-Jméno;Země;NACE;Komparace
-Škoda Auto a.s.;CZ;2910;4511
-ČEZ, a. s.;CZ;3511;3512
-Alza.cz a.s.;CZ;4791;6201
-Kooperativa pojišťovna, a.s.;CZ;6512;6419
-ABB s.r.o.;CZ;2711;2711
-Seznam.cz, a.s.;CZ;6311;7311
-Securitas ČR s.r.o.;CZ;8010;8121
+﻿Jméno;Země;NACE;Komparace
+Škoda Auto a.s.;CZ;2910;45.11 Obchod s automobily
+ČEZ, a. s.;CZ;3511;35.12 Přenos elektřiny
+Alza.cz a.s.;CZ;4791;62.01 Programování
+Kooperativa pojišťovna, a.s.;CZ;6512;64.19 Ostatní peněžní zprostředkování
+ABB s.r.o.;CZ;2711;26.11 Výroba počítačů a periferních zařízení + 46.52 Velkoobchod s počítači
+Seznam.cz, a.s.;CZ;6311;73.11 Reklamní agentury
+Securitas ČR s.r.o.;CZ;8010;81.21 Nespecializovaný úklid budov
 Slovnaft, a.s.;SK;1920;
-Siemens Aktiengesellschaft;DE;;2711
-Robert Bosch GmbH;DE;;2910
-SAP SE;DE;;6201
-Apple Inc.;US;2620;6201
-Microsoft Corporation;US;5829;6201
+Siemens Aktiengesellschaft;DE;;27.11 Výroba elektrických motorů
+Robert Bosch GmbH;DE;;29.10 Výroba motorových vozidel
+SAP SE;DE;;62.01 Programování
+Apple Inc.;US;2620;62.01 Programování
+Microsoft Corporation;US;5829;62.01 Programování
 Firma Ktera Neexistuje 12345 s.r.o.;CZ;;

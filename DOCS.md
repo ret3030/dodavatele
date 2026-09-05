@@ -260,6 +260,12 @@ původní sloupce plus nový sloupec **Shoda NACE (divize)** (ANO/NE/prázdné,
 pokud jedné straně kód chybí) a na stderr vypíše souhrn — kolik řádků je
 srovnatelných a jaké je procento shody.
 
+Kolegův/AI sloupec nemusí být "holý" kód - běžně jde o text jako
+`26.11 Výroba počítačů... + 46.52 Velkoobchod s počítači` (tečkovaná
+notace, popis, i víc kódů v jedné buňce najednou). Nástroj z takového textu
+vytáhne všechny rozpoznatelné kódy a shodu bere jako "aspoň jedna společná
+divize" - viz `vzor_komparace.csv` pro příklad přesně v tomhle formátu.
+
 ## Zdroje dat
 
 | zdroj | pokrytí | co dodá |
