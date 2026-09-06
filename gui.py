@@ -20,7 +20,7 @@ import threading
 import traceback
 import webbrowser
 from tkinter import (
-    BOTH, END, LEFT, X, BooleanVar, StringVar, Tk, ttk,
+    BOTH, END, LEFT, RIGHT, X, BooleanVar, StringVar, Tk, Toplevel, ttk,
     filedialog, messagebox, scrolledtext,
 )
 
@@ -35,6 +35,87 @@ if sys.stderr is None:
 import dodavatele as d  # noqa: E402 (musi byt az po oprave sys.stdout/stderr)
 
 NAZEV_OKNA = "Dodavatelé – obohacení seznamu"
+
+# Napoveda se zamerne drzi tri otazek, ktere kolega resi pred prvnim spustenim:
+# co appka dela, co ji dat na vstup a co ceka ve vystupu. Podrobnosti jsou
+# v DOCS.md - sem patri jen to, bez ceho nejde zacit.
+NAPOVEDA = """\
+K ČEMU TO JE
+
+Dáte seznam firem (stačí názvy) a appka ke každé dohledá ve veřejných
+rejstřících adresu, IČO, DIČ, obor podnikání (NACE) a zařadí ji do kategorie
+dodavatele. Výsledek uloží do Excelu.
+
+
+VSTUPNÍ SOUBOR
+
+Excel (.xlsx), CSV nebo prostý textový soubor se seznamem názvů.
+
+První řádek jsou názvy sloupců. Povinný je jediný sloupec - s názvem firmy.
+Ostatní jsou nepovinné, ale když je vyplníte, hledání je rychlejší a
+přesnější (hlavně IČO nebo DIČ, které firmu určí jednoznačně).
+
+Sloupce se poznají samy podle názvu, česky i anglicky:
+
+    Název firmy   Název, Jméno, Firma, Dodavatel, Name, Company, Supplier
+    IČO           IČO, IC, Company ID, Registration number
+    DIČ           DIČ, VAT, VAT ID, Tax ID
+    Země          Země, Country, Stát  (kód jako CZ, SK, DE)
+    Adresa        Ulice, Město, PSČ, Street, City, Zip
+
+Když se hlavička nepozná, vezme se první sloupec jako název firmy.
+Na pořadí sloupců nezáleží, přebytečné sloupce nevadí.
+
+Ukázka nejjednoduššího vstupu:
+
+    Název
+    Alza.cz a.s.
+    ČEZ, a. s.
+    Siemens Aktiengesellschaft
+
+Do názvu patří zapsané jméno firmy, ne značka nebo web. "megaknihy.cz"
+se nenajde, "Internet-Handel s.r.o." nebo jeho IČO ano.
+
+
+CO APPKA DOHLEDÁ
+
+    Adresu, IČO a DIČ
+    Právní formu a datum vzniku
+    Obor podnikání (NACE) - všechny zapsané obory
+    Kategorii dodavatele podle vlastní taxonomie
+    Odkaz do rejstříku ke kontrole
+    Zda firma pořád existuje (zaniklé se označí)
+
+Zdroje podle země: ČR (ARES), Slovensko, Francie, Německo, UK, USA,
+Singapur, Tchaj-wan a celosvětově GLEIF a Wikidata. Které se použijí,
+si zapnete v okně výš.
+
+
+CO VE VÝSTUPU SLEDOVAT
+
+Sloupec STAV říká, jak moc řádku věřit:
+
+    OK           firma nalezena, jméno sedí
+    VYBRANO      víc firem stejného jména, vybrána nejpodobnější - zkontrolujte
+    OVERIT       nalezena, ale něco nesedí - přečtěte si Poznámku
+    NENALEZENO   nenalezena; zkuste doplnit IČO nebo přesnější název
+
+Sloupec KATEGORIE DODAVATELE zůstane u velké části firem prázdný
+(XXX-00 Nezařazeno). Není to chyba: zapsaný obor v rejstříku popisuje, jak
+je firma zaregistrovaná, ne co doopravdy dodává. Většina firem má zapsaný
+obecný obor typu "nespecializovaný velkoobchod" nebo jich má zapsaných
+dvacet. Appka proto kategorii přiřadí jen tam, kde je jistá, a jinde radši
+nechá prázdno, než aby vás poslala špatným směrem.
+
+Zbytek se dá doplnit přes ChatGPT/Copilota - ta část je zatím jen
+v příkazové řádce, viz DOCS.md (přepínače --export-llm a --llm-mapa).
+
+
+CO TO STOJÍ ČASU
+
+Řádově sekundy na firmu. U stovek firem je to na minuty, u tisíců
+na desítky minut. Průběh vidíte dole v okně a jde ho kdykoli zavřít.
+"""
 
 ZDROJE = [
     ("Ares", "bez_ares", "ARES (ČR)", True),
@@ -160,6 +241,10 @@ class Aplikace:
         self.tlacitko_otevrit = ttk.Button(
             ramec_beh, text="Otevřít výstup", command=self._otevri_vystup, state="disabled")
         self.tlacitko_otevrit.pack(side=LEFT, padx=(8, 0))
+        # Napoveda vpravo: pack(side=RIGHT) pred progress barem, jinak by ji
+        # roztazeny progress vytlacil mimo okno.
+        ttk.Button(ramec_beh, text="? Nápověda",
+                   command=self._napoveda, width=12).pack(side=RIGHT, padx=(8, 0))
         self.progress = ttk.Progressbar(ramec_beh, mode="determinate")
         self.progress.pack(side=LEFT, fill=X, expand=True, padx=(10, 0))
 
@@ -175,6 +260,28 @@ class Aplikace:
         self.log.pack(fill=BOTH, expand=True, padx=6, pady=6)
 
     # -- pomocne akce --------------------------------------------------------
+
+    def _napoveda(self):
+        """Samostatne okno s napovedou - text je v konstante NAPOVEDA nahore."""
+        okno = Toplevel(self.root)
+        okno.title("Nápověda")
+        okno.geometry("680x600")
+        okno.minsize(520, 400)
+        okno.transient(self.root)
+
+        text = scrolledtext.ScrolledText(okno, wrap="word", padx=14, pady=12)
+        text.pack(fill=BOTH, expand=True)
+        text.insert("1.0", NAPOVEDA)
+
+        # Nadpisy (radky velkymi pismeny) tucne, at se v textu da orientovat.
+        text.tag_configure("nadpis", font=("TkDefaultFont", 10, "bold"))
+        for i, radek in enumerate(NAPOVEDA.split("\n"), start=1):
+            if radek.strip() and radek == radek.upper() and not radek.startswith(" "):
+                text.tag_add("nadpis", "%d.0" % i, "%d.end" % i)
+        text.configure(state="disabled")
+
+        ttk.Button(okno, text="Zavřít", command=okno.destroy).pack(pady=(0, 10))
+        okno.bind("<Escape>", lambda _e: okno.destroy())
 
     def _vyber_vstup(self):
         cesta = filedialog.askopenfilename(
