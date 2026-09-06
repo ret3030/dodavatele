@@ -1,8 +1,7 @@
 """
-Jednoduche desktopove GUI k dodavatele.py pro kolegy, kteri neumi s Pythonem/
-prikazovou radkou. Zabaluje se do jednoho spustitelneho souboru pres
-PyInstaller (viz README.md) - kolega jen dvojklikem spusti .exe/.app,
-nic neinstaluje.
+Jednoduche desktopove GUI k dodavatele.py pro uzivatele bez Pythonu/prikazove
+radky. Zabaluje se do jednoho spustitelneho souboru pres PyInstaller
+(viz README.md) - spousti se dvojklikem na .exe/.app, nic se neinstaluje.
 
 Logika obohaceni je beze zmeny v dodavatele.py (funkce spustit()) - tenhle
 soubor je jen tenka nadstavba, ktera si postavi stejny objekt argumentu,
@@ -36,9 +35,9 @@ import dodavatele as d  # noqa: E402 (musi byt az po oprave sys.stdout/stderr)
 
 NAZEV_OKNA = "Dodavatelé – obohacení seznamu"
 
-# Napoveda se zamerne drzi tri otazek, ktere kolega resi pred prvnim spustenim:
-# co appka dela, co ji dat na vstup a co ceka ve vystupu. Podrobnosti jsou
-# v README.md - sem patri jen to, bez ceho nejde zacit.
+# Napoveda se zamerne drzi tri otazek, ktere uzivatel resi pred prvnim
+# spustenim: co appka dela, co ji dat na vstup a co ceka ve vystupu.
+# Podrobnosti jsou v README.md - sem patri jen to, bez ceho nejde zacit.
 NAPOVEDA = """\
 K ČEMU TO JE
 

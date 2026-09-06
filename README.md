@@ -1,12 +1,16 @@
 # Dodavatelé – obohacení seznamu z veřejných rejstříků
 
-Vezme seznam názvů firem a doplní k nim adresu, IČO/DIČ a obor činnosti
-(NACE) z veřejných rejstříků – ARES (ČR), RPO SR (Slovensko), INSEE
-(Francie), SEC EDGAR (USA), GLEIF a Wikidata (svět). Vše bez API klíče.
+Nástroj, který k seznamu firem doplní adresu, IČO/DIČ a obor činnosti (NACE)
+z veřejných rejstříků – ARES (ČR), RPO SR (Slovensko), INSEE (Francie),
+SEC EDGAR (USA), GLEIF a Wikidata (svět). Vše bez API klíče a bez registrace.
 
 Zařazení do vlastní kategorie dodavatele a stručný popis, co firma skutečně
-dělá, nástroj neurčuje sám (zapsaný obor říká, jak je firma zaregistrovaná,
-ne co dodává) – doplní je krok přes LLM chat (Copilot/ChatGPT), viz níže.
+dělá, se určuje ve druhém kroku přes LLM chat (Copilot/ChatGPT) – zapsaný
+obor v rejstříku totiž říká, jak je firma zaregistrovaná, ne co dodává.
+Viz [Zařazení přes LLM chat](#zařazení-přes-llm-chat) níže.
+
+K dispozici jako příkazová řádka i jako desktopová aplikace bez nutnosti
+instalovat Python – viz [Desktopová aplikace](#desktopová-aplikace).
 
 ## Instalace a použití
 
@@ -19,7 +23,7 @@ python3 dodavatele.py vstup.csv -o vystup.xlsx
 
 Vstupem je `.csv`, `.xlsx` nebo `.txt` se seznamem firem – stačí sloupec
 s názvem, IČO/DIČ/adresa jsou nepovinné, ale zpřesní a zrychlí hledání.
-Hlavičku sloupců pozná automaticky, česky i anglicky. Ukázka:
+Hlavičku sloupců rozpozná automaticky, česky i anglicky. Ukázka:
 `vzor_dodavatele.csv`.
 
 Výstup: `Jméno | Ulice | PSČ | Město | Země | IČO | DIČ | NACE | Stav
@@ -30,13 +34,20 @@ danému řádku věřit:
 | stav | význam |
 |---|---|
 | `OK` | jednoznačná shoda, data lze převzít |
-| `VYBRANO` | víc podobných firem – vybrána nejlepší, zkontrolujte |
-| `OVERIT` | shoda s výhradou (např. jiná adresa/země) – zkontrolujte |
+| `VYBRANO` | víc podobných firem – vybrána nejlepší, doporučená kontrola |
+| `OVERIT` | shoda s výhradou (např. jiná adresa/země) – doporučená kontrola |
 | `NENALEZENO` | nic dost podobného nenalezeno |
 | `CHYBA` | prázdný řádek nebo výpadek zdrojů |
 
+Opakovaný běh nad stejným seznamem je díky keši (uložené v profilu
+uživatele) téměř okamžitý – nic se nestahuje znovu. `--obnovit` zkusí ještě
+jednou dohledat firmy, které v daném běhu skončily jako nenalezené.
+Přepínač `--help` vypíše všechny volby i s popisem.
+
+## Zařazení přes LLM chat
+
 **Kód kategorie**, **Kategorie dodavatele** a **Popis činnosti** zůstávají
-prázdné, dokud je nedoplní LLM krok:
+prázdné, dokud je nedoplní tenhle krok:
 
 ```bash
 python3 dodavatele.py vstup.csv -o vystup.xlsx --export-llm firmy.txt
@@ -44,24 +55,19 @@ python3 dodavatele.py vstup.csv -o vystup.xlsx --export-llm firmy.txt
 python3 dodavatele.py vstup.csv -o vystup.xlsx --llm-mapa odpoved.csv
 ```
 
-Opakovaný běh nad stejným seznamem je díky keši (v profilu uživatele) skoro
-okamžitý – nic se nestahuje znovu. `--obnovit` zkusí ještě jednou dohledat
-firmy, které v daném běhu skončily jako nenalezené. Přepínač `--help`
-vypíše všechny volby i s popisem.
+## Desktopová aplikace
 
-## Desktopová appka pro kolegy (bez Pythonu)
+`gui.py` je okenní rozhraní nad stejnou logikou, zabalené přes PyInstaller
+do jednoho spustitelného souboru – spouští se dvojklikem, bez nutnosti
+cokoli instalovat.
 
-`gui.py` je tenké okenní rozhraní nad stejnou logikou, zabalené přes
-PyInstaller do jednoho spustitelného souboru – kolega jen dvojklikem spustí
-`.exe`/`.app`, nic neinstaluje.
-
-**Stažení hotové appky:**
+**Stažení hotové aplikace:**
 https://github.com/ret3030/dodavatele/releases/tag/gui-latest –
-vždy poslední verze z `main`, bez přihlášení do GitHub účtu. Na macOS je po
-rozbalení potřeba appku poprvé spustit přes pravé tlačítko → Otevřít
-(Gatekeeper jinak nepodepsanou appku nespustí dvojklikem).
+vždy poslední verze, bez přihlášení do GitHub účtu. Na macOS je po
+rozbalení potřeba aplikaci poprvé spustit přes pravé tlačítko → Otevřít
+(Gatekeeper jinak nepodepsanou aplikaci nespustí dvojklikem).
 
-**Sestavení appky lokálně:**
+**Sestavení lokálně:**
 
 ```bash
 pip install pyinstaller openpyxl
@@ -69,6 +75,6 @@ pyinstaller --onefile --windowed --name Dodavatele gui.py    # Windows - .exe
 pyinstaller --windowed --name Dodavatele gui.py               # macOS - .app
 ```
 
-PyInstaller neumí sestavit appku pro jinou platformu, než na které běží –
+PyInstaller neumí sestavit aplikaci pro jinou platformu, než na které běží –
 proto GitHub Actions (`.github/workflows/build-gui.yml`) sestavuje zvlášť na
 Windows a macOS při každé změně `dodavatele.py`/`gui.py` na `main`.
