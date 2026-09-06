@@ -17,8 +17,7 @@ on:
     paths:
       - "gui.py"
       - "dodavatele.py"
-      - "taxonomie.py"
-      - "nace_nomenklatura.py"
+      - "taxonomie_data.json"
       - ".github/workflows/build-gui.yml"
 
 permissions:
