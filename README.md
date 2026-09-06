@@ -58,6 +58,15 @@ python3 dodavatele.py vstup.csv -o vystup.xlsx --export-llm firmy.txt
 python3 dodavatele.py vstup.csv -o vystup.xlsx --llm-mapa odpoved.csv
 ```
 
+Když už vyplněný výstup máte (a vstupní seznam po ruce nemáte, nebo je na
+jiném stroji bez keše), `--z-vystupu` nahradí `vstup` a export/import proběhne
+přímo nad ním, bez jediného dotazu do rejstříku:
+
+```bash
+python3 dodavatele.py --z-vystupu vystup.xlsx --export-llm firmy.txt
+python3 dodavatele.py --z-vystupu vystup.xlsx --llm-mapa odpoved.csv -o vystup2.xlsx
+```
+
 ## Desktopová aplikace
 
 `gui.py` je okenní rozhraní nad stejnou logikou, zabalené přes PyInstaller

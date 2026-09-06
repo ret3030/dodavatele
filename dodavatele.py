@@ -2057,6 +2057,51 @@ SLOUPCE_DOPLNKY = [
     ("odkaz", "Odkaz na rejstřík"), ("poznamka", "Poznámka"),
 ]
 
+
+def zaznamy_z_vystupu(cesta):
+    """
+    Nacte uz vygenerovany vystup (XLSX/CSV z drivejsiho behu, viz
+    zapis_vystup) zpet do Zaznamu - pro --z-vystupu, ktere umozni
+    --export-llm/--llm-mapa bez opakovani cele enrichment casti (dotazy do
+    rejstriku). Sloupce se poznaji podle stejneho seznamu jako pri zapisu
+    (SLOUPCE_ZAKLAD/SLOUPCE_DOPLNKY), takze funguje i vystup bez doplnkovych
+    sloupcu (ty v danem behu chybely, protoze byly prazdne u vsech firem).
+    """
+    if os.path.splitext(cesta)[1].lower() in (".xlsx", ".xlsm"):
+        from openpyxl import load_workbook
+        ws = load_workbook(cesta, read_only=True, data_only=True).active
+        it = ws.iter_rows(values_only=True)
+        hlavicka = [str(h or "").strip() for h in next(it)]
+        radky = [["" if v is None else str(v) for v in r] for r in it]
+    else:
+        with open(cesta, encoding="utf-8-sig", newline="") as f:
+            vzorek = f.read(4096)
+            f.seek(0)
+            try:
+                dialekt = csv.Sniffer().sniff(vzorek, delimiters=";,\t|")
+            except csv.Error:
+                dialekt = csv.excel
+                dialekt.delimiter = ";"
+            r = csv.reader(f, dialect=dialekt)
+            hlavicka = [h.strip() for h in next(r)]
+            radky = list(r)
+
+    indexy = {pole: hlavicka.index(nazev) for pole, nazev in SLOUPCE_ZAKLAD + SLOUPCE_DOPLNKY
+              if nazev in hlavicka}
+    if "jmeno" not in indexy:
+        sys.exit("V souboru %s nenajdu sloupec 'Jméno' - je to opravdu vystup "
+                 "tohohle nastroje?" % cesta)
+    zaznamy = []
+    for r in radky:
+        z = Zaznam()
+        for pole, i in indexy.items():
+            if i < len(r) and r[i]:
+                setattr(z, pole, str(r[i]).strip())
+        z.hledany_nazev = z.jmeno
+        if z.jmeno:
+            zaznamy.append(z)
+    return zaznamy
+
 SIRKY = {"Jméno": 40, "Ulice": 30, "PSČ": 9, "Město": 20, "Země": 7, "IČO": 12, "DIČ": 15,
          "Kód kategorie": 13, "Skupina": 24, "Kategorie dodavatele": 42, "Popis činnosti": 46,
          "Zdroj dat": 12, "Stav": 12, "LEI": 22, "NACE - zdroj": 22,
@@ -2380,9 +2425,13 @@ def main(argv=None):
   python3 dodavatele.py dodavatele.csv --llm-mapa odpoved_z_chatu.csv -o vystup.xlsx
   python3 dodavatele.py dodavatele.csv --obnovit -o vystup.xlsx
 """)
-    p.add_argument("vstup", help="CSV / XLSX / TXT se seznamem firem")
+    p.add_argument("vstup", nargs="?", help="CSV / XLSX / TXT se seznamem firem")
     p.add_argument("-o", "--vystup", default="dodavatele_vystup.xlsx",
                    help="vystupni soubor .xlsx nebo .csv (vychozi: %(default)s)")
+    p.add_argument("--z-vystupu", metavar="SOUBOR",
+                   help="misto --vstup vzit uz hotovy vystup z drivejsiho behu "
+                        "(XLSX/CSV) a pokracovat rovnou na --export-llm/--llm-mapa, "
+                        "bez opakovani dotazu do rejstriku")
     p.add_argument("--export-llm", metavar="SOUBOR",
                    help="vypsat dodavatele do textu pripraveneho na vlozeni do LLM "
                         "chatu (Copilot, ChatGPT...) - LLM podle jmena, adresy "
@@ -2409,6 +2458,8 @@ def main(argv=None):
                         "(a nic se neuklada)")
     p.add_argument("--ua", default=UA, help="hlavicka User-Agent (SEC vyzaduje kontakt)")
     a = p.parse_args(argv)
+    if not a.vstup and not a.z_vystupu:
+        p.error("chybi vstupni soubor (nebo pouzijte --z-vystupu)")
 
     try:
         spustit(a)
@@ -2435,55 +2486,65 @@ def spustit(a, na_radek=None):
     radku (navic k prubeznemu vypisu na stderr) - GUI si tim aktualizuje
     progress bar bez nutnosti parsovat konzolovy vystup.
     """
-    radky = nacti_vstup(a.vstup, getattr(a, "sloupec", None))
-    if not radky:
-        raise RuntimeError("Ve vstupu %s nejsou zadne pouzitelne radky." % a.vstup)
-    print("Nacteno %d radku z %s" % (len(radky), a.vstup), file=sys.stderr)
+    z_kese, stazeno = 0, 0
 
-    if getattr(a, "bez_kese", False):
-        cesta_kese = None
+    if getattr(a, "z_vystupu", None):
+        # --z-vystupu: zadne dotazy do rejstriku, jen export/import pro LLM
+        # nad uz hotovym vystupem - proto se tu vubec nezaklada Klient/kes
+        # ani se nespousti enrichment smycka nize.
+        zaznamy = zaznamy_z_vystupu(a.z_vystupu)
+        print("Nacteno %d firem z %s" % (len(zaznamy), a.z_vystupu), file=sys.stderr)
     else:
-        # --cache "" znamena tez "bez kese" (drivejsi zpusob, nez pribylo
-        # --no-cache); None = neurceno, tedy vychozi misto v profilu.
-        cesta_kese = (a.cache if a.cache is not None else vychozi_cache()) or None
-    print("Kes: %s" % (cesta_kese or "vypnuta"), file=sys.stderr)
-    klient = Klient(cache_soubor=cesta_kese, prodleva=0.25, ua=a.ua)
-    n = {"pocet": 30, "prah_ok": 0.90, "prah_overit": 0.72}
+        radky = nacti_vstup(a.vstup, getattr(a, "sloupec", None))
+        if not radky:
+            raise RuntimeError("Ve vstupu %s nejsou zadne pouzitelne radky." % a.vstup)
+        print("Nacteno %d radku z %s" % (len(radky), a.vstup), file=sys.stderr)
 
-    hotovo = [0]
-    zamek = threading.Lock()
-    obnovit = getattr(a, "obnovit", False)
-    SPATNE_STAVY = (STAV_NENALEZENO, STAV_OVERIT, STAV_CHYBA)
+        if getattr(a, "bez_kese", False):
+            cesta_kese = None
+        else:
+            # --cache "" znamena tez "bez kese" (drivejsi zpusob, nez pribylo
+            # --no-cache); None = neurceno, tedy vychozi misto v profilu.
+            cesta_kese = (a.cache if a.cache is not None else vychozi_cache()) or None
+        print("Kes: %s" % (cesta_kese or "vypnuta"), file=sys.stderr)
+        klient = Klient(cache_soubor=cesta_kese, prodleva=0.25, ua=a.ua)
+        n = {"pocet": 30, "prah_ok": 0.90, "prah_overit": 0.72}
 
-    def uloha(vstup):
-        z = zpracuj_radek(vstup, klient, n)
-        # --obnovit: kdyz beh skoncil se spatnym stavem, zkusit JEStE JEDNOU
-        # s obejitim kese - stejny princip jako drivejsi --obnovit-nenalezene,
-        # jen bez nutnosti tahat kvuli tomu drivejsi vystup - spatny stav se
-        # pozna rovnou v tomhle behu.
-        if obnovit and z.stav in SPATNE_STAVY:
-            klient.zapni_obnovu()
-            try:
-                znovu = zpracuj_radek(vstup, klient, n)
-            finally:
-                klient.vypni_obnovu()
-            if znovu.stav not in SPATNE_STAVY or znovu.stav != z.stav:
-                z = znovu
-        with zamek:
-            hotovo[0] += 1
-            print("  [%d/%d] %-42.42s -> %s" % (
-                hotovo[0], len(radky), z.hledany_nazev, z.stav), file=sys.stderr)
-            if na_radek is not None:
-                na_radek(hotovo[0], len(radky), z)
-        return z
+        hotovo = [0]
+        zamek = threading.Lock()
+        obnovit = getattr(a, "obnovit", False)
+        SPATNE_STAVY = (STAV_NENALEZENO, STAV_OVERIT, STAV_CHYBA)
 
-    # Kes se uklada i kdyz beh spadne nebo ho uzivatel prerusi - jinak by
-    # hodiny stahovani prisly vnivec a dalsi pokus by zacinal od nuly.
-    try:
-        with ThreadPoolExecutor(max_workers=max(1, a.workers)) as ex:
-            zaznamy = list(ex.map(uloha, radky))
-    finally:
-        klient.uloz_cache()
+        def uloha(vstup):
+            z = zpracuj_radek(vstup, klient, n)
+            # --obnovit: kdyz beh skoncil se spatnym stavem, zkusit JEStE JEDNOU
+            # s obejitim kese - stejny princip jako drivejsi --obnovit-nenalezene,
+            # jen bez nutnosti tahat kvuli tomu drivejsi vystup - spatny stav se
+            # pozna rovnou v tomhle behu.
+            if obnovit and z.stav in SPATNE_STAVY:
+                klient.zapni_obnovu()
+                try:
+                    znovu = zpracuj_radek(vstup, klient, n)
+                finally:
+                    klient.vypni_obnovu()
+                if znovu.stav not in SPATNE_STAVY or znovu.stav != z.stav:
+                    z = znovu
+            with zamek:
+                hotovo[0] += 1
+                print("  [%d/%d] %-42.42s -> %s" % (
+                    hotovo[0], len(radky), z.hledany_nazev, z.stav), file=sys.stderr)
+                if na_radek is not None:
+                    na_radek(hotovo[0], len(radky), z)
+            return z
+
+        # Kes se uklada i kdyz beh spadne nebo ho uzivatel prerusi - jinak by
+        # hodiny stahovani prisly vnivec a dalsi pokus by zacinal od nuly.
+        try:
+            with ThreadPoolExecutor(max_workers=max(1, a.workers)) as ex:
+                zaznamy = list(ex.map(uloha, radky))
+        finally:
+            klient.uloz_cache()
+        z_kese, stazeno = klient.z_kese, klient.stazeno
 
     if getattr(a, "llm_mapa", None):
         mapa_llm = {}
@@ -2504,7 +2565,8 @@ def spustit(a, na_radek=None):
         souhrn[z.stav] = souhrn.get(z.stav, 0) + 1
     print("\nHotovo -> %s" % a.vystup, file=sys.stderr)
     print("Souhrn: " + ", ".join("%s=%d" % kv for kv in sorted(souhrn.items())), file=sys.stderr)
-    print("Dotazy: %d z kese, %d stazeno" % (klient.z_kese, klient.stazeno), file=sys.stderr)
+    if not getattr(a, "z_vystupu", None):
+        print("Dotazy: %d z kese, %d stazeno" % (z_kese, stazeno), file=sys.stderr)
     nezarazeno = [z for z in zaznamy if not z.kod_kategorie]
     if nezarazeno:
         print("Bez kategorie (%d): %s" % (
