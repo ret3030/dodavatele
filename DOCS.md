@@ -1010,7 +1010,7 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
                         viz "Skutečný NACE ve Švédsku/Finsku/Pobaltí"
                         (nebo proměnná prostředí SCORIS_API_KEY)
 --bez-gleif-popisy      nepřekládat kódy GLEIF (rejstřík, právní forma) na text - rychlejší
---cache SOUBOR          keš odpovědí (výchozí .dodavatele_cache.json.gz)
+--cache SOUBOR          keš odpovědí (výchozí: v profilu uživatele, viz Poznámky k provozu)
 --obnovit-nenalezene SOUBOR   dřívější výstup (bez --kompakt) - firmy s minulým
                         stavem NENALEZENO/OVERIT/CHYBA se vynuceně znovu
                         dotáží (obejde keš jen pro ně), viz "Poznámky k provozu"
@@ -1029,7 +1029,14 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
 
 ## Poznámky k provozu
 
-* **Keš** (`.dodavatele_cache.json.gz`) drží odpovědi rejstříků, takže opakovaný
+* **Keš** se ukládá do profilu uživatele — `%LOCALAPPDATA%\dodavatele\`
+  na Windows, `~/Library/Caches/dodavatele/` na macOS, `~/.cache/dodavatele/`
+  na Linuxu. Dřív to byla relativní cesta vedle spuštěného souboru, jenže
+  u appky spuštěné dvojklikem je pracovní adresář nepředvídatelný (na macOS
+  kořenový, kam se zapsat nedá) — keš se pak tiše neuložila a každý běh znovu
+  čekal na dotazy do zahraničních rejstříků. Leží-li keš v pracovním adresáři
+  z dřívějška, použije se přednostně. Vlastní cestu určí `--cache`.
+* **Keš** drží odpovědi rejstříků, takže opakovaný
   běh nad stejným seznamem je téměř okamžitý. Je trvalá – i výsledek "nic
   nenalezeno" zůstává uložený navždy, dokud keš nesmažete, takže firma, která
   se mezitím v rejstříku objevila, by se stejnou keší pořád vracela jako

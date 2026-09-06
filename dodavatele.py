@@ -139,6 +139,38 @@ OSVC_PRAVNI_FORMY = {"100", "101", "102", "103", "104", "105", "106", "107", "10
 # HTTP vrstva: rate limit na host, opakovani pri chybe, cache na disku
 # ---------------------------------------------------------------------------
 
+CACHE_JMENO = ".dodavatele_cache.json.gz"
+
+
+def vychozi_cache():
+    """
+    Kde drzet kes. Driv to byla relativni cesta ".dodavatele_cache.json.gz",
+    ktera se resila proti pracovnimu adresari - u zabalene appky spustene
+    dvojklikem je ten ale nepredvidatelny (na macOS dokonce korenovy adresar,
+    kam se zapsat neda). Kes se pak tise neulozila a kazdy beh zacinal znovu,
+    vcetne pomalych dotazu na zahranicni firmy.
+
+    Proto pevne misto v profilu uzivatele. Kdyz uz kes lezi v pracovnim
+    adresari z drivejska, pouzije se ta - at o ni nikdo neprijde.
+    """
+    if os.path.exists(CACHE_JMENO):
+        return CACHE_JMENO
+    domov = os.path.expanduser("~")
+    if sys.platform == "win32":
+        zaklad = os.environ.get("LOCALAPPDATA") or domov
+    elif sys.platform == "darwin":
+        zaklad = os.path.join(domov, "Library", "Caches")
+    else:
+        zaklad = os.environ.get("XDG_CACHE_HOME") or os.path.join(domov, ".cache")
+    adresar = os.path.join(zaklad, "dodavatele")
+    try:
+        os.makedirs(adresar, exist_ok=True)
+        return os.path.join(adresar, CACHE_JMENO)
+    except OSError:
+        # Nezapisovatelny profil - at to radeji bezi bez kese nez spadne.
+        return CACHE_JMENO
+
+
 class Klient:
     def __init__(self, cache_soubor=None, prodleva=0.25, pokusy=3, timeout=25, ua=UA):
         self.prodleva = prodleva
@@ -3330,7 +3362,7 @@ def main(argv=None):
                    help="nepřekládat kódy GLEIF (rejstřík, právní forma) na text - rychlejší")
     p.add_argument("--bez-edgar", action="store_true")
     p.add_argument("--bez-wikidata", action="store_true")
-    p.add_argument("--cache", default=".dodavatele_cache.json.gz",
+    p.add_argument("--cache", default=None,
                    help="soubor s kesi odpovedi (prazdny retezec = bez kese)")
     p.add_argument("--obnovit-nenalezene", metavar="SOUBOR",
                    help="drivejsi vystup (bez --kompakt) - firmy, ktere v nem mely "
@@ -3425,7 +3457,8 @@ def spustit(a, na_radek=None):
         raise RuntimeError("Ve vstupu %s nejsou zadne pouzitelne radky." % a.vstup)
     print("Nacteno %d radku z %s" % (len(radky), a.vstup), file=sys.stderr)
 
-    klient = Klient(cache_soubor=a.cache or None, prodleva=a.prodleva, ua=a.ua)
+    klient = Klient(cache_soubor=(a.cache if a.cache is not None else vychozi_cache()) or None,
+                    prodleva=a.prodleva, ua=a.ua)
     n = {"pocet": a.pocet, "prah_ok": a.prah_ok, "prah_overit": a.prah_overit,
          "vies": a.vies, "bez_ares": a.bez_ares, "bez_sk": a.bez_sk,
          "bez_fr": a.bez_fr, "bez_sg": a.bez_sg, "bez_tw": a.bez_tw,

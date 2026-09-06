@@ -133,7 +133,12 @@ ZDROJE = [
 
 def vychozi_argumenty():
     """
-    Stejne vychozi hodnoty jako ma CLI (main() v dodavatele.py). export_llm/
+    Stejne vychozi hodnoty jako ma CLI (main() v dodavatele.py). `cache=None`
+    znamena "vychozi umisteni" (dodavatele.vychozi_cache) - drive tu byla
+    relativni cesta, ktera se u zabalene appky resila proti pracovnimu
+    adresari, a ten je pri spusteni dvojklikem nepredvidatelny (na macOS
+    korenovy adresar, kam se zapsat neda). Kes se pak tise neukladala a kazdy
+    beh znovu cekal na dotazy do zahranicnich rejstriku. export_llm/
     export_davka/llm_mapa jsou zamerne CLI-only funkce (zarazeni pres LLM chat
     je dvoukrokovy postup s rucnim mezikrokem, viz DOCS.md) - GUI pro ne nema
     ovladaci prvky, ale spustit() na tyhle atributy sahaje vzdy, takze tu musi
@@ -147,7 +152,7 @@ def vychozi_argumenty():
         vies=False, bez_ares=False, bez_sk=False, bez_fr=False, bez_sg=False,
         bez_tw=False, bez_de=False, de_api_klic="", scoris_api_klic="",
         bez_gb=False, bez_gleif=False, bez_gleif_popisy=False, bez_edgar=False,
-        bez_wikidata=False, cache=".dodavatele_cache.json.gz",
+        bez_wikidata=False, cache=None,   # None = d.vychozi_cache(), viz nize
         obnovit_nenalezene=None, taxonomy=None, ua=d.UA,
     )
 
