@@ -358,7 +358,17 @@ a udělá z něj prompt bez jediného dotazu do rejstříku:
 python3 dodavatele.py --z-vystupu vystup.xlsx --export-llm firmy.txt
 ```
 
-**Exportují se všichni dodavatelé, ne jen ti bez kategorie.** Zapsaný NACE
+S `--jen-nezarazene` se vypíšou jen firmy bez kategorie (`XXX-00`):
+
+```bash
+python3 dodavatele.py --z-vystupu vystup.xlsx --export-llm firmy.txt --jen-nezarazene
+```
+
+Má to smysl proto, že kategorii dnes dostane jen firma, u které se **všechny**
+zapsané obory shodly — tedy případ, kde je zařazení doložené a druhý názor
+tolik nepotřebuje. U velkých seznamů to ušetří práci v chatu.
+
+**Bez toho přepínače se exportují všichni dodavatelé, i ti s kategorií.** Zapsaný NACE
 popisuje, jak je firma zaregistrovaná, ne co dodává — firma dělající 3D tisk
 může mít zapsaný „maloobchod přes internet". Kód je pravdivý, jako zařazení
 dodavatele nepoužitelný, a žádná heuristika to nepozná. Proto se ptáme
@@ -981,6 +991,7 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
 --jen-id                jen dohledat IČO/registrační číslo, viz "Dohledání identifikátoru"
 --export-llm SOUBOR     export všech dodavatelů pro LLM chat, viz "Zařazení dodavatelů přes LLM chat"
 --llm-mapa SOUBOR [SOUBOR...]   aplikovat odpověď z LLM chatu (Název;NACE;Kategorie) na výstup
+--jen-nezarazene        do --export-llm dát jen firmy bez kategorie (XXX-00)
 --z-vystupu SOUBOR      udělat --export-llm z už hotového výstupu, bez opakování běhu
 --export-davka N        rozdělit --export-llm do víc souborů po N firmách
 --workers N             souběžné dotazy (výchozí 4)

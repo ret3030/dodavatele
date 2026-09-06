@@ -2624,17 +2624,23 @@ SIRKY = {"Jméno": 40, "Ulice": 30, "PSČ": 9, "Město": 20, "Země": 7, "IČO":
 # v chatu mimo skript.
 # ---------------------------------------------------------------------------
 
-def zapis_export_llm(zaznamy, cesta, kategorie_ciselnik=None, davka=None, nace_kategorie=None):
+def zapis_export_llm(zaznamy, cesta, kategorie_ciselnik=None, davka=None,
+                     nace_kategorie=None, jen_nezarazene=False):
     """
     Vypise dodavatele do textoveho souboru pripraveneho na vlozeni do LLM chatu
     (Copilot, ChatGPT...) - bez API klice, stejny dvoukrokovy princip jako
     --jen-id: mezikrok dela clovek v chatu mimo skript.
 
-    Exportuji se VSICHNI dodavatele, ne jen ti bez kategorie. Duvod: zapsany
-    NACE popisuje, jak je firma zaregistrovana, ne co dodava. Firma delajici
-    3D tisk muze mit zapsany "maloobchod pres internet" - kod je pravdivy,
-    ale jako zarazeni dodavatele nepouzitelny, a zadna heuristika to nepozna.
-    Proto se ptame u kazde firmy, i u te, ktera uz kategorii z NACE ma.
+    Vychozi je export VSECH dodavatelu, i tech, kteri uz kategorii maji. Duvod:
+    zapsany NACE popisuje, jak je firma zaregistrovana, ne co dodava. Firma
+    delajici 3D tisk muze mit zapsany "maloobchod pres internet" - kod je
+    pravdivy, ale jako zarazeni dodavatele nepouzitelny, a zadna heuristika to
+    nepozna.
+
+    S `jen_nezarazene` se vypisou jen firmy bez kategorie (XXX-00). Ma to smysl
+    proto, ze kategorii dnes dostane jen firma, u ktere se VSECHNY zapsane obory
+    shodly - tedy pripad, kde uz je zarazeni dolozene a druhy nazor tolik
+    nepotrebuje. Usetri to praci v chatu, hlavne u velkych seznamu.
 
     Ptame se na dva udaje najednou:
 
@@ -2655,7 +2661,9 @@ def zapis_export_llm(zaznamy, cesta, kategorie_ciselnik=None, davka=None, nace_k
     """
     kategorie_ciselnik = kategorie_ciselnik or taxonomie.KATEGORIE
     nedosazitelne = taxonomie.nedosazitelne_kategorie(nace_kategorie, kategorie_ciselnik)
-    kandidati = [z for z in zaznamy if z.hledany_nazev or z.jmeno]
+    kandidati = [z for z in zaznamy if (z.hledany_nazev or z.jmeno)
+                 and not (jen_nezarazene and z.kod_kategorie
+                          and z.kod_kategorie != taxonomie.VYCHOZI_KOD)]
     if not kandidati:
         return 0, []
 
@@ -3267,6 +3275,9 @@ def main(argv=None):
                         "chatu (Copilot, ChatGPT...) - ptame se na skutecnou hlavni "
                         "cinnost jako NACE kod a na kod nasi kategorie; u kazde firmy "
                         "se uvedou vsechny zapsane obory jako napoveda")
+    p.add_argument("--jen-nezarazene", action="store_true",
+                   help="do --export-llm dat jen firmy bez kategorie (XXX-00), "
+                        "ne vsechny - usetri praci v chatu")
     p.add_argument("--z-vystupu", metavar="SOUBOR",
                    help="vzit uz hotovy vystup (XLSX/CSV z drivejsiho behu nebo "
                         "z appky) a udelat z nej --export-llm, bez opakovani "
@@ -3358,7 +3369,8 @@ def main(argv=None):
                 nace_kategorie, ciselnik, mapa_oboru = taxonomie.z_json(json.load(f))
         pocet, cesty = zapis_export_llm(zaznamy, a.export_llm, ciselnik,
                                         davka=a.export_davka,
-                                        nace_kategorie=nace_kategorie)
+                                        nace_kategorie=nace_kategorie,
+                                        jen_nezarazene=a.jen_nezarazene)
         print("Nacteno %d firem z %s" % (len(zaznamy), a.z_vystupu), file=sys.stderr)
         print("Export pro LLM chat -> %s (%d firem)" % (", ".join(cesty), pocet),
               file=sys.stderr)
@@ -3474,10 +3486,16 @@ def spustit(a, na_radek=None):
 
     if a.export_llm:
         pocet, cesty = zapis_export_llm(zaznamy, a.export_llm, ciselnik,
-                                        davka=a.export_davka, nace_kategorie=nace_kategorie)
+                                        davka=a.export_davka, nace_kategorie=nace_kategorie,
+                                        jen_nezarazene=a.jen_nezarazene)
         if pocet:
-            print("Export pro LLM chat -> %s (%d firem)" % (
-                ", ".join(cesty), pocet), file=sys.stderr)
+            print("Export pro LLM chat -> %s (%d %s)" % (
+                ", ".join(cesty), pocet,
+                "firem bez kategorie" if a.jen_nezarazene else "firem"),
+                file=sys.stderr)
+        else:
+            print("Vsechny firmy uz maji kategorii, export se nevytvaril.",
+                  file=sys.stderr)
 
     zapis_vystup(zaznamy, a.vystup, a.oddelovac, a.kompakt, jen_id=a.jen_id,
                  nace_kategorie=nace_kategorie)
