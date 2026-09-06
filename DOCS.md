@@ -87,21 +87,18 @@ pro kontrolu (`--kompakt` je vypne):
   zvlášť nezobrazuje, aby nepůsobil jako jistota, kterou často není.
 * **NACE - zdroj** – rozlišuje skutečný NACE z rejstříku (ARES, INSEE) od
   odhadu z oboru na Wikidatech, který je méně přesný.
-* **NACE (LLM)** – vyplní se jen po použití `--llm-mapa` (viz "Zařazení
-  dodavatelů přes LLM chat" níže) - NACE kód, který k firmě dohledal
-  člověk/LLM chat, vedle zapsaných kódů z rejstříku ve sloupci NACE (všechny).
-* **Kategorie (LLM)** – kód kategorie, který k firmě navrhl přímo LLM chat
-  (`--llm-mapa`). U většiny firem je to rozhodující údaj, protože z NACE se
-  kategorie určí jen u konkrétních tříd - viz "Kdy se kategorie určí z NACE".
+* **Zařazeno podle** – čím byla kategorie určena: `NACE z rejstříku`,
+  `obor činnosti z Wikidat`, nebo po použití `--llm-mapa` věta typu
+  `LLM: online knihkupectví, NACE 4761` — co LLM o firmě zjistil a jaký kód
+  navrhl. Prázdné u firem, které kategorii nedostaly.
 * **Klasifikace (US NAICS)** – u amerických dodavatelů severoamerická obdoba
   NACE (NACE se u USA jen odhaduje pro účely vlastní taxonomie).
 
 Sloupce, které jsou prázdné u **všech** firem, se do výstupu nedávají — jen
-by ho rozšiřovaly o prázdno. Typicky **NACE (LLM)**, **Kategorie (LLM)**
-a **Činnost (LLM)**, které se plní až po `--llm-mapa`, nebo **DIČ ověřeno
-(VIES)** bez přepínače `--vies`. Jakmile mají čím být naplněné, objeví se
-samy. Základní sloupce (Jméno až Kategorie dodavatele) zůstávají vždy, aby
-měl výstup stabilní tvar.
+by ho rozšiřovaly o prázdno (např. **DIČ ověřeno (VIES)** bez přepínače
+`--vies`, nebo **LEI** u čistě českého seznamu). Jakmile mají čím být
+naplněné, objeví se samy. Základní sloupce (Jméno až Kategorie dodavatele)
+zůstávají vždy, aby měl výstup stabilní tvar.
 
 XLSX má druhý list **Číselník kategorií** s celou taxonomií a počtem
 dodavatelů v každé kategorii, a třetí list **Číselník NACE** s **kompletní
@@ -409,26 +406,19 @@ python3 -c "import taxonomie; print(sorted(taxonomie.nedosazitelne_kategorie()))
 
 ### Co je vidět ve výstupu
 
-Nic se nepřepisuje tiše. Vedle sebe stojí **NACE (všechny)** (rejstřík),
-**NACE (LLM)** a **Kategorie (LLM)** — návrhy z chatu — a sloupec
-**Zařazeno podle** rozliší, odkud kategorie je:
+Zapsané obory z rejstříku (**NACE (všechny)**) zůstávají beze změny — návrh
+z chatu je nepřepisuje. Mění se jen **Kód kategorie** a **Kategorie
+dodavatele**, a proč, řekne sloupec **Zařazeno podle**:
 
 | Hodnota | Význam |
 |---|---|
-| `nace` | konkrétní NACE z rejstříku |
-| `obor` | obor činnosti z Wikidat (QID) |
-| `rucne (LLM pres NACE)` | NACE od LLM se přeložil přes `NACE_MAPA` |
-| `rucne (LLM - kategorie)` | NACE od LLM nikam nevedl, rozhodl kód kategorie |
-| `rucne (LLM - kategorie mimo NACE)` | NACE vedl jinam, ale LLM vybral kategorii, kterou NACE vyjádřit neumí |
-| `vychozi` | `XXX-00`, nikdo nerozhodl |
+| `NACE z rejstříku` | rozhodly zapsané obory |
+| `obor činnosti z Wikidat` | rozhodl obor (QID) u zahraniční firmy |
+| `LLM: online knihkupectví, NACE 4761` | rozhodla odpověď z chatu — čím se firma zabývá a jaký kód LLM navrhl |
+| (prázdné) | `XXX-00`, kategorii nikdo neurčil |
 
-Protože máte v jednom souboru vedle sebe **NACE (všechny)** (rejstřík)
-i **NACE (LLM)**, jde je rovnou porovnat stejným nástrojem jako cizí zdroj —
-viz `--komparace` níže:
-
-```bash
-python3 dodavatele.py --komparace vystup.xlsx --komparace-sloupec "NACE (LLM)"
-```
+U firmy zařazené přes chat je tak v jedné buňce vidět zdroj i důvod, takže
+při kontrole nemusíte nic dohledávat znovu.
 
 ### Velké seznamy
 

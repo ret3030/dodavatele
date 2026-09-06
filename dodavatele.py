@@ -418,9 +418,6 @@ class Zaznam:
     aktivni: bool = True
     kandidati: list = field(default_factory=list)
     nace_nejisty: bool = False   # rejstrikem deklarovana hlavni cinnost kategorii neurcuje
-    nace_llm: str = ""           # NACE dohledany rucne/LLM (--llm-mapa), pro srovnani
-    kategorie_llm: str = ""      # kod kategorie primo od LLM - pro kategorie, kam NACE nedosahne
-    cinnost_llm: str = ""        # cim se firma podle LLM zabyva - duvod k zarazeni, ke kontrole
 
 
 # ---------------------------------------------------------------------------
@@ -2442,7 +2439,10 @@ def zpracuj_radek(vstup, klient, n):
         z.kod_kategorie = k["kod"]
         z.kategorie = k["kategorie"]
         z.skupina = k["skupina"]
-        z.zdroj_kategorie = k["zdroj"]
+        z.zdroj_kategorie = {
+            "nace": "NACE z rejstříku",
+            "obor": "obor činnosti z Wikidat",
+        }.get(k["zdroj"], "")
         if not z.nace and k["nace"]:
             # NACE se u zahranicnich firem bez rejstriku pocita jen jako
             # odhad z oboru cinnosti - proto se oznaci zvlast, ne jako
@@ -2576,8 +2576,7 @@ SLOUPCE_DOPLNKY = [
     ("lei", "LEI"), ("reg_cislo", "Registrační číslo"), ("reg_rejstrik", "Rejstřík"),
     ("pravni_forma", "Právní forma"), ("datum_vzniku", "Datum vzniku"),
     ("dic_overeno", "DIČ ověřeno (VIES)"), ("nace_vse", "NACE (všechny)"),
-    ("nace_zdroj", "NACE - zdroj"), ("nace_llm", "NACE (LLM)"),
-    ("kategorie_llm", "Kategorie (LLM)"), ("cinnost_llm", "Činnost (LLM)"),
+    ("nace_zdroj", "NACE - zdroj"),
     ("klasifikace", "Klasifikace (US NAICS)"),
     ("odkaz", "Odkaz na rejstřík"), ("poznamka", "Poznámka"),
 ]
@@ -2597,8 +2596,7 @@ SIRKY = {"Jméno": 40, "Ulice": 30, "PSČ": 9, "Město": 20, "Země": 7, "IČO":
          "Kategorie dodavatele": 42, "Zařazeno podle": 14, "Zdroj dat": 12, "Shoda názvu": 11,
          "Stav": 12, "Hledaný název": 34, "Region": 18, "LEI": 22,
          "Registrační číslo": 18, "Rejstřík": 20, "Právní forma": 14,
-         "NACE - zdroj": 22, "NACE (LLM)": 12, "Kategorie (LLM)": 15,
-         "Činnost (LLM)": 52,
+         "NACE - zdroj": 22, "Zařazeno podle": 46,
          "Klasifikace (US NAICS)": 34,
          "Datum vzniku": 13, "DIČ ověřeno (VIES)": 16, "NACE (všechny)": 30,
          "Odkaz na rejstřík": 46, "Poznámka": 70,
@@ -2849,6 +2847,22 @@ def _kategorie_z_pole(text, kategorie_ciselnik=None):
     return kod
 
 
+def _popis_llm(kod_kategorie, kod_nace, cinnost):
+    """
+    Jednoradkovy popis do sloupce "Zarazeno podle" u firem zarazenych podle
+    odpovedi z LLM chatu. Drive se navrhy LLM rozpadaly do tri samostatnych
+    sloupcu (NACE/Kategorie/Cinnost), ktere byly u beznych behu prazdne a jen
+    roztahovaly tabulku - ted je vsechno v jedne vete, kterou jde precist
+    zleva doprava: co LLM navrhlo a proc.
+    """
+    casti = []
+    if cinnost:
+        casti.append(cinnost)
+    if kod_nace:
+        casti.append("NACE %s" % kod_nace)
+    return "LLM: %s" % ", ".join(casti) if casti else "LLM"
+
+
 def pouzij_llm_mapu(zaznamy, mapa, nace_kategorie=None, kategorie_ciselnik=None, mapa_oboru=None):
     """
     Aplikuje odpoved z LLM chatu (viz zapis_export_llm) na zaznamy. Prepisuje
@@ -2857,8 +2871,8 @@ def pouzij_llm_mapu(zaznamy, mapa, nace_kategorie=None, kategorie_ciselnik=None,
     i u firmy, ktera ma v rejstriku zapsany specificky, duveryhodne vypadajici
     kod (napr. firma na personalizovane reklamni predmety s "hlavni cinnosti"
     zapsanou jako vyroba odevu). Puvodni NACE z rejstriku (sloupec NACE) zustava
-    beze zmeny - navrh LLM se zapisuje do NACE (LLM) a Kategorie (LLM), takze
-    oboji zustava vedle sebe k porovnani.
+    beze zmeny - co LLM navrhlo a proc, se zapise do sloupce "Zarazeno podle",
+    takze u kazde firmy je videt duvod zarazeni vedle rejstrikovych udaju.
 
     Prednost ma NACE: kategorii z nej dopocita taxonomie.zarad(), stejne jako
     u skutecneho NACE z rejstriku. Diky tomu vede stejny kod vzdycky na stejnou
@@ -2891,9 +2905,7 @@ def pouzij_llm_mapu(zaznamy, mapa, nace_kategorie=None, kategorie_ciselnik=None,
         if not odpoved:
             continue
         kod_nace, kod_kat = odpoved.get("nace", ""), odpoved.get("kategorie", "")
-        z.nace_llm = kod_nace
-        z.kategorie_llm = kod_kat
-        z.cinnost_llm = odpoved.get("cinnost", "")
+        cinnost = odpoved.get("cinnost", "")
         k = taxonomie.zarad(nace=kod_nace, mapa=nace_kategorie,
                             kategorie=kategorie_ciselnik, mapa_oboru=mapa_oboru)
         z_nace = k["kod"] != taxonomie.VYCHOZI_KOD
@@ -2901,8 +2913,7 @@ def pouzij_llm_mapu(zaznamy, mapa, nace_kategorie=None, kategorie_ciselnik=None,
                 not z_nace or kod_kat in nedosazitelne):
             skupina, nazev_kat = kategorie_ciselnik[kod_kat]
             z.kod_kategorie, z.kategorie, z.skupina = kod_kat, nazev_kat, skupina
-            z.zdroj_kategorie = ("rucne (LLM - kategorie mimo NACE)" if z_nace
-                                 else "rucne (LLM - kategorie)")
+            z.zdroj_kategorie = _popis_llm(kod_kat, kod_nace, cinnost)
             zmeny += 1
             continue
         if not z_nace:
@@ -2912,7 +2923,7 @@ def pouzij_llm_mapu(zaznamy, mapa, nace_kategorie=None, kategorie_ciselnik=None,
         z.kod_kategorie = k["kod"]
         z.kategorie = k["kategorie"]
         z.skupina = k["skupina"]
-        z.zdroj_kategorie = "rucne (LLM pres NACE)"
+        z.zdroj_kategorie = _popis_llm(k["kod"], kod_nace, cinnost)
         zmeny += 1
     return zmeny, rozpory
 
@@ -2942,10 +2953,9 @@ def zapis_vystup(zaznamy, cesta, oddelovac=";", kompakt=False, jen_id=False,
         sloupce = SLOUPCE_ID
     else:
         # Doplnkove sloupce, ktere jsou prazdne u VSECH firem, se do vystupu
-        # nedavaji - jen by ho rozsirovaly o prazdno. Typicky "NACE (LLM)",
-        # "Kategorie (LLM)" a "Cinnost (LLM)", ktere se plni az po --llm-mapa,
-        # nebo "DIC overeno (VIES)" bez prepinace --vies. Zakladni sloupce
-        # zustavaji vzdy, aby mel vystup stabilni tvar.
+        # nedavaji - jen by ho rozsirovaly o prazdno. Typicky "DIC overeno
+        # (VIES)" bez prepinace --vies nebo "LEI" u ciste ceskeho seznamu.
+        # Zakladni sloupce zustavaji vzdy, aby mel vystup stabilni tvar.
         doplnky = [(k, n) for k, n in SLOUPCE_DOPLNKY
                    if any(str(getattr(z, k, "") or "").strip() for z in zaznamy)]
         sloupce = SLOUPCE_ZAKLAD + ([] if kompakt else doplnky)
@@ -3449,7 +3459,7 @@ def spustit(a, na_radek=None):
             ", ".join(a.llm_mapa), zmeny, len(mapa_llm)), file=sys.stderr)
         if rozpory:
             print("  z toho %d firem, kde se kategorie od LLM lisi od kategorie z jeho "
-                  "vlastniho NACE - ponechana ta z NACE, viz sloupec Kategorie (LLM)"
+                  "vlastniho NACE - ponechana ta z NACE"
                   % rozpory, file=sys.stderr)
 
     if a.export_llm:
