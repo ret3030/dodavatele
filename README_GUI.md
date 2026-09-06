@@ -57,10 +57,6 @@ přepínačů:
   ve výstupu,
 * výběr vstupního/výstupního souboru,
 * zapnutí/vypnutí jednotlivých zdrojů (odpovídá `--bez-*`),
-* volitelné API klíče pro OpenRegister.de a Scoris,
-* tlačítka na přípravu místních databází (Německo/UK) - jde o desítky
-  minut a gigabajty stažených dat, appka jen spustí totéž, co
-  `--pripravit-de-rejstrik`/`--pripravit-gb-rejstrik` na CLI,
 * průběžný log a souhrn po doběhnutí.
 
 Pokročilé přepínače (`--workers`, `--pocet`, `--prah-ok`, `--taxonomy`,
@@ -69,8 +65,9 @@ zatím nenabízí - na to pořád slouží CLI, viz [DOCS.md](DOCS.md). Appka je
 zamýšlená jako rychlá cesta pro běžné použití, ne náhrada CLI pro
 pokročilé scénáře.
 
-## Bezpečnost API klíčů
+## Žádné klíče, žádné stahování
 
-Klíče zadané v appce se nikam neukládají (ani do souboru, ani do keše) -
-platí přesně stejné pravidlo jako pro CLI (viz DOCS.md), jen se zadávají
-do textového pole místo parametru příkazové řádky.
+Appka nepotřebuje API klíč ani jednorázovou přípravu místních databází -
+všechny zapojené zdroje jsou bezplatné a bezklíčové. Dřív tu byla pole na
+placené klíče (OpenRegister.de, Scoris) a tlačítka na stažení gigabajtových
+kopií německého a britského rejstříku; zrušeno, viz DOCS.md.

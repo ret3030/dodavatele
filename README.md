@@ -2,7 +2,7 @@
 
 Vezme seznam názvů firem a doplní k nim adresu, IČO/DIČ, obor činnosti (NACE)
 a zařazení do vlastní kategorie dodavatele – z veřejných rejstříků (ARES, RPO
-SR, INSEE, Companies House, Handelsregister, GLEIF, Wikidata a dalších).
+SR, INSEE, SEC EDGAR, GLEIF, Wikidata).
 
 ## Instalace
 

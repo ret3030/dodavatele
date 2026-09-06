@@ -86,9 +86,10 @@ CO APPKA DOHLEDÁ
     Odkaz do rejstříku ke kontrole
     Zda firma pořád existuje (zaniklé se označí)
 
-Zdroje podle země: ČR (ARES), Slovensko, Francie, Německo, UK, USA,
-Singapur, Tchaj-wan a celosvětově GLEIF a Wikidata. Které se použijí,
-si zapnete v okně výš.
+Zdroje: ARES (ČR), RPO SR (Slovensko), INSEE (Francie), SEC EDGAR (USA)
+a celosvětově GLEIF (firmy s LEI) a Wikidata. Které se použijí, si zapnete
+v okně výš. Firmy z ostatních zemí se najdou přes GLEIF nebo Wikidata,
+a když ne, doplní je krok přes AI.
 
 
 CO VE VÝSTUPU SLEDOVAT
@@ -121,10 +122,6 @@ ZDROJE = [
     ("Ares", "bez_ares", "ARES (ČR)", True),
     ("Sk", "bez_sk", "RPO SR (Slovensko)", True),
     ("Fr", "bez_fr", "INSEE (Francie)", True),
-    ("Sg", "bez_sg", "ACRA (Singapur)", True),
-    ("Tw", "bez_tw", "GCIS (Tchaj-wan)", True),
-    ("De", "bez_de", "Handelsregister – místní kopie (Německo)", True),
-    ("Gb", "bez_gb", "Companies House – místní kopie (UK)", True),
     ("Edgar", "bez_edgar", "SEC EDGAR (USA)", True),
     ("Gleif", "bez_gleif", "GLEIF (svět, firmy s LEI)", True),
     ("Wikidata", "bez_wikidata", "Wikidata (obor u velkých firem)", True),
@@ -149,9 +146,8 @@ def vychozi_argumenty():
         kompakt=False, jen_id=False, export_llm=None, llm_mapa=None,
         export_davka=None,
         workers=4, prodleva=0.25, pocet=30, prah_ok=0.90, prah_overit=0.72,
-        vies=False, bez_ares=False, bez_sk=False, bez_fr=False, bez_sg=False,
-        bez_tw=False, bez_de=False, de_api_klic="", scoris_api_klic="",
-        bez_gb=False, bez_gleif=False, bez_gleif_popisy=False, bez_edgar=False,
+        vies=False, bez_ares=False, bez_sk=False, bez_fr=False,
+        bez_gleif=False, bez_gleif_popisy=False, bez_edgar=False,
         bez_wikidata=False, cache=None,   # None = d.vychozi_cache(), viz nize
         obnovit_nenalezene=None, taxonomy=None, ua=d.UA,
     )
@@ -174,8 +170,6 @@ class Aplikace:
         self.var_zdroje = {}
         for klic, _attr, _popis, vychozi in ZDROJE:
             self.var_zdroje[klic] = BooleanVar(value=vychozi)
-        self.var_de_klic = StringVar()
-        self.var_scoris_klic = StringVar()
 
         self._sestav_ui()
         self.root.after(150, self._kontroluj_frontu)
@@ -211,33 +205,6 @@ class Aplikace:
             ramec_zdroje, text="Ověřit DIČ v EU přes VIES (o dost pomalejší)",
             variable=self.var_vies,
         ).pack(anchor="w", padx=8, pady=(0, 6))
-
-        ramec_klice = ttk.LabelFrame(
-            self.root, text="Volitelné placené API klíče (nechte prázdné, pokud je nemáte)")
-        ramec_klice.pack(fill=X, **pad)
-        radek3 = ttk.Frame(ramec_klice)
-        radek3.pack(fill=X, padx=8, pady=4)
-        ttk.Label(radek3, text="OpenRegister.de klíč:", width=20).pack(side=LEFT)
-        ttk.Entry(radek3, textvariable=self.var_de_klic, show="•").pack(side=LEFT, fill=X, expand=True)
-        radek4 = ttk.Frame(ramec_klice)
-        radek4.pack(fill=X, padx=8, pady=4)
-        ttk.Label(radek4, text="Scoris klíč:", width=20).pack(side=LEFT)
-        ttk.Entry(radek4, textvariable=self.var_scoris_klic, show="•").pack(side=LEFT, fill=X, expand=True)
-        ttk.Label(
-            ramec_klice,
-            text="OpenRegister.de = skutečný obor pro Německo, Scoris = pro Švédsko/"
-                 "Finsko/Estonsko/Lotyšsko/Litvu. Klíče se nikam neukládají.",
-            foreground="#666", wraplength=660, justify=LEFT,
-        ).pack(anchor="w", padx=8, pady=(0, 6))
-
-        ramec_db = ttk.LabelFrame(self.root, text="Místní databáze (jednorázová příprava, velké stažení)")
-        ramec_db.pack(fill=X, **pad)
-        radek5 = ttk.Frame(ramec_db)
-        radek5.pack(fill=X, padx=8, pady=4)
-        ttk.Button(radek5, text="Připravit Německo (~2,6 GB)",
-                   command=lambda: self._priprav_db("de")).pack(side=LEFT)
-        ttk.Button(radek5, text="Připravit UK (~500 MB)",
-                   command=lambda: self._priprav_db("gb")).pack(side=LEFT, padx=(8, 0))
 
         ramec_beh = ttk.Frame(self.root)
         ramec_beh.pack(fill=X, **pad)
@@ -322,27 +289,6 @@ class Aplikace:
             else:
                 webbrowser.open(self.cesta_vystup)
 
-    # -- priprava mistnich databazi -----------------------------------------
-
-    def _priprav_db(self, druh):
-        if self.bezi:
-            return
-        self.bezi = True
-        self._nastav_stav_behu(True)
-        self._pridej_log("Připravuji místní databázi (%s) – může to trvat i desítky minut…" % druh.upper())
-
-        def uloha():
-            try:
-                if druh == "de":
-                    d.de_pripravit_databazi()
-                else:
-                    d.gb_pripravit_databazi()
-                self.fronta.put(("db_hotovo", druh))
-            except Exception as e:
-                self.fronta.put(("chyba", "Příprava databáze selhala: %s" % e))
-
-        threading.Thread(target=uloha, daemon=True).start()
-
     # -- samotny beh ----------------------------------------------------------
 
     def _sestav_argumenty(self):
@@ -350,8 +296,6 @@ class Aplikace:
         a.vstup = self.var_vstup.get().strip()
         a.vystup = self.var_vystup.get().strip() or "dodavatele_vystup.xlsx"
         a.vies = self.var_vies.get()
-        a.de_api_klic = self.var_de_klic.get().strip()
-        a.scoris_api_klic = self.var_scoris_klic.get().strip()
         for klic, attr, _popis, _vychozi in ZDROJE:
             setattr(a, attr, not self.var_zdroje[klic].get())
         return a
@@ -423,12 +367,6 @@ class Aplikace:
                     self._nastav_stav_behu(False)
                     self.tlacitko_otevrit.configure(state="normal")
                     messagebox.showinfo(NAZEV_OKNA, "Hotovo. Výstup uložen do:\n%s" % cesta)
-                elif druh == "db_hotovo":
-                    self._pridej_log("Místní databáze (%s) je připravená." % obsah.upper())
-                    self.bezi = False
-                    self._nastav_stav_behu(False)
-                    self.progress.stop()
-                    self.progress.configure(mode="determinate")
                 elif druh == "chyba":
                     self.progress.stop()
                     self.progress.configure(mode="determinate")

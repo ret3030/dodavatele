@@ -60,28 +60,9 @@ VIES_API = "https://ec.europa.eu/taxation_customs/vies/rest-api/ms/{cc}/vat/{num
 EDGAR_API = "https://www.sec.gov/cgi-bin/browse-edgar"
 WIKIDATA_API = "https://www.wikidata.org/w/api.php"
 INSEE_FR = "https://recherche-entreprises.api.gouv.fr/search"
-SG_ACRA = "https://data.gov.sg/api/action/datastore_search"
-SG_ACRA_ZDROJ = "d_3f960c10fed6145404ca7b821f263b87"
-TW_GCIS = "https://data.gcis.nat.gov.tw/od/data/api/6BBA2268-1367-4B42-9CCA-BC17499EBE8C"
 
 _TW_SSL_KONTEXT = None
 
-
-def tw_ssl_kontext():
-    """
-    Certifikat data.gcis.nat.gov.tw postrada rozsireni Subject Key Identifier,
-    ktere novejsi OpenSSL/Python defaultne vyzaduje (VERIFY_X509_STRICT).
-    Overeni retezce duvery a jmena hostitele zustava aktivni - vypina se jen
-    tato jedna nadstandardni RFC 5280 kontrola, ktera zpusobuje, ze pripojeni
-    ze standardniho urllib kontextu vzdy selze, i kdyz je server v poradku
-    (napr. curl tuto kontrolu vubec neprovadi, proto tam problem videt neni).
-    """
-    global _TW_SSL_KONTEXT
-    if _TW_SSL_KONTEXT is None:
-        ctx = ssl.create_default_context()
-        ctx.verify_flags &= ~ssl.VERIFY_X509_STRICT
-        _TW_SSL_KONTEXT = ctx
-    return _TW_SSL_KONTEXT
 
 EU_STATY = {"AT", "BE", "BG", "CY", "CZ", "DE", "DK", "EE", "EL", "GR", "ES", "FI", "FR",
             "HR", "HU", "IE", "IT", "LT", "LU", "LV", "MT", "NL", "PL", "PT", "RO", "SE",
@@ -464,7 +445,6 @@ class Zaznam:
 # s celou mnozinou kodu (taxonomie.zarad(kody=...)) a pole `nace` se plni jen
 # tam, kde hlavni cinnost deklaruje SAM rejstrik - ceske RES (prevazujici
 # cinnost), francouzsky NAF nebo Scoris, kde je kod od zacatku jen jeden.
-
 
 
 def _ares_ulice(sidlo):
@@ -1084,86 +1064,7 @@ def edgar_podle_cik(klient, cik):
     return _edgar_na_zaznam(ci) if ci is not None else None
 
 
-# ---------------------------------------------------------------------------
-# Nemecko - Handelsregister pres lokalni kopii OffeneRegister.de
-#
-# GLEIF obsahuje jen firmy s LEI (povinne hlavne pro ucastniky financnich
-# trhu), takze bezna mala nemecka GmbH/UG v nem typicky vubec neni. Nemecko
-# nema oficialni verejne API k Handelsregisteru - jedina otevrena alternativa
-# je bulk export OpenCorporates zverejnovany projektem OffeneRegister.de
-# (OKF Deutschland). Jeho zive dotazovaci API (db.offeneregister.de) je
-# dlouhodobe nedostupne (padly backend), proto se pouziva primo stazitelna
-# SQLite kopie s FTS5 indexem (daten.offeneregister.de) - viz
-# de_pripravit_databazi(). Data jsou sbirana do zacatku 2019 a dal se
-# neaktualizuji, takze u aktivity/noveho jednatele pocitejte s tim, ze
-# nemusi byt aktualni - na rozdil od ARES/INSEE tu nejde o zivy rejstrik.
-# ---------------------------------------------------------------------------
-
-DE_REGISTER_URL = "https://daten.offeneregister.de/openregister.db.gz"
-DE_REGISTER_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                               "de_handelsregister.db")
-
-# Serazeno od nejdelsich k nejkratsim, aby se napr. "GmbH & Co. KG" nerozpoznalo
-# jen jako "KG".
-DE_PRAVNI_FORMY = (
-    "UG (haftungsbeschränkt) & Co. KG", "GmbH & Co. KGaA", "GmbH & Co. KG",
-    "AG & Co. KG", "UG (haftungsbeschränkt)", "gGmbH", "GmbH", "KGaA",
-    "OHG", "PartG", "GbR", "e.K.", "eK", "e.G.", "eG", "e.V.", "eV",
-    "mbH", "AG", "KG", "SE",
-)
-
 _DE_LOCAL = threading.local()
-
-
-def de_pripravit_databazi(force=False):
-    """
-    Stahne (~740 MB) a rozbali (~2,6 GB) lokalni SQLite kopii nemeckeho
-    Handelsregisteru z daten.offeneregister.de (OpenCorporates/OKF
-    Deutschland, licence CC BY 4.0). Jednorazova priprava pred prvnim
-    pouzitim --bez-de neaktivniho behu.
-    """
-    if os.path.exists(DE_REGISTER_DB) and not force:
-        print("%s uz existuje, preskakuji stahovani (spustte se --force pro "
-              "znovustazeni)" % DE_REGISTER_DB, file=sys.stderr)
-        return
-    gz_cesta = DE_REGISTER_DB + ".gz"
-    print("Stahuji %s (~740 MB)..." % DE_REGISTER_URL, file=sys.stderr)
-    with urllib.request.urlopen(DE_REGISTER_URL, timeout=120) as odpoved, \
-            open(gz_cesta, "wb") as f:
-        while True:
-            blok = odpoved.read(1024 * 1024)
-            if not blok:
-                break
-            f.write(blok)
-    print("Rozbaluji do %s (~2,6 GB)..." % DE_REGISTER_DB, file=sys.stderr)
-    with gzip.open(gz_cesta, "rb") as f_in, open(DE_REGISTER_DB, "wb") as f_out:
-        while True:
-            blok = f_in.read(1024 * 1024)
-            if not blok:
-                break
-            f_out.write(blok)
-    os.remove(gz_cesta)
-    print("Hotovo -> %s" % DE_REGISTER_DB, file=sys.stderr)
-
-
-def _de_pripojeni():
-    if not os.path.exists(DE_REGISTER_DB):
-        raise RuntimeError(
-            "chybi %s - spustte 'python3 dodavatele.py --pripravit-de-rejstrik'"
-            % os.path.basename(DE_REGISTER_DB))
-    spojeni = getattr(_DE_LOCAL, "spojeni", None)
-    if spojeni is None:
-        spojeni = sqlite3.connect(
-            "file:%s?mode=ro" % DE_REGISTER_DB, uri=True, check_same_thread=False)
-        _DE_LOCAL.spojeni = spojeni
-    return spojeni
-
-
-def _de_pravni_forma(jmeno):
-    for forma in DE_PRAVNI_FORMY:
-        if jmeno.endswith(forma):
-            return forma
-    return ""
 
 
 # "Ulice cislo, PSC Mesto." - format adres v datech OpenCorporates. Cast
@@ -1172,261 +1073,12 @@ def _de_pravni_forma(jmeno):
 _DE_ADRESA_RE = re.compile(r"^(?P<ulice>.*?),\s*(?P<psc>\d{5})\s+(?P<mesto>.*?)\.?\s*$")
 
 
-def _de_adresa(retezec):
-    m = _DE_ADRESA_RE.match((retezec or "").strip())
-    if not m:
-        return (retezec or "").rstrip("., ").strip(), "", ""
-    return m.group("ulice").strip(), m.group("psc"), m.group("mesto").strip()
-
-
 _DE_SLOUPCE = ("company_number", "name", "registered_address", "current_status",
                "register_art", "register_nummer")
 
 
-def _de_na_zaznam(radek):
-    company_number, name, registered_address, current_status, register_art, \
-        register_nummer = radek
-    ulice, psc, mesto = _de_adresa(registered_address)
-    aktivni = current_status == "currently registered"
-    return Zaznam(
-        jmeno=name or "",
-        ulice=ulice, psc=psc, mesto=mesto, zeme="DE",
-        reg_cislo=("%s %s" % (register_art, register_nummer)).strip()
-                  or company_number,
-        reg_rejstrik="Handelsregister",
-        pravni_forma=_de_pravni_forma(name or ""),
-        aktivni=aktivni,
-        zdroj="OffeneRegister.de (data k 2019)",
-        poznamka="vymazana/zanikla firma (Handelsregister, stav k 2019)"
-                 if not aktivni else "",
-    )
-
-
-def de_podle_nazvu(klient, nazev, pocet=15):
-    """
-    Fulltextove hledani v lokalni kopii Handelsregisteru (FTS5, ~5,3 mil.
-    firem vsech velikosti vc. malych GmbH/UG bez LEI).
-    """
-    dotaz = " ".join(re.findall(r"\w+", nazev, re.UNICODE))
-    if not dotaz:
-        return []
-    spojeni = _de_pripojeni()
-    kurzor = spojeni.execute(
-        "SELECT c.%s FROM company_fts f JOIN company c ON c.id = f.rowid "
-        "WHERE company_fts MATCH ? ORDER BY bm25(company_fts) LIMIT ?"
-        % ", c.".join(_DE_SLOUPCE),
-        (dotaz, pocet))
-    return [_de_na_zaznam(r) for r in kurzor.fetchall()]
-
-
-def de_podle_registru(register_art, register_nummer):
-    """
-    Presny dotaz na cislo zapisu (napr. HRB 150148). Cislo samo o sobe neni
-    jednoznacne - stejne cislo pouzivaji ruzne rejstrikove soudy - proto se
-    (stejne jako u GLEIF narodniho cisla) muze vratit vic kandidatu k
-    rozliseni podle nazvu/adresy.
-    """
-    spojeni = _de_pripojeni()
-    kurzor = spojeni.execute(
-        "SELECT c.%s FROM company c WHERE c.register_art = ? "
-        "AND c.register_nummer = ?" % ", c.".join(_DE_SLOUPCE),
-        (register_art, register_nummer))
-    return [_de_na_zaznam(r) for r in kurzor.fetchall()]
-
-
 _DE_REG_CISLO_RE = re.compile(r"\b(HRA|HRB|GnR|PR|VR)\s*0*(\d+)\b", re.IGNORECASE)
 
-
-def de_rozloz_reg_cislo(text):
-    """Vytahne (druh, cislo) z retezce jako 'HRB 150148' nebo 'HRB150148'."""
-    m = _DE_REG_CISLO_RE.search(text or "")
-    return (m.group(1).upper(), m.group(2)) if m else (None, None)
-
-
-# ---------------------------------------------------------------------------
-# Nemecko - OpenRegister.de API (volitelne, vyzaduje vlastni API klic)
-#
-# Na rozdil od lokalni kopie Handelsregisteru (vyse) tohle je placene/
-# kreditove API tretí strany, ktere ale narozdil od samotneho Handelsregisteru
-# vede i skutecny obor cinnosti (WZ2025 - nemecka obdoba NACE) a text
-# "Gegenstand des Unternehmens". Vyzaduje vlastni ucet a API klic
-# (openregister.de, zdarma 500 kreditu/mesic, 10 kreditu/dotaz na detail) -
-# klic se NIKDY neuklada v kodu ani v repozitari, jen se preda pri behu
-# (--de-api-klic, nebo promenna prostredi OPENREGISTER_API_KEY).
-# ---------------------------------------------------------------------------
-
-OPENREGISTER_API = "https://api.openregister.de"
-OPENREGISTER_AUTOCOMPLETE = OPENREGISTER_API + "/v1/autocomplete/company"
-OPENREGISTER_DETAIL = OPENREGISTER_API + "/v1/company/{id}"
-
-
-def _openregister_adresa(adresa):
-    adresa = adresa or {}
-    ulice = " ".join(x for x in (adresa.get("street"),) if x)
-    return ulice, adresa.get("postal_code") or "", adresa.get("city") or ""
-
-
-def _openregister_na_zaznam(polozka):
-    ulice, psc, mesto = _openregister_adresa(polozka.get("address"))
-    return Zaznam(
-        jmeno=polozka.get("name") or "",
-        ulice=ulice, psc=_psc(psc), mesto=mesto, zeme=polozka.get("country") or "DE",
-        reg_cislo=("%s %s" % (polozka.get("register_type") or "",
-                              polozka.get("register_number") or "")).strip(),
-        reg_rejstrik="Handelsregister (%s)" % polozka.get("register_court")
-                    if polozka.get("register_court") else "Handelsregister",
-        pravni_forma=polozka.get("legal_form") or "",
-        aktivni=bool(polozka.get("active", True)),
-        zdroj="OpenRegister.de",
-        odkaz="",
-        poznamka="",
-        identifikator=polozka.get("company_id") or "",   # docasne - viz doplnit_openregister_nace
-    )
-
-
-def _openregister_detail_ocisti(data):
-    return {k: v for k, v in data.items() if k in ("industry_codes", "purpose", "purposes")}
-
-
-def openregister_podle_nazvu(klient, nazev, api_klic, pocet=15):
-    """
-    Vyhledani podle jmena pres OpenRegister.de (autocomplete) - neobsahuje
-    jeste WZ kod (ten je az v detailu jednotlive firmy, viz
-    doplnit_openregister_nace), ale uz obsahuje adresu, pravni formu a text
-    predmetu podnikani (purpose).
-    """
-    if not api_klic:
-        return []
-    url = OPENREGISTER_AUTOCOMPLETE + "?" + urllib.parse.urlencode({"query": nazev})
-    data = json.loads(klient.ziskej(
-        url, hlavicky={"Authorization": "Bearer %s" % api_klic}))
-    vysledky = []
-    for r in (data.get("results") or [])[:pocet]:
-        z = _openregister_na_zaznam(r)
-        z.poznamka = (r.get("purpose") or "")[:300]
-        vysledky.append(z)
-    return vysledky
-
-
-def doplnit_openregister_nace(klient, z, api_klic):
-    """
-    Dotahne WZ2025 kod (nemecka obdoba NACE) pro uz vybranou nejlepsi shodu -
-    autocomplete vyhledavani ho nevraci, je az v detailu jedne konkretni
-    firmy (company_id). Vola se jen jednou, po vyberu nejlepsiho kandidata -
-    ne pro kazdy vraceny kandidat zvlast, aby se zbytecne neplytvalo kredity.
-    """
-    if z.zdroj != "OpenRegister.de" or not z.identifikator or z.nace:
-        return
-    url = OPENREGISTER_DETAIL.format(id=urllib.parse.quote(z.identifikator, safe=""))
-    data = json.loads(klient.ziskej(
-        url, hlavicky={"Authorization": "Bearer %s" % api_klic},
-        ocisti=_openregister_detail_ocisti))
-    # OpenRegister.de vraci WZ kody v poradi z rejstriku a hlavni neoznacuje,
-    # takze se zapisuji vsechny a zadny se nevybira.
-    cisla = []
-    for k in ((data.get("industry_codes") or {}).get("WZ2025") or []):
-        cislo = re.sub(r"\D", "", str(k.get("code") or ""))
-        if cislo and cislo not in cisla:
-            cisla.append(cislo)
-    if cisla:
-        z.nace_vse = ",".join(sorted(cisla))
-        z.nace_zdroj = "WZ2025 (OpenRegister.de)"
-
-
-# ---------------------------------------------------------------------------
-# Pobalti + Svedsko/Finsko - Scoris API (volitelne, vyzaduje vlastni API klic)
-#
-# scoris.eu (ne zamenovat s ceskym/litevskym scoris.lt - jine API, jiny klic)
-# pokryva jen SE/FI/EE/LV/LT/GB - u GB uz mame lepsi bezplatny zdroj
-# (Companies House), proto se zde pouziva jen pro SE/FI/EE/LV/LT. Vyhledavani
-# jmenem nevraci adresu ani NACE, jen jmeno+zemi+registracni cislo - detail
-# (a tim i skutecny NACE) se dotahuje az pro jiz vybraneho nejlepsiho
-# kandidata, aby se neplytvalo kredity na kandidaty, kteri nakonec nejsou
-# vybrani.
-# ---------------------------------------------------------------------------
-
-SCORIS_API = "https://scoris.eu"
-SCORIS_SEARCH = SCORIS_API + "/api/v1/company-search/"
-SCORIS_DETAIL = SCORIS_API + "/api/v1/company/{zeme}/{regcode}/"
-SCORIS_ZEME = {"SE", "FI", "EE", "LV", "LT"}
-
-
-def scoris_podle_nazvu(klient, nazev, api_klic, zeme=None, pocet=15):
-    if not api_klic:
-        return []
-    parametry = {"name": nazev, "limit": min(pocet, 100)}
-    if zeme:
-        parametry["country_code"] = zeme
-    url = SCORIS_SEARCH + "?" + urllib.parse.urlencode(parametry)
-    data = json.loads(klient.ziskej(url, hlavicky={"X-API-Key": api_klic}))
-    return [
-        Zaznam(
-            jmeno=r.get("name") or "",
-            zeme=r.get("country_code") or "",
-            reg_cislo=r.get("regcode") or "",
-            reg_rejstrik="obchodni rejstrik (Scoris)",
-            zdroj="Scoris",
-            identifikator="%s:%s" % (r.get("country_code"), r.get("regcode")),
-        )
-        for r in (data or [])[:pocet]
-    ]
-
-
-def _scoris_detail_ocisti(data):
-    return {k: v for k, v in data.items() if k in ("company", "meta")}
-
-
-def doplnit_scoris_detail(klient, z, api_klic):
-    """
-    Dotahne adresu, pravni formu, DIC a skutecny NACE pro uz vybraneho
-    nejlepsiho kandidata - vyhledavani jmenem (scoris_podle_nazvu) samo
-    o sobe vraci jen jmeno/zemi/registracni cislo.
-    """
-    if z.zdroj != "Scoris" or not z.identifikator or z.pravni_forma:
-        return
-    zeme, regcode = z.identifikator.split(":", 1)
-    url = SCORIS_DETAIL.format(zeme=zeme, regcode=urllib.parse.quote(regcode, safe=""))
-    data = json.loads(klient.ziskej(
-        url, hlavicky={"X-API-Key": api_klic}, ocisti=_scoris_detail_ocisti))
-    spol = data.get("company") or {}
-    adresa = spol.get("address") or {}
-    z.psc = adresa.get("postal_code") or z.psc
-    casti = (adresa.get("address") or "").split(",")
-    z.ulice = casti[0].strip()
-    if len(casti) > 1:
-        # posledni cast bývá "PSC MESTO" nebo jen "MESTO" - admin_name1/2
-        # jsou kraj/region, ne mesto (napr. FI "Uusimaa" pro Espoo)
-        posledni = casti[-1].strip()
-        if z.psc and posledni.startswith(z.psc):
-            posledni = posledni[len(z.psc):].strip()
-        z.mesto = posledni or adresa.get("admin_name2") or adresa.get("admin_name1") or z.mesto
-    else:
-        z.mesto = adresa.get("admin_name2") or adresa.get("admin_name1") or z.mesto
-    z.pravni_forma = spol.get("type") or "neurcena"
-    z.dic = z.dic or spol.get("vat_code") or ""
-    nace = ((spol.get("classifications") or {}).get("nace") or {})
-    kod = re.sub(r"\D", "", str(nace.get("nace_code") or ""))
-    if kod:
-        z.nace = kod
-        z.nace_popis = taxonomie.nazev_nace(kod)
-        z.nace_vse = kod
-        z.nace_zdroj = "NACE (Scoris)"
-
-
-# ---------------------------------------------------------------------------
-# Velka Britanie - Companies House (bezplatny bulk export, zadna registrace)
-#
-# Na rozdil od nemeckeho Handelsregisteru obsahuje bulk soubor primo i obor
-# cinnosti (UK SIC 2007 - stejna urovnova struktura jako NACE Rev. 2, prvni
-# 2 cislice = divize se stejnym vyznamem), takze pro UK neni potreba fallback
-# na Wikidata jen kvuli oboru - jen na samotne dohledani firmy. Soubor se
-# aktualizuje mesicne (nahran kolem zacatku mesice), zadny API klic ani
-# registrace neni potreba - viz http://download.companieshouse.gov.uk/en_output.html
-# ---------------------------------------------------------------------------
-
-GB_REGISTER_URL_VZOR = "http://download.companieshouse.gov.uk/BasicCompanyDataAsOneFile-%s-01.zip"
-GB_REGISTER_DB = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                               "gb_companies_house.db")
 
 # (nazev sloupce v CSV, nazev sloupce v nasi SQLite tabulce)
 _GB_SLOUPCE_CSV = (
@@ -1443,173 +1095,7 @@ _GB_SLOUPCE = tuple(nazev_db for _, nazev_db in _GB_SLOUPCE_CSV)
 _GB_LOCAL = threading.local()
 
 
-def _gb_najdi_aktualni_url():
-    """Soubor je pojmenovany podle mesice publikace a bezici mesic jeste
-    nemusi byt nahrany - zkusi aktualni mesic, pak jeden zpet."""
-    ted = time.gmtime()
-    rok, mesic = ted.tm_year, ted.tm_mon
-    for _ in range(2):
-        url = GB_REGISTER_URL_VZOR % ("%04d-%02d" % (rok, mesic))
-        try:
-            urllib.request.urlopen(
-                urllib.request.Request(url, method="HEAD"), timeout=20).close()
-            return url
-        except urllib.error.HTTPError:
-            mesic -= 1
-            if mesic <= 0:
-                mesic, rok = 12, rok - 1
-    raise RuntimeError(
-        "aktualni soubor Companies House se nepodarilo najit (zkuseny posledni "
-        "2 mesice) - zkontrolujte http://download.companieshouse.gov.uk/en_output.html")
-
-
-def _gb_importuj_csv(f, cesta_db):
-    """Naimportuje bulk CSV do nove SQLite s FTS5 indexem nad nazvem firmy.
-    FTS index se stavi az po hromadnem vlozeni dat (rebuild) - podstatne
-    rychlejsi nez prubezna udrzba indexu pri ~5 mil. radcich."""
-    if os.path.exists(cesta_db):
-        os.remove(cesta_db)
-    spojeni = sqlite3.connect(cesta_db)
-    spojeni.execute("PRAGMA synchronous=OFF")
-    spojeni.execute("PRAGMA journal_mode=MEMORY")
-    spojeni.execute("CREATE TABLE company (id INTEGER PRIMARY KEY, %s)"
-                    % ", ".join("%s TEXT" % s for s in _GB_SLOUPCE))
-
-    cteni = csv.reader(f)
-    hlavicka = [h.strip() for h in next(cteni)]
-    try:
-        indexy = [hlavicka.index(nazev_csv) for nazev_csv, _ in _GB_SLOUPCE_CSV]
-    except ValueError as e:
-        raise RuntimeError(
-            "Companies House CSV nema ocekavany sloupec (%s) - format souboru "
-            "se zjevne zmenil" % e)
-
-    vlozit = "INSERT INTO company (%s) VALUES (%s)" % (
-        ", ".join(_GB_SLOUPCE), ", ".join("?" * len(_GB_SLOUPCE)))
-    davka = []
-    with spojeni:
-        for radek in cteni:
-            davka.append(tuple(radek[i] if i < len(radek) else "" for i in indexy))
-            if len(davka) >= 5000:
-                spojeni.executemany(vlozit, davka)
-                davka.clear()
-        if davka:
-            spojeni.executemany(vlozit, davka)
-
-    spojeni.execute(
-        "CREATE VIRTUAL TABLE company_fts USING FTS5(name, content='company', "
-        "content_rowid='id')")
-    spojeni.execute("INSERT INTO company_fts(company_fts) VALUES ('rebuild')")
-    spojeni.commit()
-    spojeni.close()
-
-
-def gb_pripravit_databazi(force=False):
-    """
-    Stahne mesicni bulk export Companies House (~500 MB zip, ~5 mil. firem
-    vc. SIC/oboru cinnosti) a naimportuje ho do lokalni SQLite s FTS5 indexem -
-    zadny API klic ani registrace neni potreba.
-    """
-    if os.path.exists(GB_REGISTER_DB) and not force:
-        print("%s uz existuje, preskakuji stahovani (smazte soubor a spustte "
-              "znovu pro aktualizaci)" % GB_REGISTER_DB, file=sys.stderr)
-        return
-    url = _gb_najdi_aktualni_url()
-    zip_cesta = GB_REGISTER_DB + ".zip"
-    print("Stahuji %s (~500 MB)..." % url, file=sys.stderr)
-    with urllib.request.urlopen(url, timeout=120) as odpoved, open(zip_cesta, "wb") as f:
-        while True:
-            blok = odpoved.read(1024 * 1024)
-            if not blok:
-                break
-            f.write(blok)
-    print("Rozbaluji a importuji do %s..." % GB_REGISTER_DB, file=sys.stderr)
-    with zipfile.ZipFile(zip_cesta) as z:
-        nazev_csv = next(n for n in z.namelist() if n.lower().endswith(".csv"))
-        with z.open(nazev_csv) as f_bin:
-            _gb_importuj_csv(io.TextIOWrapper(f_bin, encoding="utf-8", errors="replace"),
-                             GB_REGISTER_DB)
-    os.remove(zip_cesta)
-    print("Hotovo -> %s" % GB_REGISTER_DB, file=sys.stderr)
-
-
-def _gb_pripojeni():
-    if not os.path.exists(GB_REGISTER_DB):
-        raise RuntimeError(
-            "chybi %s - spustte 'python3 dodavatele.py --pripravit-gb-rejstrik'"
-            % os.path.basename(GB_REGISTER_DB))
-    spojeni = getattr(_GB_LOCAL, "spojeni", None)
-    if spojeni is None:
-        spojeni = sqlite3.connect(
-            "file:%s?mode=ro" % GB_REGISTER_DB, uri=True, check_same_thread=False)
-        _GB_LOCAL.spojeni = spojeni
-    return spojeni
-
-
 _GB_SIC_RE = re.compile(r"^\s*(\d{4,5})")
-
-
-def _gb_nace_ze_sic(sic_text):
-    """'62020 - Information technology consultancy activities' -> '62020'."""
-    m = _GB_SIC_RE.match(sic_text or "")
-    return m.group(1) if m else ""
-
-
-def _gb_na_zaznam(radek):
-    (company_number, name, status, category, incorporation_date,
-     address1, address2, post_town, post_code, sic1, sic2, sic3, sic4) = radek
-    ulice = ", ".join(x for x in (address1, address2) if x)
-    # Companies House hlavni obor neoznacuje - SIC1..SIC4 jsou v poradi, v jakem
-    # je firma zapsala, ne podle vyznamu. Zapisuji se proto vsechny a zadny se
-    # nevybira jako hlavni.
-    kody = []
-    for sic in (sic1, sic2, sic3, sic4):
-        kod = _gb_nace_ze_sic(sic)
-        if kod and kod not in kody:
-            kody.append(kod)
-    nace_vse = ",".join(sorted(kody))
-    aktivni = (status or "").strip().lower() == "active"
-    return Zaznam(
-        jmeno=name or "",
-        ulice=ulice, psc=post_code or "", mesto=post_town or "", zeme="GB",
-        reg_cislo=company_number or "",
-        reg_rejstrik="Companies House",
-        pravni_forma=category or "",
-        nace_vse=nace_vse,
-        nace_zdroj="UK SIC 2007 (Companies House)" if nace_vse else "",
-        datum_vzniku=incorporation_date or "",
-        aktivni=aktivni,
-        zdroj="Companies House",
-        odkaz="https://find-and-update.company-information.service.gov.uk/company/%s"
-              % company_number if company_number else "",
-        poznamka="" if aktivni else "stav v Companies House: %s" % status,
-    )
-
-
-def gb_podle_nazvu(klient, nazev, pocet=15):
-    """Fulltextove hledani v lokalni kopii Companies House (FTS5, ~5 mil. firem)."""
-    dotaz = " ".join(re.findall(r"\w+", nazev, re.UNICODE))
-    if not dotaz:
-        return []
-    spojeni = _gb_pripojeni()
-    kurzor = spojeni.execute(
-        "SELECT c.%s FROM company_fts f JOIN company c ON c.id = f.rowid "
-        "WHERE company_fts MATCH ? ORDER BY bm25(company_fts) LIMIT ?"
-        % ", c.".join(_GB_SLOUPCE),
-        (dotaz, pocet))
-    return [_gb_na_zaznam(r) for r in kurzor.fetchall()]
-
-
-def gb_podle_cisla(company_number):
-    """Presny dotaz na registracni cislo (Company Number) - jednoznacne, na
-    rozdil od nemeckeho HRB/HRA cislo v UK neni sdilene mezi ruznymi soudy."""
-    spojeni = _gb_pripojeni()
-    kurzor = spojeni.execute(
-        "SELECT c.%s FROM company c WHERE c.company_number = ?"
-        % ", c.".join(_GB_SLOUPCE),
-        (company_number.strip().upper(),))
-    radek = kurzor.fetchone()
-    return _gb_na_zaznam(radek) if radek else None
 
 
 # ---------------------------------------------------------------------------
@@ -1681,19 +1167,6 @@ def fr_podle_nazvu(klient, nazev, pocet=15):
     return vysledky
 
 
-# ---------------------------------------------------------------------------
-# Singapur - ACRA (data.gov.sg, otevrena data)
-# ---------------------------------------------------------------------------
-
-SG_ACRA_POLE = ("uen", "entity_name", "entity_type_desc", "uen_status_desc",
-               "reg_street_name", "reg_postal_code")
-
-
-def _sg_ocisti(d):
-    return {"result": {"records": [{k: v for k, v in r.items() if k in SG_ACRA_POLE}
-                                   for r in d.get("result", {}).get("records", [])]}}
-
-
 def _sg_na_zaznam(r):
     uen = r.get("uen") or ""
     aktivni = (r.get("uen_status_desc") or "").strip().lower() == "registered"
@@ -1713,65 +1186,6 @@ def _sg_na_zaznam(r):
         poznamka="stav v ACRA: %s" % r["uen_status_desc"]
                  if r.get("uen_status_desc") and not aktivni else "",
     )
-
-
-def sg_podle_nazvu(klient, nazev, pocet=15):
-    url = SG_ACRA + "?" + urllib.parse.urlencode({
-        "resource_id": SG_ACRA_ZDROJ, "q": nazev, "limit": min(pocet, 30)})
-    data = json.loads(klient.ziskej(url, ocisti=_sg_ocisti))
-    return [_sg_na_zaznam(r) for r in data.get("result", {}).get("records", [])]
-
-
-def sg_podle_uen(klient, uen):
-    """Presny dotaz na jeden UEN - spolehlivejsi nez fulltextove hledani jmenem."""
-    url = SG_ACRA + "?" + urllib.parse.urlencode({
-        "resource_id": SG_ACRA_ZDROJ, "filters": json.dumps({"uen": uen}), "limit": 1})
-    data = json.loads(klient.ziskej(url, ocisti=_sg_ocisti))
-    zaznamy = data.get("result", {}).get("records", [])
-    return _sg_na_zaznam(zaznamy[0]) if zaznamy else None
-
-
-# ---------------------------------------------------------------------------
-# Tchaj-wan - GCIS (data.gcis.nat.gov.tw, otevrena data)
-# ---------------------------------------------------------------------------
-
-def tw_podle_nazvu(klient, nazev, pocet=15):
-    """
-    GCIS bez filtru na stav vraci prazdno i pro bezne existujici firmy - proto
-    je "Company_Status eq 01" (aktivni/schvalene zalozeni) soucasti dotazu,
-    ne dodatecny filtr az na strane klienta.
-    """
-    url = TW_GCIS + "?" + urllib.parse.urlencode({
-        "$format": "json",
-        "$filter": "Company_Name like %s and Company_Status eq 01" % nazev,
-        "$skip": 0, "$top": min(pocet, 30),
-    })
-    data = klient.ziskej(url, kontext=tw_ssl_kontext(), ocisti=lambda d: [
-        {k: v for k, v in r.items() if k in (
-            "Business_Accounting_NO", "Company_Name", "Company_Status_Desc",
-            "Company_Location", "Company_Setup_Date")}
-        for r in d] if isinstance(d, list) else d)
-    zaznamy = json.loads(data)
-    if not isinstance(zaznamy, list):
-        return []
-    vysledky = []
-    for r in zaznamy:
-        cislo = r.get("Business_Accounting_NO") or ""
-        datum = r.get("Company_Setup_Date") or ""
-        # tchajwanske datum je v minguo kalendari (rok - 1911), napr. "0760221"
-        # = 1976-02-21 - pro cteni ve vystupu neni potreba prevadet, jen orezat
-        vysledky.append(Zaznam(
-            jmeno=r.get("Company_Name") or "",
-            ulice=r.get("Company_Location") or "",
-            zeme="TW",
-            reg_cislo=cislo,
-            reg_rejstrik="統一編號 (GCIS)",
-            datum_vzniku=datum,
-            zdroj="GCIS",
-            odkaz="https://data.gcis.nat.gov.tw/od/detail?oid=6BBA2268-1367-4B42-9CCA-BC17499EBE8C",
-            poznamka="",
-        ))
-    return vysledky
 
 
 # ---------------------------------------------------------------------------
@@ -2204,16 +1618,6 @@ def zpracuj_radek(vstup, klient, n):
                 elif zeme == "US" and not n["bez_edgar"]:
                     nalezeny = edgar_podle_cik(klient, ico)
                     kandidati = [nalezeny] if nalezeny else []
-                elif zeme == "SG" and not n["bez_sg"]:
-                    nalezeny = sg_podle_uen(klient, ico.upper())
-                    kandidati = [nalezeny] if nalezeny else []
-                elif zeme == "DE" and not n["bez_de"] and os.path.exists(DE_REGISTER_DB):
-                    druh, cislo = de_rozloz_reg_cislo(ico)
-                    if druh:
-                        kandidati = de_podle_registru(druh, cislo)
-                elif zeme == "GB" and not n["bez_gb"] and os.path.exists(GB_REGISTER_DB):
-                    nalezeny = gb_podle_cisla(ico)
-                    kandidati = [nalezeny] if nalezeny else []
                 if not kandidati and not n["bez_gleif"]:
                     if re.fullmatch(r"[A-Za-z0-9]{20}", ico):
                         nalezeny = gleif_podle_lei(klient, ico.upper())
@@ -2305,29 +1709,8 @@ def zpracuj_radek(vstup, klient, n):
                 zkus(rpo_sk_podle_nazvu, nazev, min(n["pocet"], 20))
             if zeme == "FR" and not n["bez_fr"]:
                 zkus(fr_podle_nazvu, nazev, n["pocet"])
-            if zeme == "SG" and not n["bez_sg"]:
-                zkus(sg_podle_nazvu, nazev, n["pocet"])
-            if zeme == "TW" and not n["bez_tw"]:
-                zkus(tw_podle_nazvu, nazev, n["pocet"])
             if zeme in ("", "US") and not n["bez_edgar"]:
                 zkus(edgar_podle_nazvu, nazev, n["pocet"])
-            if zeme == "DE" and n["openregister_klic"]:
-                zkus(openregister_podle_nazvu, nazev, n["openregister_klic"], n["pocet"])
-            # DULEZITE: kontrola "stav == STAV_NENALEZENO", ne proste druhe
-            # "if" bez podminky - kdyby se lokalni DB zkousela vzdy vedle
-            # OpenRegisteru, mohla by ho v zkus() prebit jen diky vyssimu
-            # skore shody jmena, i kdyz OpenRegister uz nasel spravnou firmu
-            # se skutecnym NACE (lokalni DB zadny NACE nema). Lokalni DB se
-            # proto zkousi jen kdyz OpenRegister.de nenasel vubec nic - napr.
-            # kdyz dosly kredity/klic je neplatny - jinak by firma bez teto
-            # zalohy zustala cela nenalezena, i kdyz ji mame lokalne k dispozici.
-            if (zeme == "DE" and stav == STAV_NENALEZENO
-                    and not n["bez_de"] and os.path.exists(DE_REGISTER_DB)):
-                zkus(de_podle_nazvu, nazev, n["pocet"])
-            if zeme == "GB" and not n["bez_gb"] and os.path.exists(GB_REGISTER_DB):
-                zkus(gb_podle_nazvu, nazev, n["pocet"])
-            if zeme in SCORIS_ZEME and n["scoris_klic"]:
-                zkus(scoris_podle_nazvu, nazev, n["scoris_klic"], zeme, n["pocet"])
             if zeme != "CZ" and not n["bez_gleif"]:
                 zkus(gleif_podle_nazvu, nazev, zeme or None, n["pocet"])
             if zeme != "CZ" and not n["bez_wikidata"]:
@@ -2400,16 +1783,6 @@ def zpracuj_radek(vstup, klient, n):
                         z.stav = STAV_OVERIT
         if z.stav != STAV_NENALEZENO and not n["bez_sk"]:
             doplnit_sk_nace(klient, z)
-        if z.stav != STAV_NENALEZENO and n["openregister_klic"]:
-            try:
-                doplnit_openregister_nace(klient, z, n["openregister_klic"])
-            except Exception as e:
-                poznamky.append("OpenRegister.de: %s" % e)
-        if z.stav != STAV_NENALEZENO and n["scoris_klic"]:
-            try:
-                doplnit_scoris_detail(klient, z, n["scoris_klic"])
-            except Exception as e:
-                poznamky.append("Scoris: %s" % e)
         if (z.stav not in (STAV_NENALEZENO, STAV_CHYBA) and not z.nace and not z.obory
                 and z.zdroj != "Wikidata" and not n["bez_wikidata"]):
             try:
@@ -2758,7 +2131,6 @@ def zapis_export_llm(zaznamy, cesta, kategorie_ciselnik=None, davka=None,
     davky = _rozdel_davky(kandidati, davka)
     cesty = _zapis_davky(cesta, davky, obsah)
     return len(kandidati), cesty
-
 
 
 def _ciselnik_do_promptu(kategorie_ciselnik, nedosazitelne=()):
@@ -3335,28 +2707,6 @@ def main(argv=None):
     p.add_argument("--bez-ares", action="store_true")
     p.add_argument("--bez-sk", action="store_true")
     p.add_argument("--bez-fr", action="store_true")
-    p.add_argument("--bez-sg", action="store_true")
-    p.add_argument("--bez-tw", action="store_true")
-    p.add_argument("--bez-de", action="store_true",
-                   help="nepouzivat lokalni kopii nemeckeho Handelsregisteru")
-    p.add_argument("--pripravit-de-rejstrik", action="store_true",
-                   help="stahnout/rozbalit lokalni kopii nemeckeho Handelsregisteru "
-                        "(%s) a skoncit" % os.path.basename(DE_REGISTER_DB))
-    p.add_argument("--de-api-klic", default=os.environ.get("OPENREGISTER_API_KEY", ""),
-                   help="API klic pro OpenRegister.de (openregister.de) - placena "
-                        "sluzba se skutecnym oborem cinnosti (WZ2025) pro nemecke firmy; "
-                        "ma prednost pred lokalnim Handelsregisterem. Klic se nikam "
-                        "neuklada, jen se pouzije za behu - lze predat i pres "
-                        "promennou prostredi OPENREGISTER_API_KEY")
-    p.add_argument("--scoris-api-klic", default=os.environ.get("SCORIS_API_KEY", ""),
-                   help="API klic pro Scoris (scoris.eu) - placena sluzba se skutecnym "
-                        "NACE pro SE/FI/EE/LV/LT. Klic se nikam neuklada, jen se pouzije "
-                        "za behu - lze predat i pres promennou prostredi SCORIS_API_KEY")
-    p.add_argument("--bez-gb", action="store_true",
-                   help="nepouzivat lokalni kopii Companies House (UK)")
-    p.add_argument("--pripravit-gb-rejstrik", action="store_true",
-                   help="stahnout/naimportovat lokalni kopii Companies House "
-                        "(%s) a skoncit" % os.path.basename(GB_REGISTER_DB))
     p.add_argument("--bez-gleif", action="store_true")
     p.add_argument("--bez-gleif-popisy", action="store_true",
                    help="nepřekládat kódy GLEIF (rejstřík, právní forma) na text - rychlejší")
@@ -3417,14 +2767,6 @@ def main(argv=None):
                           sloupec_nas=a.komparace_nas_sloupec)
         return 0
 
-    if a.pripravit_de_rejstrik:
-        de_pripravit_databazi()
-        return 0
-
-    if a.pripravit_gb_rejstrik:
-        gb_pripravit_databazi()
-        return 0
-
     if not a.vstup:
         p.error("chybi vstupni soubor (nebo pouzijte --dump-taxonomy)")
 
@@ -3461,9 +2803,7 @@ def spustit(a, na_radek=None):
                     prodleva=a.prodleva, ua=a.ua)
     n = {"pocet": a.pocet, "prah_ok": a.prah_ok, "prah_overit": a.prah_overit,
          "vies": a.vies, "bez_ares": a.bez_ares, "bez_sk": a.bez_sk,
-         "bez_fr": a.bez_fr, "bez_sg": a.bez_sg, "bez_tw": a.bez_tw,
-         "bez_de": a.bez_de, "bez_gb": a.bez_gb, "openregister_klic": a.de_api_klic,
-         "scoris_klic": a.scoris_api_klic,
+         "bez_fr": a.bez_fr,
          "bez_gleif": a.bez_gleif, "bez_gleif_popisy": a.bez_gleif_popisy,
          "bez_edgar": a.bez_edgar, "bez_wikidata": a.bez_wikidata,
          "nace_kategorie": nace_kategorie, "kategorie_ciselnik": ciselnik,
