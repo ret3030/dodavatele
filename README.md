@@ -92,3 +92,32 @@ pyinstaller --windowed --name Dodavatele --add-data "taxonomie_data.json:." gui.
 PyInstaller neumí sestavit aplikaci pro jinou platformu, než na které běží –
 proto GitHub Actions (`.github/workflows/build-gui.yml`) sestavuje zvlášť na
 Windows a macOS při každé změně `dodavatele.py`/`gui.py` na `main`.
+
+## Porovnání s cizí kategorizací
+
+Chcete-li ověřit, jak moc se náš `Kód kategorie`/`Kategorie dodavatele`
+shoduje s kategorizací od někoho jiného (kolega, jiný nástroj) nad stejným
+seznamem firem ve stejném pořadí, stačí přidat sloupec a jeden vzorec –
+žádný skript navíc:
+
+1. Vložte cizí kategorii jako **nový sloupec na konec** výstupu, řádek pod
+   řádkem stejně jako u nás (např. sloupec `N`, pokud `Kategorie dodavatele`
+   je ve sloupci `L`).
+2. Do dalšího sloupce (`O`) přidejte vzorec porovnání – ignoruje velikost
+   písmen a mezery navíc:
+   ```
+   =IF(TRIM(LOWER(L2))=TRIM(LOWER(N2));"ANO";"NE")
+   ```
+   a zkopírujte ho dolů přes všechny řádky s daty.
+3. Souhrnné procento shody spočítá v libovolné volné buňce:
+   ```
+   =COUNTIF(O2:O1000;"ANO")/COUNTA(O2:O1000)
+   ```
+   (rozsah upravte podle skutečného počtu řádků) a naformátujte buňku jako
+   **procenta**.
+
+Vzorec vyžaduje **stejná slova ve stejném pořadí** – funguje spolehlivě,
+když obě strany používají stejný katalog kategorií (stejné názvy). Pokud
+srovnáváte proti jinému číselníku/volnému textu, přesná shoda nebude
+vypovídající a je potřeba porovnání provést ručně nebo volněji (např. jen
+podle skupiny).
