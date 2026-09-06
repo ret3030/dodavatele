@@ -12,7 +12,7 @@ Vytvořil: Robert Plevač (robert.plevac@cz.ey.com), EY s.r.o., IČO 26705338.
 **Stálý odkaz ke stažení (doporučeno pro kolegy):**
 https://github.com/ret3030/dodavatele/releases/tag/gui-latest
 
-Vždy obsahuje poslední úspěšně sestavenou verzi z branche `gui-desktop`
+Vždy obsahuje poslední úspěšně sestavenou verzi z branche `main`
 (`Dodavatele.exe` pro Windows, `Dodavatele-macOS.zip` pro macOS) - stažení
 funguje **bez přihlášení do GitHub účtu** a odkaz se při dalších verzích
 nemění. Aktualizuje se automaticky při každé změně `gui.py`/`dodavatele.py`

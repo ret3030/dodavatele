@@ -6,10 +6,14 @@ name: Build desktop GUI
 # (job "release" nize) zabali do GitHub Release s pevnym tagem "gui-latest" -
 # na rozdil od Artifacts (zalozka Actions) jde stahnout bez prihlaseni do
 # GitHub uctu a bez expirace, coz je nutne pro kolegy bez vlastniho uctu.
+#
+# Drive se stavelo z oddelene branche "gui-desktop", ktera se do main jen
+# obcas slevala - dve vetve znamenaly, ze v main dlouho chybelo to, co uz
+# bylo v appce. Ted je jedina vetev main.
 on:
   workflow_dispatch:
   push:
-    branches: [gui-desktop]
+    branches: [main]
     paths:
       - "gui.py"
       - "dodavatele.py"
@@ -76,7 +80,7 @@ jobs:
           tag_name: gui-latest
           name: "Dodavatelé – desktopová appka (nejnovější sestavení)"
           body: >
-            Automaticky sestaveno z branche `gui-desktop`, commit ${{ github.sha }}.
+            Automaticky sestaveno z branche `main`, commit ${{ github.sha }}.
             Windows: stáhněte `Dodavatele.exe` a spusťte (SmartScreen: "Další
             informace" → "Přesto spustit"). macOS: stáhněte a rozbalte
             `Dodavatele-macOS.zip`, pravým tlačítkem na `Dodavatele.app` →
