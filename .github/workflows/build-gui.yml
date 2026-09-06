@@ -78,13 +78,18 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           tag_name: gui-latest
-          name: "Dodavatelé – desktopová appka (nejnovější sestavení)"
+          name: "Dodavatelé – desktopová appka"
           body: >
-            Automaticky sestaveno z branche `main`, commit ${{ github.sha }}.
-            Windows: stáhněte `Dodavatele.exe` a spusťte (SmartScreen: "Další
-            informace" → "Přesto spustit"). macOS: stáhněte a rozbalte
-            `Dodavatele-macOS.zip`, pravým tlačítkem na `Dodavatele.app` →
-            Otevřít (napoprvé kvůli Gatekeeperu).
+            **Windows:** stáhněte `Dodavatele.exe` a spusťte. Napoprvé
+            SmartScreen: "Další informace" → "Přesto spustit".
+
+
+            **macOS:** stáhněte a rozbalte `Dodavatele-macOS.zip`, pak pravým
+            tlačítkem na `Dodavatele.app` → Otevřít (napoprvé kvůli
+            Gatekeeperu).
+
+
+            Sestaveno z commitu ${{ github.sha }}.
           files: |
             stazeno/Dodavatele-Windows/Dodavatele.exe
             stazeno/Dodavatele-macOS/Dodavatele-macOS.zip
