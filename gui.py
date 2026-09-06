@@ -1,8 +1,8 @@
 """
 Jednoduche desktopove GUI k dodavatele.py pro kolegy, kteri neumi s Pythonem/
 prikazovou radkou. Zabaluje se do jednoho spustitelneho souboru pres
-PyInstaller (viz build.spec a README_GUI.md) - kolega jen dvojklikem spusti
-.exe/.app, nic neinstaluje.
+PyInstaller (viz README.md) - kolega jen dvojklikem spusti .exe/.app,
+nic neinstaluje.
 
 Logika obohaceni je beze zmeny v dodavatele.py (funkce spustit()) - tenhle
 soubor je jen tenka nadstavba, ktera si postavi stejny objekt argumentu,
@@ -38,13 +38,13 @@ NAZEV_OKNA = "Dodavatelé – obohacení seznamu"
 
 # Napoveda se zamerne drzi tri otazek, ktere kolega resi pred prvnim spustenim:
 # co appka dela, co ji dat na vstup a co ceka ve vystupu. Podrobnosti jsou
-# v DOCS.md - sem patri jen to, bez ceho nejde zacit.
+# v README.md - sem patri jen to, bez ceho nejde zacit.
 NAPOVEDA = """\
 K ČEMU TO JE
 
 Dáte seznam firem (stačí názvy) a appka ke každé dohledá ve veřejných
-rejstřících adresu, IČO, DIČ, obor podnikání (NACE) a zařadí ji do kategorie
-dodavatele. Výsledek uloží do Excelu.
+rejstřících adresu, IČO, DIČ a obor podnikání (NACE). Výsledek uloží do
+Excelu.
 
 
 VSTUPNÍ SOUBOR
@@ -82,14 +82,12 @@ CO APPKA DOHLEDÁ
     Adresu, IČO a DIČ
     Právní formu a datum vzniku
     Obor podnikání (NACE) - všechny zapsané obory
-    Kategorii dodavatele podle vlastní taxonomie
     Odkaz do rejstříku ke kontrole
     Zda firma pořád existuje (zaniklé se označí)
 
 Zdroje: ARES (ČR), RPO SR (Slovensko), INSEE (Francie), SEC EDGAR (USA)
-a celosvětově GLEIF (firmy s LEI) a Wikidata. Které se použijí, si zapnete
-v okně výš. Firmy z ostatních zemí se najdou přes GLEIF nebo Wikidata,
-a když ne, doplní je krok přes AI.
+a celosvětově GLEIF (firmy s LEI) a Wikidata - vždy všechny najednou.
+Firmy z ostatních zemí se najdou přes GLEIF nebo Wikidata.
 
 
 CO VE VÝSTUPU SLEDOVAT
@@ -101,56 +99,34 @@ Sloupec STAV říká, jak moc řádku věřit:
     OVERIT       nalezena, ale něco nesedí - přečtěte si Poznámku
     NENALEZENO   nenalezena; zkuste doplnit IČO nebo přesnější název
 
-Sloupec KATEGORIE DODAVATELE zůstane u velké části firem prázdný
-(XXX-00 Nezařazeno). Není to chyba: zapsaný obor v rejstříku popisuje, jak
-je firma zaregistrovaná, ne co doopravdy dodává. Většina firem má zapsaný
-obecný obor typu "nespecializovaný velkoobchod" nebo jich má zapsaných
-dvacet. Appka proto kategorii přiřadí jen tam, kde je jistá, a jinde radši
-nechá prázdno, než aby vás poslala špatným směrem.
-
-Zbytek se dá doplnit přes ChatGPT/Copilota - ta část je zatím jen
-v příkazové řádce, viz DOCS.md (přepínače --export-llm a --llm-mapa).
+Sloupce KÓD KATEGORIE, KATEGORIE DODAVATELE a POPIS ČINNOSTI zůstanou
+prázdné - appka je sama neurčuje. Zapsaný obor v rejstříku říká, jak je
+firma zaregistrovaná, ne co doopravdy dodává, takže by šlo jen o hádání.
+Zařazení doplní krok přes ChatGPT/Copilota - zatím jen v příkazové řádce
+(přepínače --export-llm a --llm-mapa), viz README.md.
 
 
 CO TO STOJÍ ČASU
 
 Řádově sekundy na firmu. U stovek firem je to na minuty, u tisíců
 na desítky minut. Průběh vidíte dole v okně a jde ho kdykoli zavřít.
+Opakovaný běh nad stejným seznamem je díky keši skoro okamžitý.
 """
-
-ZDROJE = [
-    ("Ares", "bez_ares", "ARES (ČR)", True),
-    ("Sk", "bez_sk", "RPO SR (Slovensko)", True),
-    ("Fr", "bez_fr", "INSEE (Francie)", True),
-    ("Edgar", "bez_edgar", "SEC EDGAR (USA)", True),
-    ("Gleif", "bez_gleif", "GLEIF (svět, firmy s LEI)", True),
-    ("Wikidata", "bez_wikidata", "Wikidata (obor u velkých firem)", True),
-]
 
 
 def vychozi_argumenty():
     """
     Stejne vychozi hodnoty jako ma CLI (main() v dodavatele.py). `cache=None`
-    znamena "vychozi umisteni" (dodavatele.vychozi_cache) - drive tu byla
-    relativni cesta, ktera se u zabalene appky resila proti pracovnimu
-    adresari, a ten je pri spusteni dvojklikem nepredvidatelny (na macOS
-    korenovy adresar, kam se zapsat neda). Kes se pak tise neukladala a kazdy
-    beh znovu cekal na dotazy do zahranicnich rejstriku. export_llm/
+    znamena "vychozi umisteni" (dodavatele.vychozi_cache). export_llm/
     export_davka/llm_mapa jsou zamerne CLI-only funkce (zarazeni pres LLM chat
-    je dvoukrokovy postup s rucnim mezikrokem, viz DOCS.md) - GUI pro ne nema
-    ovladaci prvky, ale spustit() na tyhle atributy sahaje vzdy, takze tu musi
-    byt aspon prazdne/vychozi, jinak by beh z GUI spadl na AttributeError.
+    je dvoukrokovy postup s rucnim mezikrokem, viz README.md) - GUI pro ne
+    nema ovladaci prvky, ale spustit() na tyhle atributy sahaje vzdy, takze tu
+    musi byt aspon prazdne/vychozi, jinak by beh z GUI spadl na AttributeError.
     """
     return argparse.Namespace(
-        vstup=None, vystup="dodavatele_vystup.xlsx", sloupec=None, oddelovac=";",
-        kompakt=False, jen_id=False, export_llm=None, llm_mapa=None,
-        export_davka=None,
-        workers=4, prodleva=0.25, pocet=30, prah_ok=0.90, prah_overit=0.72,
-        vies=False, bez_ares=False, bez_sk=False, bez_fr=False,
-        bez_gleif=False, bez_gleif_popisy=False, bez_edgar=False,
-        bez_wikidata=False, cache=None,   # None = d.vychozi_cache(), viz nize
-        bez_kese=False,
-        obnovit_nenalezene=None, taxonomy=None, ua=d.UA,
+        vstup=None, vystup="dodavatele_vystup.xlsx",
+        export_llm=None, llm_mapa=None, export_davka=None,
+        obnovit=False, workers=4, cache=None, bez_kese=False, ua=d.UA,
     )
 
 
@@ -167,10 +143,7 @@ class Aplikace:
 
         self.var_vstup = StringVar()
         self.var_vystup = StringVar()
-        self.var_vies = BooleanVar(value=False)
-        self.var_zdroje = {}
-        for klic, _attr, _popis, vychozi in ZDROJE:
-            self.var_zdroje[klic] = BooleanVar(value=vychozi)
+        self.var_obnovit = BooleanVar(value=False)
 
         self._sestav_ui()
         self.root.after(150, self._kontroluj_frontu)
@@ -195,18 +168,6 @@ class Aplikace:
         ttk.Entry(radek2, textvariable=self.var_vystup).pack(side=LEFT, fill=X, expand=True)
         ttk.Button(radek2, text="Uložit jako…", command=self._vyber_vystup).pack(side=LEFT, padx=(6, 0))
 
-        ramec_zdroje = ttk.LabelFrame(self.root, text="Zdroje dat (odškrtněte, co nechcete použít)")
-        ramec_zdroje.pack(fill=X, **pad)
-        mrizka = ttk.Frame(ramec_zdroje)
-        mrizka.pack(fill=X, padx=8, pady=4)
-        for i, (klic, _attr, popis, _vychozi) in enumerate(ZDROJE):
-            ttk.Checkbutton(mrizka, text=popis, variable=self.var_zdroje[klic]).grid(
-                row=i // 2, column=i % 2, sticky="w", padx=4, pady=2)
-        ttk.Checkbutton(
-            ramec_zdroje, text="Ověřit DIČ v EU přes VIES (o dost pomalejší)",
-            variable=self.var_vies,
-        ).pack(anchor="w", padx=8, pady=(0, 6))
-
         ramec_beh = ttk.Frame(self.root)
         ramec_beh.pack(fill=X, **pad)
         self.tlacitko_spustit = ttk.Button(ramec_beh, text="Spustit", command=self._spustit)
@@ -214,6 +175,10 @@ class Aplikace:
         self.tlacitko_otevrit = ttk.Button(
             ramec_beh, text="Otevřít výstup", command=self._otevri_vystup, state="disabled")
         self.tlacitko_otevrit.pack(side=LEFT, padx=(8, 0))
+        ttk.Checkbutton(
+            ramec_beh, text="Zkusit znovu nenalezené firmy (obejít keš)",
+            variable=self.var_obnovit,
+        ).pack(side=LEFT, padx=(8, 0))
         self.progress = ttk.Progressbar(ramec_beh, mode="determinate")
         self.progress.pack(side=LEFT, fill=X, expand=True, padx=(10, 0))
 
@@ -296,9 +261,7 @@ class Aplikace:
         a = vychozi_argumenty()
         a.vstup = self.var_vstup.get().strip()
         a.vystup = self.var_vystup.get().strip() or "dodavatele_vystup.xlsx"
-        a.vies = self.var_vies.get()
-        for klic, attr, _popis, _vychozi in ZDROJE:
-            setattr(a, attr, not self.var_zdroje[klic].get())
+        a.obnovit = self.var_obnovit.get()
         return a
 
     def _spustit(self):

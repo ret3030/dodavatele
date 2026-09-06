@@ -1,50 +1,74 @@
 # Dodavatelé – obohacení seznamu z veřejných rejstříků
 
-Vezme seznam názvů firem a doplní k nim adresu, IČO/DIČ, obor činnosti (NACE)
-a zařazení do vlastní kategorie dodavatele – z veřejných rejstříků (ARES, RPO
-SR, INSEE, SEC EDGAR, GLEIF, Wikidata).
+Vezme seznam názvů firem a doplní k nim adresu, IČO/DIČ a obor činnosti
+(NACE) z veřejných rejstříků – ARES (ČR), RPO SR (Slovensko), INSEE
+(Francie), SEC EDGAR (USA), GLEIF a Wikidata (svět). Vše bez API klíče.
 
-## Instalace
+Zařazení do vlastní kategorie dodavatele a stručný popis, co firma skutečně
+dělá, nástroj neurčuje sám (zapsaný obor říká, jak je firma zaregistrovaná,
+ne co dodává) – doplní je krok přes LLM chat (Copilot/ChatGPT), viz níže.
+
+## Instalace a použití
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt
-```
+.venv/bin/pip install -r requirements.txt   # openpyxl, jen pro zápis XLSX
 
-(`openpyxl` je potřeba jen pro XLSX – bez instalace čehokoli funguje CSV/TXT
-vstup i výstup na čistém Pythonu 3.9+.)
-
-## Použití
-
-```bash
 python3 dodavatele.py vstup.csv -o vystup.xlsx
 ```
 
-Vstupem je jakýkoli seznam firem (`.csv`, `.xlsx` nebo `.txt`) – stačí sloupec
+Vstupem je `.csv`, `.xlsx` nebo `.txt` se seznamem firem – stačí sloupec
 s názvem, IČO/DIČ/adresa jsou nepovinné, ale zpřesní a zrychlí hledání.
-Hlavičku sloupců pozná automaticky, česky i anglicky. Ukázka: `vzor_dodavatele.csv`.
+Hlavičku sloupců pozná automaticky, česky i anglicky. Ukázka:
+`vzor_dodavatele.csv`.
 
-Výstup obsahuje `Jméno | Ulice | PSČ | Město | Země | IČO | DIČ |
-Kód kategorie | Kategorie dodavatele` a kontrolní sloupce navíc (vč. NACE
-(všechny)) – hlavně
-**Stav** (`OK` / `VYBRANO` / `OVERIT` / `NENALEZENO`), který říká, jak moc
-danému řádku věřit. XLSX má navíc dva přehledové listy s číselníkem kategorií
-a číselníkem NACE.
+Výstup: `Jméno | Ulice | PSČ | Město | Země | IČO | DIČ | NACE | Stav
+| Zdroj dat | Kód kategorie | Kategorie dodavatele | Popis činnosti` (+ pár
+sloupců navíc, jen když mají čím být naplněné). **Stav** říká, jak moc
+danému řádku věřit:
 
-Kategorie se z NACE určí jen tam, kde je to **jisté** — každý zapsaný obor
-firmy musí určovat kategorii a všechny musí vést na tutéž. Stačí jeden obecný
-nebo odporující si obor a zůstane `XXX-00 Nezařazeno` místo zavádějícího
-zařazení. Na reálných datech to znamená necelých 9 % dodavatelů; zbytek se
-záměrně nehádá.
-Skutečnou činnost doplní krok přes LLM chat (`--export-llm` / `--llm-mapa`,
-viz DOCS.md) – exportují se všichni dodavatelé, protože zapsaný obor říká, jak
-je firma zaregistrovaná, ne co dodává.
+| stav | význam |
+|---|---|
+| `OK` | jednoznačná shoda, data lze převzít |
+| `VYBRANO` | víc podobných firem – vybrána nejlepší, zkontrolujte |
+| `OVERIT` | shoda s výhradou (např. jiná adresa/země) – zkontrolujte |
+| `NENALEZENO` | nic dost podobného nenalezeno |
+| `CHYBA` | prázdný řádek nebo výpadek zdrojů |
 
-## Chcete víc?
+**Kód kategorie**, **Kategorie dodavatele** a **Popis činnosti** zůstávají
+prázdné, dokud je nedoplní LLM krok:
 
-Popis všech přepínačů, zdrojů dat po jednotlivých zemích, řešení konkrétních
-situací (firma se nenajde, dvě firmy stejného jména, OSVČ zadaná jen jménem,
-ruční zařazení přes LLM chat, porovnání s cizím NACE…) a kompletní seznam
-kategorií je v **[DOCS.md](DOCS.md)** – README je záměrně jen "jak to
-spustit", zbytek je referenční dokumentace, ke které se sahá jen když je
-potřeba.
+```bash
+python3 dodavatele.py vstup.csv -o vystup.xlsx --export-llm firmy.txt
+# --> obsah firmy.txt vložit do Copilotu/ChatGPT, odpověď uložit jako CSV
+python3 dodavatele.py vstup.csv -o vystup.xlsx --llm-mapa odpoved.csv
+```
+
+Opakovaný běh nad stejným seznamem je díky keši (v profilu uživatele) skoro
+okamžitý – nic se nestahuje znovu. `--obnovit` zkusí ještě jednou dohledat
+firmy, které v daném běhu skončily jako nenalezené. Přepínač `--help`
+vypíše všechny volby i s popisem.
+
+## Desktopová appka pro kolegy (bez Pythonu)
+
+`gui.py` je tenké okenní rozhraní nad stejnou logikou, zabalené přes
+PyInstaller do jednoho spustitelného souboru – kolega jen dvojklikem spustí
+`.exe`/`.app`, nic neinstaluje.
+
+**Stažení hotové appky:**
+https://github.com/ret3030/dodavatele/releases/tag/gui-latest –
+vždy poslední verze z `main`, bez přihlášení do GitHub účtu. Na macOS je po
+rozbalení potřeba appku poprvé spustit přes pravé tlačítko → Otevřít
+(Gatekeeper jinak nepodepsanou appku nespustí dvojklikem).
+
+**Sestavení appky lokálně:**
+
+```bash
+pip install pyinstaller openpyxl
+pyinstaller --onefile --windowed --name Dodavatele gui.py    # Windows - .exe
+pyinstaller --windowed --name Dodavatele gui.py               # macOS - .app
+```
+
+PyInstaller neumí sestavit appku pro jinou platformu, než na které běží –
+proto GitHub Actions (`.github/workflows/build-gui.yml`) sestavuje zvlášť na
+Windows a macOS při každé změně `dodavatele.py`/`gui.py` na `main`.
