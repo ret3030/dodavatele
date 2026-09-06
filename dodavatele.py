@@ -3125,6 +3125,42 @@ def nacti_stavy_k_obnove(cesta, spatne_stavy=(STAV_NENALEZENO, STAV_OVERIT, STAV
     return {r[i_nazev] for r in radky if len(r) > i_stav and r[i_stav] in spatne_stavy}
 
 
+def zaznamy_z_vystupu(cesta):
+    """
+    Nacte zpet uz vygenerovany vystup (XLSX/CSV) do zaznamu. Slouzi k tomu, aby
+    slo z hotoveho vystupu udelat export pro LLM chat, aniz by se cely beh
+    (a s nim vsechny dotazy do rejstriku) opakoval - typicky po behu z GUI,
+    ktere --export-llm zatim nenabizi.
+
+    Berou se jen sloupce, ktere export potrebuje; zbytek vystupu se ignoruje.
+    """
+    hlavicka, radky = nacti_tabulku(cesta)
+    mapa = {
+        "jmeno": "Jméno", "hledany_nazev": "Hledaný název", "zeme": "Země",
+        "ulice": "Ulice", "psc": "PSČ", "mesto": "Město",
+        "nace_vse": "NACE (všechny)", "nace": "NACE", "kod_kategorie": "Kód kategorie",
+    }
+    indexy = {}
+    for atribut, nazev in mapa.items():
+        for i, h in enumerate(hlavicka):
+            if (h or "").strip() == nazev:
+                indexy[atribut] = i
+                break
+    if "jmeno" not in indexy and "hledany_nazev" not in indexy:
+        sys.exit("V souboru %s nenajdu sloupec 'Jméno' ani 'Hledaný název' - "
+                 "je to opravdu vystup tohohle nastroje?" % cesta)
+
+    zaznamy = []
+    for r in radky:
+        z = Zaznam()
+        for atribut, i in indexy.items():
+            if i < len(r):
+                setattr(z, atribut, (r[i] or "").strip())
+        if z.hledany_nazev or z.jmeno:
+            zaznamy.append(z)
+    return zaznamy
+
+
 def zpracuj_komparaci(cesta_vstup, sloupec_kolega, cesta_vystup, sloupec_nas="NACE (všechny)"):
     """
     Porovna nas sloupec NACE se sloupcem, ktery do jiz vygenerovaneho vystupu
@@ -3204,6 +3240,10 @@ def main(argv=None):
                         "chatu (Copilot, ChatGPT...) - ptame se na skutecnou hlavni "
                         "cinnost jako NACE kod a na kod nasi kategorie; u kazde firmy "
                         "se uvedou vsechny zapsane obory jako napoveda")
+    p.add_argument("--z-vystupu", metavar="SOUBOR",
+                   help="vzit uz hotovy vystup (XLSX/CSV z drivejsiho behu nebo "
+                        "z appky) a udelat z nej --export-llm, bez opakovani "
+                        "celeho behu a dotazu do rejstriku")
     p.add_argument("--export-davka", type=int, metavar="N",
                    help="rozdelit --export-llm do vice souboru po N firmach - pro "
                         "vkladani do LLM chatu po castech u velkych seznamu")
@@ -3279,6 +3319,22 @@ def main(argv=None):
         with open(a.dump_taxonomy, "w", encoding="utf-8") as f:
             json.dump(taxonomie.jako_json(), f, ensure_ascii=False, indent=2)
         print("Taxonomie zapsana do %s" % a.dump_taxonomy)
+        return 0
+
+    if a.z_vystupu:
+        if not a.export_llm:
+            p.error("--z-vystupu se pouziva spolu s --export-llm SOUBOR")
+        zaznamy = zaznamy_z_vystupu(a.z_vystupu)
+        nace_kategorie, ciselnik, mapa_oboru = None, None, None
+        if a.taxonomy:
+            with open(a.taxonomy, encoding="utf-8") as f:
+                nace_kategorie, ciselnik, mapa_oboru = taxonomie.z_json(json.load(f))
+        pocet, cesty = zapis_export_llm(zaznamy, a.export_llm, ciselnik,
+                                        davka=a.export_davka,
+                                        nace_kategorie=nace_kategorie)
+        print("Nacteno %d firem z %s" % (len(zaznamy), a.z_vystupu), file=sys.stderr)
+        print("Export pro LLM chat -> %s (%d firem)" % (", ".join(cesty), pocet),
+              file=sys.stderr)
         return 0
 
     if a.komparace:
