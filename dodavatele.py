@@ -29,6 +29,7 @@ import io
 import json
 import os
 import re
+import shutil
 import sqlite3
 import ssl
 import sys
@@ -122,20 +123,18 @@ OSVC_PRAVNI_FORMY = {"100", "101", "102", "103", "104", "105", "106", "107", "10
 
 CACHE_JMENO = ".dodavatele_cache.json.gz"
 
+# Kdy kes ulozit uz behem behu. Driv se ukladala az po dobehnuti celeho
+# seznamu, takze preruseny beh (Ctrl+C, zavrene okno appky, pad) zahodil
+# vsechno stazene a dalsi beh zacinal od nuly - navenek to vypadalo, ze kes
+# nefunguje. Zapisuje se cela kes najednou, u tisicu firem uz to nejsou
+# jednotky milisekund, proto krome poctu novych odpovedi i minimalni odstup:
+# rezie zapisu tak zustane nizka i u velke kese.
+PRUBEZNY_ZAPIS_PO = 200        # novych odpovedi
+PRUBEZNY_ZAPIS_ODSTUP = 30.0   # s od posledniho ulozeni
 
-def vychozi_cache():
-    """
-    Kde drzet kes. Driv to byla relativni cesta ".dodavatele_cache.json.gz",
-    ktera se resila proti pracovnimu adresari - u zabalene appky spustene
-    dvojklikem je ten ale nepredvidatelny (na macOS dokonce korenovy adresar,
-    kam se zapsat neda). Kes se pak tise neulozila a kazdy beh zacinal znovu,
-    vcetne pomalych dotazu na zahranicni firmy.
 
-    Proto pevne misto v profilu uzivatele. Kdyz uz kes lezi v pracovnim
-    adresari z drivejska, pouzije se ta - at o ni nikdo neprijde.
-    """
-    if os.path.exists(CACHE_JMENO):
-        return CACHE_JMENO
+def _adresar_kese():
+    """Adresar pro kes v profilu uzivatele (bez vytvareni)."""
     domov = os.path.expanduser("~")
     if sys.platform == "win32":
         zaklad = os.environ.get("LOCALAPPDATA") or domov
@@ -143,13 +142,38 @@ def vychozi_cache():
         zaklad = os.path.join(domov, "Library", "Caches")
     else:
         zaklad = os.environ.get("XDG_CACHE_HOME") or os.path.join(domov, ".cache")
-    adresar = os.path.join(zaklad, "dodavatele")
+    return os.path.join(zaklad, "dodavatele")
+
+
+def vychozi_cache():
+    """
+    Kde drzet kes: pevne v profilu uzivatele (%LOCALAPPDATA%, ~/Library/Caches,
+    ~/.cache). Driv to byla relativni cesta ".dodavatele_cache.json.gz" resena
+    proti pracovnimu adresari - u zabalene appky spustene dvojklikem je ten
+    nepredvidatelny (na macOS dokonce korenovy adresar, kam se zapsat neda),
+    takze se kes tise neulozila.
+
+    Nasledna oprava davala prednost kesi lezici v pracovnim adresari, cimz ale
+    umisteni zase zaviselo na tom, odkud se program spusti: z projektoveho
+    adresare se pouzila jedna kes, po dvojkliku na appku druha, a beh, ktery
+    "uz jednou probehl", stahoval vsechno znovu. Ted je misto jedno jedine
+    a stara kes z pracovniho adresare se do nej jednorazove prekopiruje
+    (jen kdyz v profilu jeste zadna neni - at se necim starym neprepise ta,
+    do ktere se aktualne pise).
+    """
     try:
+        adresar = _adresar_kese()
         os.makedirs(adresar, exist_ok=True)
-        return os.path.join(adresar, CACHE_JMENO)
     except OSError:
         # Nezapisovatelny profil - at to radeji bezi bez kese nez spadne.
         return CACHE_JMENO
+    cil = os.path.join(adresar, CACHE_JMENO)
+    if not os.path.exists(cil) and os.path.exists(CACHE_JMENO):
+        try:
+            shutil.copyfile(CACHE_JMENO, cil)
+        except OSError:
+            return CACHE_JMENO
+    return cil
 
 
 class Klient:
@@ -159,16 +183,25 @@ class Klient:
         self.timeout = timeout
         self.ua = ua
         self._zamek = threading.Lock()
+        self._zamek_zapisu = threading.Lock()   # serializuje zapisy kese na disk
         self._posledni = {}
         self._cache_soubor = cache_soubor
         self._cache = {}
         self._zmenena = False
+        self._od_zapisu = 0     # novych odpovedi od posledniho ulozeni kese
+        self._cas_zapisu = time.monotonic()
+        self.z_kese = 0         # statistika behu: odpovedi vzatych z kese
+        self.stazeno = 0        # statistika behu: odpovedi stazenych ze site
         self._obnova = threading.local()   # viz zapni_obnovu/vypni_obnovu
         if cache_soubor and os.path.exists(cache_soubor):
             try:
                 with self._otevri(cache_soubor, "rt") as f:
                     self._cache = json.load(f)
-            except Exception:
+            except Exception as e:
+                # Poskozenou kes zahodime, ale potichu ne - jinak se jen
+                # zahadne kazdy beh vleze stejne dlouho jako ten prvni.
+                print("Kes %s se nepodarilo nacist (%s), zaklada se nova."
+                      % (cache_soubor, e), file=sys.stderr)
                 self._cache = {}
 
     def _otevri(self, cesta, rezim):
@@ -212,6 +245,7 @@ class Klient:
         if not getattr(self._obnova, "aktivni", False):
             with self._zamek:
                 if klic in self._cache:
+                    self.z_kese += 1
                     return self._cache[klic]
 
         h = {"User-Agent": self.ua, "Accept": "application/json"}
@@ -237,6 +271,13 @@ class Klient:
                 with self._zamek:
                     self._cache[klic] = text
                     self._zmenena = True
+                    self.stazeno += 1
+                    self._od_zapisu += 1
+                    ulozit = (self._od_zapisu >= PRUBEZNY_ZAPIS_PO
+                              and time.monotonic() - self._cas_zapisu
+                              >= PRUBEZNY_ZAPIS_ODSTUP)
+                if ulozit:
+                    self.uloz_cache()
                 return text
             except urllib.error.HTTPError as e:
                 posledni_chyba = RuntimeError("HTTP %s" % e.code)
@@ -268,11 +309,39 @@ class Klient:
             self._cache.pop(klic, None)
 
     def uloz_cache(self):
-        if self._cache_soubor and self._zmenena:
-            tmp = self._cache_soubor + ".tmp"
-            with self._otevri(tmp, "wt") as f:
-                json.dump(self._cache, f, ensure_ascii=False)
-            os.replace(tmp, self._cache_soubor)
+        """
+        Zapise kes na disk. Vola se nejen na konci behu, ale i prubezne
+        (viz PRUBEZNY_ZAPIS_PO), takze musi snest soubezne dotazy ostatnich
+        vlaken - obsah se proto pod zamkem zkopiruje (jen reference na
+        retezce, levne) a serializuje se az kopie, jinak by json.dump padal
+        na "dictionary changed size during iteration".
+        """
+        if not self._cache_soubor:
+            return
+        with self._zamek:
+            if not self._zmenena:
+                return
+            data = dict(self._cache)
+            self._zmenena = False
+            self._od_zapisu = 0
+            self._cas_zapisu = time.monotonic()
+        tmp = self._cache_soubor + ".tmp"
+        with self._zamek_zapisu:
+            try:
+                with self._otevri(tmp, "wt") as f:
+                    json.dump(data, f, ensure_ascii=False)
+                os.replace(tmp, self._cache_soubor)
+            except OSError as e:
+                # Kes je jen zrychleni - neulozena at beh nezabije. Ale at
+                # o tom uzivatel vi, jinak jen zahadne kazdy beh trva stejne.
+                print("Kes se nepodarilo ulozit do %s: %s"
+                      % (self._cache_soubor, e), file=sys.stderr)
+                with self._zamek:
+                    self._zmenena = True   # zkusit to znovu pri dalsim zapisu
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
 
 
 # ---------------------------------------------------------------------------
@@ -2712,8 +2781,11 @@ def main(argv=None):
                    help="nepřekládat kódy GLEIF (rejstřík, právní forma) na text - rychlejší")
     p.add_argument("--bez-edgar", action="store_true")
     p.add_argument("--bez-wikidata", action="store_true")
-    p.add_argument("--cache", default=None,
-                   help="soubor s kesi odpovedi (prazdny retezec = bez kese)")
+    p.add_argument("--cache", default=None, metavar="SOUBOR",
+                   help="vlastni soubor s kesi odpovedi (vychozi: v profilu uzivatele)")
+    p.add_argument("--no-cache", "--bez-kese", dest="bez_kese", action="store_true",
+                   help="nepouzivat kes - kazdy dotaz jde znovu do rejstriku "
+                        "(a nic se neuklada)")
     p.add_argument("--obnovit-nenalezene", metavar="SOUBOR",
                    help="drivejsi vystup (bez --kompakt) - firmy, ktere v nem mely "
                         "stav NENALEZENO/OVERIT/CHYBA, se pro tento beh vynucene "
@@ -2774,6 +2846,12 @@ def main(argv=None):
         spustit(a)
     except RuntimeError as e:
         sys.exit(str(e))
+    except KeyboardInterrupt:
+        # Kes uz je ulozena (viz spustit) - at je videt, ze prerusenim
+        # se stazene odpovedi neztratily a dalsi beh na ne navaze.
+        print("\nPreruseno. Stazene odpovedi zustaly v kesi, dalsi beh na ne navaze.",
+              file=sys.stderr)
+        return 130
     return 0
 
 
@@ -2799,8 +2877,14 @@ def spustit(a, na_radek=None):
         raise RuntimeError("Ve vstupu %s nejsou zadne pouzitelne radky." % a.vstup)
     print("Nacteno %d radku z %s" % (len(radky), a.vstup), file=sys.stderr)
 
-    klient = Klient(cache_soubor=(a.cache if a.cache is not None else vychozi_cache()) or None,
-                    prodleva=a.prodleva, ua=a.ua)
+    if getattr(a, "bez_kese", False):
+        cesta_kese = None
+    else:
+        # --cache "" znamena tez "bez kese" (drivejsi zpusob, nez pribylo
+        # --no-cache); None = neurceno, tedy vychozi misto v profilu.
+        cesta_kese = (a.cache if a.cache is not None else vychozi_cache()) or None
+    print("Kes: %s" % (cesta_kese or "vypnuta"), file=sys.stderr)
+    klient = Klient(cache_soubor=cesta_kese, prodleva=a.prodleva, ua=a.ua)
     n = {"pocet": a.pocet, "prah_ok": a.prah_ok, "prah_overit": a.prah_overit,
          "vies": a.vies, "bez_ares": a.bez_ares, "bez_sk": a.bez_sk,
          "bez_fr": a.bez_fr,
@@ -2839,10 +2923,13 @@ def spustit(a, na_radek=None):
                 na_radek(hotovo[0], len(radky), z)
         return z
 
-    with ThreadPoolExecutor(max_workers=max(1, a.workers)) as ex:
-        zaznamy = list(ex.map(uloha, radky))
-
-    klient.uloz_cache()
+    # Kes se uklada i kdyz beh spadne nebo ho uzivatel prerusi - jinak by
+    # hodiny stahovani prisly vnivec a dalsi pokus by zacinal od nuly.
+    try:
+        with ThreadPoolExecutor(max_workers=max(1, a.workers)) as ex:
+            zaznamy = list(ex.map(uloha, radky))
+    finally:
+        klient.uloz_cache()
 
     if a.llm_mapa:
         mapa_llm = {}
@@ -2878,6 +2965,7 @@ def spustit(a, na_radek=None):
         souhrn[z.stav] = souhrn.get(z.stav, 0) + 1
     print("\nHotovo -> %s" % a.vystup, file=sys.stderr)
     print("Souhrn: " + ", ".join("%s=%d" % kv for kv in sorted(souhrn.items())), file=sys.stderr)
+    print("Dotazy: %d z kese, %d stazeno" % (klient.z_kese, klient.stazeno), file=sys.stderr)
     nezarazeno = [z for z in zaznamy if z.kod_kategorie == taxonomie.VYCHOZI_KOD]
     if nezarazeno:
         print("Bez kategorie (%d): %s" % (

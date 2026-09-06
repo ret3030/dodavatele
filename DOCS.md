@@ -849,7 +849,10 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
                         viz "Skutečný NACE ve Švédsku/Finsku/Pobaltí"
                         (nebo proměnná prostředí SCORIS_API_KEY)
 --bez-gleif-popisy      nepřekládat kódy GLEIF (rejstřík, právní forma) na text - rychlejší
---cache SOUBOR          keš odpovědí (výchozí: v profilu uživatele, viz Poznámky k provozu)
+--cache SOUBOR          vlastní soubor s keší (výchozí: v profilu uživatele,
+                        viz Poznámky k provozu)
+--no-cache              nepoužívat keš – každý dotaz jde znovu do rejstříku
+                        (a nic se neukládá); alias --bez-kese
 --obnovit-nenalezene SOUBOR   dřívější výstup (bez --kompakt) - firmy s minulým
                         stavem NENALEZENO/OVERIT/CHYBA se vynuceně znovu
                         dotáží (obejde keš jen pro ně), viz "Poznámky k provozu"
@@ -870,11 +873,17 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
 
 * **Keš** se ukládá do profilu uživatele — `%LOCALAPPDATA%\dodavatele\`
   na Windows, `~/Library/Caches/dodavatele/` na macOS, `~/.cache/dodavatele/`
-  na Linuxu. Dřív to byla relativní cesta vedle spuštěného souboru, jenže
-  u appky spuštěné dvojklikem je pracovní adresář nepředvídatelný (na macOS
-  kořenový, kam se zapsat nedá) — keš se pak tiše neuložila a každý běh znovu
-  čekal na dotazy do zahraničních rejstříků. Leží-li keš v pracovním adresáři
-  z dřívějška, použije se přednostně. Vlastní cestu určí `--cache`.
+  na Linuxu. Místo je jedno jediné, nezávislé na tom, odkud se program spustí:
+  dřív se dávala přednost keši ležící v pracovním adresáři, takže z projektového
+  adresáře se použila jedna keš a po dvojkliku na appku druhá — běh, který „už
+  jednou proběhl“, stahoval všechno znovu. Starou keš z pracovního adresáře
+  program jednorázově překopíruje do profilu (jen když tam ještě žádná není).
+  Cestu ke keši vypisuje na začátku běhu, na konci pak `Dotazy: N z keše,
+  M staženo`. Vlastní cestu určí `--cache`, úplné vypnutí `--no-cache`.
+* **Keš se ukládá i průběžně** (po 200 nových odpovědích, nejvýš jednou za
+  30 s) a vždy při ukončení běhu, včetně přerušení Ctrl+C nebo chyby. Dřív se
+  zapisovala až po dokončení celého seznamu, takže přerušený běh zahodil úplně
+  vše stažené a další pokus začínal od nuly.
 * **Keš** drží odpovědi rejstříků, takže opakovaný
   běh nad stejným seznamem je téměř okamžitý. Je trvalá – i výsledek "nic
   nenalezeno" zůstává uložený navždy, dokud keš nesmažete, takže firma, která

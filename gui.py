@@ -149,6 +149,7 @@ def vychozi_argumenty():
         vies=False, bez_ares=False, bez_sk=False, bez_fr=False,
         bez_gleif=False, bez_gleif_popisy=False, bez_edgar=False,
         bez_wikidata=False, cache=None,   # None = d.vychozi_cache(), viz nize
+        bez_kese=False,
         obnovit_nenalezene=None, taxonomy=None, ua=d.UA,
     )
 
