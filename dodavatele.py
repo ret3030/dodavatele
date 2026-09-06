@@ -2941,7 +2941,14 @@ def zapis_vystup(zaznamy, cesta, oddelovac=";", kompakt=False, jen_id=False,
     if jen_id:
         sloupce = SLOUPCE_ID
     else:
-        sloupce = SLOUPCE_ZAKLAD + ([] if kompakt else SLOUPCE_DOPLNKY)
+        # Doplnkove sloupce, ktere jsou prazdne u VSECH firem, se do vystupu
+        # nedavaji - jen by ho rozsirovaly o prazdno. Typicky "NACE (LLM)",
+        # "Kategorie (LLM)" a "Cinnost (LLM)", ktere se plni az po --llm-mapa,
+        # nebo "DIC overeno (VIES)" bez prepinace --vies. Zakladni sloupce
+        # zustavaji vzdy, aby mel vystup stabilni tvar.
+        doplnky = [(k, n) for k, n in SLOUPCE_DOPLNKY
+                   if any(str(getattr(z, k, "") or "").strip() for z in zaznamy)]
+        sloupce = SLOUPCE_ZAKLAD + ([] if kompakt else doplnky)
     hlavicka = [n for _, n in sloupce]
     radky = [[getattr(z, k, "") or "" for k, _ in sloupce] for z in zaznamy]
 

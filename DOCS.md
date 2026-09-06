@@ -96,6 +96,13 @@ pro kontrolu (`--kompakt` je vypne):
 * **Klasifikace (US NAICS)** – u amerických dodavatelů severoamerická obdoba
   NACE (NACE se u USA jen odhaduje pro účely vlastní taxonomie).
 
+Sloupce, které jsou prázdné u **všech** firem, se do výstupu nedávají — jen
+by ho rozšiřovaly o prázdno. Typicky **NACE (LLM)**, **Kategorie (LLM)**
+a **Činnost (LLM)**, které se plní až po `--llm-mapa`, nebo **DIČ ověřeno
+(VIES)** bez přepínače `--vies`. Jakmile mají čím být naplněné, objeví se
+samy. Základní sloupce (Jméno až Kategorie dodavatele) zůstávají vždy, aby
+měl výstup stabilní tvar.
+
 XLSX má druhý list **Číselník kategorií** s celou taxonomií a počtem
 dodavatelů v každé kategorii, a třetí list **Číselník NACE** s **kompletní
 nomenklaturou** - 86 divizí, 286 skupin a 650 tříd NACE Rev. 2.1 plus 132
