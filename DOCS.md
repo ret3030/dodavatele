@@ -80,7 +80,7 @@ pro kontrolu (`--kompakt` je vypne):
 * **Registrační číslo / Rejstřík** – u zahraničních firem národní registrační
   číslo (obdoba IČO, např. `HRB 719915` u Německa, `1803-01-018771` u Japonska)
   a jméno rejstříku, u kterého je vedeno.
-* **NACE (všechny)** – všechny zapsané obory dané firmy z rejstříku
+* **NACE** – všechny zapsané obory dané firmy z rejstříku
   (čárkou oddělený seznam kódů) – jediný sloupec s NACE ve výstupu; z něj
   se interně vybírá kód pro automatické zařazení do kategorie (viz
   "Taxonomie kategorií" níže), samotný "vybraný hlavní kód" se ale
@@ -194,7 +194,7 @@ věstníku.
 
 #### Firma má víc oborů podnikání a kategorie nesedí
 
-Kategorie se vždycky počítá z **jednoho** kódu (sloupec **NACE (všechny)** je
+Kategorie se vždycky počítá z **jednoho** kódu (sloupec **NACE** je
 jen informativní). Který to je, závisí na rejstříku:
 
 | Zdroj | Hlavní NACE |
@@ -278,7 +278,7 @@ ukázalo, že i tenhle údaj bývá formální nebo zastaralý.
 
 Když je zapsaný kód obecný nebo formální (`6820` pronájem nemovitostí, `7010`
 sídlo podniku), nástroj ho nepřehazuje za jiný ani nehádá z názvu firmy —
-doplní upozornění do **Poznámky** a odkáže na sloupec **NACE (všechny)**.
+doplní upozornění do **Poznámky** a odkáže na sloupec **NACE**.
 Je-li to jediný zapsaný kód, řádek dostane stav `OVERIT`. Do exportu pro LLM
 chat jde stejně jako všechny ostatní firmy (viz níže).
 
@@ -413,7 +413,7 @@ python3 -c "import taxonomie; print(sorted(taxonomie.nedosazitelne_kategorie()))
 
 ### Co je vidět ve výstupu
 
-Zapsané obory z rejstříku (**NACE (všechny)**) zůstávají beze změny — návrh
+Zapsané obory z rejstříku (sloupec **NACE**) zůstávají beze změny — návrh
 z chatu je nepřepisuje. Mění se jen **Kód kategorie** a **Kategorie
 dodavatele**, a proč, řekne sloupec **Zařazeno podle**:
 
@@ -456,7 +456,7 @@ python3 dodavatele.py --komparace vystup_s_kolegovym_sloupcem.xlsx \
     --komparace-sloupec "Kolegův NACE"
 ```
 
-Ukázkový soubor `vzor_komparace.csv` (sloupce `Jméno;Země;NACE (všechny);Komparace`)
+Ukázkový soubor `vzor_komparace.csv` (sloupce `Jméno;Země;NACE;Komparace`)
 demonstruje typický výsledek – kolegův/AI odhad se často trefí jen na
 hrubou kategorii nebo úplně mine:
 

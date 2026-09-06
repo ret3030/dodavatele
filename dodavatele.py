@@ -2576,6 +2576,7 @@ def nacti_vstup(cesta, sloupec_nazvu=None):
 SLOUPCE_ZAKLAD = [
     ("jmeno", "Jméno"), ("ulice", "Ulice"), ("psc", "PSČ"), ("mesto", "Město"),
     ("zeme", "Země"), ("ico", "IČO"), ("dic", "DIČ"),
+    ("nace_vse", "NACE"),
     ("kod_kategorie", "Kód kategorie"), ("skupina", "Skupina"),
     ("kategorie", "Kategorie dodavatele"),
 ]
@@ -2584,7 +2585,7 @@ SLOUPCE_DOPLNKY = [
     ("stav", "Stav"), ("hledany_nazev", "Hledaný název"), ("region", "Region"),
     ("lei", "LEI"), ("reg_cislo", "Registrační číslo"), ("reg_rejstrik", "Rejstřík"),
     ("pravni_forma", "Právní forma"), ("datum_vzniku", "Datum vzniku"),
-    ("dic_overeno", "DIČ ověřeno (VIES)"), ("nace_vse", "NACE (všechny)"),
+    ("dic_overeno", "DIČ ověřeno (VIES)"),
     ("nace_zdroj", "NACE - zdroj"),
     ("klasifikace", "Klasifikace (US NAICS)"),
     ("odkaz", "Odkaz na rejstřík"), ("poznamka", "Poznámka"),
@@ -2607,7 +2608,7 @@ SIRKY = {"Jméno": 40, "Ulice": 30, "PSČ": 9, "Město": 20, "Země": 7, "IČO":
          "Registrační číslo": 18, "Rejstřík": 20, "Právní forma": 14,
          "NACE - zdroj": 22, "Zařazeno podle": 46,
          "Klasifikace (US NAICS)": 34,
-         "Datum vzniku": 13, "DIČ ověřeno (VIES)": 16, "NACE (všechny)": 30,
+         "Datum vzniku": 13, "DIČ ověřeno (VIES)": 16, "NACE": 30,
          "Odkaz na rejstřík": 46, "Poznámka": 70,
          "Název": 34, "Nalezené jméno": 34, "Typ čísla / rejstřík": 20,
          "Shoda NACE (divize)": 20}
@@ -3164,7 +3165,7 @@ def zaznamy_z_vystupu(cesta):
     mapa = {
         "jmeno": "Jméno", "hledany_nazev": "Hledaný název", "zeme": "Země",
         "ulice": "Ulice", "psc": "PSČ", "mesto": "Město",
-        "nace_vse": "NACE (všechny)", "nace": "NACE", "kod_kategorie": "Kód kategorie",
+        "nace_vse": "NACE", "kod_kategorie": "Kód kategorie",
     }
     indexy = {}
     for atribut, nazev in mapa.items():
@@ -3187,7 +3188,7 @@ def zaznamy_z_vystupu(cesta):
     return zaznamy
 
 
-def zpracuj_komparaci(cesta_vstup, sloupec_kolega, cesta_vystup, sloupec_nas="NACE (všechny)"):
+def zpracuj_komparaci(cesta_vstup, sloupec_kolega, cesta_vystup, sloupec_nas="NACE"):
     """
     Porovna nas sloupec NACE se sloupcem, ktery do jiz vygenerovaneho vystupu
     pridal nekdo dalsi (napr. rucni/AI doplneni od kolegy) - radky se berou
@@ -3334,8 +3335,8 @@ def main(argv=None):
                         "vyzaduje --komparace-sloupec, jen porovna a skonci")
     p.add_argument("--komparace-sloupec", metavar="NAZEV",
                    help="nazev sloupce v --komparace souboru s porovnavanym NACE kodem")
-    p.add_argument("--komparace-nas-sloupec", metavar="NAZEV", default="NACE (všechny)",
-                   help="nazev naseho sloupce s NACE kodem (vychozi: NACE (všechny))")
+    p.add_argument("--komparace-nas-sloupec", metavar="NAZEV", default="NACE",
+                   help="nazev naseho sloupce s NACE kodem (vychozi: NACE)")
     p.add_argument("--komparace-vystup", metavar="SOUBOR",
                    help="kam zapsat vysledek komparace (vychozi: <--komparace>_komparace.<pripona>)")
     p.add_argument("--ua", default=UA, help="hlavicka User-Agent (SEC vyzaduje kontakt)")
