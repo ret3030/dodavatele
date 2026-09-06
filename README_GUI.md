@@ -52,7 +52,7 @@ proto GitHub Actions workflow běží zvlášť na `windows-latest` a
 Stejná logika jako CLI (`dodavatele.py spustit()`), jen s okny místo
 přepínačů:
 
-* tlačítko **? Nápověda** - vysvětlí kolegovi bez čtení dokumentace, co appka
+* tlačítko **?** v pravém dolním rohu - vysvětlí kolegovi bez čtení dokumentace, co appka
   dělá, jaký čeká vstupní soubor a co znamenají sloupce Stav a Kategorie
   ve výstupu,
 * výběr vstupního/výstupního souboru,

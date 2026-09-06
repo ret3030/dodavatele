@@ -241,18 +241,20 @@ class Aplikace:
         self.tlacitko_otevrit = ttk.Button(
             ramec_beh, text="Otevřít výstup", command=self._otevri_vystup, state="disabled")
         self.tlacitko_otevrit.pack(side=LEFT, padx=(8, 0))
-        # Napoveda vpravo: pack(side=RIGHT) pred progress barem, jinak by ji
-        # roztazeny progress vytlacil mimo okno.
-        ttk.Button(ramec_beh, text="? Nápověda",
-                   command=self._napoveda, width=12).pack(side=RIGHT, padx=(8, 0))
         self.progress = ttk.Progressbar(ramec_beh, mode="determinate")
         self.progress.pack(side=LEFT, fill=X, expand=True, padx=(10, 0))
 
+        # Spodni radek: credits uprostred, male "?" v pravem rohu. Tlacitko se
+        # pakuje jako prvni (side=RIGHT), aby ho roztazeny popisek nevytlacil.
+        ramec_dole = ttk.Frame(self.root)
+        ramec_dole.pack(side="bottom", fill=X, pady=(0, 4))
+        ttk.Button(ramec_dole, text="?", width=3,
+                   command=self._napoveda).pack(side=RIGHT, padx=(4, 8))
         ttk.Label(
-            self.root, text="EY s.r.o., IČO 26705338 — vytvořil Robert Plevač "
-                            "(robert.plevac@cz.ey.com)",
+            ramec_dole, text="EY s.r.o., IČO 26705338 — vytvořil Robert Plevač "
+                             "(robert.plevac@cz.ey.com)",
             foreground="#888", anchor="center",
-        ).pack(side="bottom", fill=X, pady=(0, 4))
+        ).pack(side=LEFT, fill=X, expand=True)
 
         ramec_log = ttk.LabelFrame(self.root, text="Průběh")
         ramec_log.pack(fill=BOTH, expand=True, **pad)
