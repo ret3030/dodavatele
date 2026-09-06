@@ -112,6 +112,13 @@ udělal náš text, který už nejde ověřit proti zdroji. Nomenklatura je
 v `nace_nomenklatura.py`, generovaná z Eurostat SDMX (codelisty
 `ESTAT/NACE_R2_1` a `ESTAT/NACE_R2`); URL je uvedená v hlavičce souboru.
 
+U firmy, kterou se nepovede najít (`NENALEZENO`), zůstanou ve výstupu
+**údaje ze vstupu** — název, IČO, DIČ, země i adresa, pokud jste je zadali.
+Řádek tak jde porovnat s původním seznamem a opravit v něm překlep, místo aby
+byl skoro prázdný. Když se firma najde, platí údaje z rejstříku i tehdy, když
+se od zadaných liší — právě rozdíl v adrese bývá důvod, proč hledání
+napoprvé selhalo, a je vidět ve sloupci **Stav** jako `OVERIT`.
+
 ### Sloupec „Stav“
 
 | stav | význam |

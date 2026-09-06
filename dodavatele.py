@@ -2319,9 +2319,18 @@ def zpracuj_radek(vstup, klient, n):
             z.stav = STAV_CHYBA
             poznamky.append("prazdny radek vstupu")
 
+        # Udaje ze vstupu se doplni tam, kde je rejstrik nedal - typicky
+        # u nenalezene firmy, kde by jinak radek ve vystupu zustal skoro
+        # prazdny a nesel by porovnat s puvodnim seznamem. Prepsat rejstrikovy
+        # udaj vstupnim se ale nesmi: kdyz firmu najdeme, plati adresa
+        # z rejstriku, i kdyz se od zadane lisi (prave to je casto duvod,
+        # proc se hledani nepovedlo napoprve).
         z.ico = z.ico or ico
         z.dic = z.dic or dic
         z.zeme = z.zeme or zeme
+        z.ulice = z.ulice or hledana_adresa["ulice"]
+        z.psc = z.psc or hledana_adresa["psc"]
+        z.mesto = z.mesto or hledana_adresa["mesto"]
 
         # 3) upresneni oboru cinnosti
         if z.stav != STAV_NENALEZENO and not n["bez_ares"]:
