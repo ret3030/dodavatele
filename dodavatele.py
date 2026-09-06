@@ -2045,6 +2045,7 @@ SLOUPCE_ZAKLAD = [
     ("popis", "Popis činnosti"),
 ]
 SLOUPCE_DOPLNKY = [
+    ("nace_zdroj", "NACE - zdroj"),
     ("lei", "LEI"), ("reg_cislo", "Registrační číslo"), ("reg_rejstrik", "Rejstřík"),
     ("pravni_forma", "Právní forma"), ("datum_vzniku", "Datum vzniku"),
     ("odkaz", "Odkaz na rejstřík"), ("poznamka", "Poznámka"),
@@ -2052,7 +2053,7 @@ SLOUPCE_DOPLNKY = [
 
 SIRKY = {"Jméno": 40, "Ulice": 30, "PSČ": 9, "Město": 20, "Země": 7, "IČO": 12, "DIČ": 15,
          "Kód kategorie": 13, "Kategorie dodavatele": 42, "Popis činnosti": 46,
-         "Zdroj dat": 12, "Stav": 12, "LEI": 22,
+         "Zdroj dat": 12, "Stav": 12, "LEI": 22, "NACE - zdroj": 22,
          "Registrační číslo": 18, "Rejstřík": 20, "Právní forma": 14,
          "Datum vzniku": 13, "NACE": 30, "Odkaz na rejstřík": 46, "Poznámka": 70}
 
@@ -2084,15 +2085,19 @@ def zapis_export_llm(zaznamy, cesta, davka=None):
 
     def obsah(davka_zaznamu):
         radky = [
-            "Pro kazdou z firem nize urci (1) kod kategorie z ciselniku nize "
-            "a (2) strucny popis, co firma skutecne dodava. U kazde firmy je "
-            "v hranate zavorce seznam JEJICH NACE kodu zapsanych v obchodnim "
-            "rejstriku - ber je jako hlavni napovedu, ale rejstrik casto vede "
-            "jen zastaraly nebo formalni udaj (firma delajici 3D tisk muze "
-            "mit zapsany 'maloobchod pres internet'), takze pouzij i vlastni "
-            "znalosti o firme (nazev casto napovi, o jakou firmu jde). Pokud "
-            "si nejsi jisty/a nebo o firme nic nenajdes, napis misto kodu "
-            "'neznamo' - chybejici udaj je lepsi nez neopodstatneny odhad.",
+            "Pro kazdou z firem nize urci (1) NACE kod skutecne hlavni cinnosti, "
+            "(2) kod kategorie z ciselniku nize a (3) strucny popis, co firma "
+            "skutecne dodava. U kazde firmy je v hranate zavorce seznam JEJICH "
+            "NACE kodu zapsanych v obchodnim rejstriku, pokud je rejstrik uvadi - "
+            "ber je jako hlavni napovedu pro NACE odpoved (bud jeden z nich "
+            "potvrd, nebo navrhni presnejsi, pokud zjevne neodpovida skutecne "
+            "cinnosti; rejstrik casto vede jen zastaraly nebo formalni udaj, "
+            "napr. 'maloobchod pres internet' u firmy delajici 3D tisk). "
+            "U firem OZNACENYCH '[bez zapsaneho oboru]' NACE navrhni cele sam "
+            "podle vlastnich znalosti o firme (nazev casto napovi, o jakou "
+            "firmu jde). Pokud si u NACE ani kategorie nejsi jisty/a nebo "
+            "o firme nic nenajdes, napis misto kodu 'neznamo' - chybejici udaj "
+            "je lepsi nez neopodstatneny odhad.",
             "",
             "ČÍSELNÍK KATEGORIÍ:",
         ]
@@ -2117,11 +2122,11 @@ def zapis_export_llm(zaznamy, cesta, davka=None):
             "",
             "Odpověz přesně v tomto formátu, jeden řádek na firmu, oddělovač ';', "
             "beze změny pořadí a bez dalšího textu okolo:",
-            "Původní název;Kód kategorie;Čím se firma zabývá",
+            "Původní název;NACE kód;Kód kategorie;Čím se firma zabývá",
             "",
             "Poslední sloupec napiš vlastními slovy (pár slov až věta) - slouží "
-            "ke kontrole, aby šlo posoudit, jestli kategorie sedí, aniž by to "
-            "musel někdo dohledávat znovu.",
+            "ke kontrole, aby šlo posoudit, jestli NACE a kategorie sedí, aniž "
+            "by to musel někdo dohledávat znovu.",
         ]
         return "\n".join(radky)
 
@@ -2171,13 +2176,15 @@ def _zapis_davky(cesta, davky, obsah_davky):
     return cesty
 
 
+_NACE_KOD_RE = re.compile(r"\b\d{2,6}(?:\.\d+)?\b")
 _KATEGORIE_KOD_RE = re.compile(r"\b[A-Z]{2,4}-\d{2}\b")
 
 
 def nacti_llm_odpovedi(cesta):
     """
-    Nacte odpoved z LLM chatu (Nazev;Kod kategorie;Popis - viz zapis_export_llm)
-    zpet. Vraci {klic nazvu: {"kategorie": kod, "popis": text}}.
+    Nacte odpoved z LLM chatu (Nazev;NACE kod;Kod kategorie;Popis - viz
+    zapis_export_llm) zpet. Vraci {klic nazvu: {"nace": kod, "kategorie": kod,
+    "popis": text}}.
     """
     mapa = {}
     with open(cesta, encoding="utf-8-sig", newline="") as f:
@@ -2202,18 +2209,30 @@ def nacti_llm_odpovedi(cesta):
             if len(radek) < 2:
                 continue
             nazev = radek[0].strip()
-            kod_kat = _kategorie_z_pole(radek[1] if len(radek) > 1 else "")
-            popis = radek[2].strip() if len(radek) > 2 else ""
+            kod_nace = _nace_z_pole(radek[1] if len(radek) > 1 else "")
+            kod_kat = _kategorie_z_pole(radek[2] if len(radek) > 2 else "")
+            popis = radek[3].strip() if len(radek) > 3 else ""
             if not kod_kat:
                 # Kod kategorie se nenasel na ocekavane pozici (LLM format
-                # nedodrzelo) - zkusi se najit kdekoli ve zbytku radku.
-                kod_kat = _kategorie_z_pole(" ".join(radek[1:]))
-            if not nazev or not (kod_kat or popis):
+                # nedodrzelo) - zkusi se najit kdekoli ve zbytku radku. Kod
+                # kategorie se vyjme jako prvni, jinak by jeho koncove cislice
+                # (napr. "PRO-03") zamotaly hledani NACE.
+                zbytek = " ".join(radek[1:])
+                kod_kat = _kategorie_z_pole(zbytek)
+                if not kod_nace:
+                    kod_nace = _nace_z_pole(_KATEGORIE_KOD_RE.sub(" ", zbytek))
+            if not nazev or not (kod_nace or kod_kat or popis):
                 continue
             klic = normalizuj_nazev(nazev)
             if klic:
-                mapa[klic] = {"kategorie": kod_kat, "popis": popis}
+                mapa[klic] = {"nace": kod_nace, "kategorie": kod_kat, "popis": popis}
     return mapa
+
+
+def _nace_z_pole(text):
+    """Prvni rozpoznatelny NACE kod v poli, jen cislice ('62.01' -> '6201')."""
+    shoda = _NACE_KOD_RE.search(text or "")
+    return re.sub(r"\D", "", shoda.group()) if shoda else ""
 
 
 def _kategorie_z_pole(text):
@@ -2225,12 +2244,14 @@ def _kategorie_z_pole(text):
 
 def pouzij_llm_mapu(zaznamy, mapa):
     """
-    Aplikuje odpoved z LLM chatu (viz zapis_export_llm) na zaznamy - kod
-    kategorie a popis cinnosti se prevezmou primo, beze srovnavani s NACE:
-    o zarazeni uz rozhodl LLM, ktery pri tom mel NACE kody z rejstriku
-    k dispozici (viz prompt v zapis_export_llm). Prepisuje se KAZDA firma,
-    pro kterou mapa obsahuje odpoved - i ta, ktera uz kategorii/popis mela
-    ze predchoziho behu v chatu.
+    Aplikuje odpoved z LLM chatu (viz zapis_export_llm) na zaznamy.
+
+    Kod kategorie a popis cinnosti se prevezmou vzdy, kdyz je mapa obsahuje -
+    i pro firmu, ktera uz je mela z predchoziho behu v chatu. NACE od LLM se
+    naopak pouzije JEN tam, kde firma dosud zadny NACE nema (nenasel se
+    v zadnem rejstriku) - skutecny udaj z rejstriku se nikdy neprepisuje
+    odhadem. Takovy NACE se oznaci ve sloupci "NACE - zdroj" jako odhad LLM,
+    ne rejstrikovy fakt.
 
     Vraci pocet zmenenych zaznamu.
     """
@@ -2242,13 +2263,27 @@ def pouzij_llm_mapu(zaznamy, mapa):
         odpoved = mapa.get(klic)
         if not odpoved:
             continue
+        kod_nace = odpoved.get("nace", "")
         kod_kat, popis = odpoved.get("kategorie", ""), odpoved.get("popis", "")
+        zmena = False
+        if kod_nace and not z.nace and not z.nace_vse:
+            # Sloupec "NACE" ve vystupu ctuze pole nace_vse (vsechny zname
+            # kody), ne nace (jen jeden "hlavni") - obe se proto musi
+            # nastavit spolu, jinak by odhad z LLM ve vystupu nebyl videt.
+            z.nace = kod_nace
+            z.nace_vse = kod_nace
+            z.nace_zdroj = "odhad LLM"
+            if not z.nace_popis:
+                z.nace_popis = nazev_nace(kod_nace)
+            zmena = True
         if kod_kat:
             skupina, nazev_kat = KATEGORIE[kod_kat]
             z.kod_kategorie, z.kategorie, z.skupina = kod_kat, nazev_kat, skupina
+            zmena = True
         if popis:
             z.popis = popis
-        if kod_kat or popis:
+            zmena = True
+        if zmena:
             zmeny += 1
     return zmeny
 

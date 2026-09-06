@@ -47,7 +47,10 @@ Přepínač `--help` vypíše všechny volby i s popisem.
 ## Zařazení přes LLM chat
 
 **Kód kategorie**, **Kategorie dodavatele** a **Popis činnosti** zůstávají
-prázdné, dokud je nedoplní tenhle krok:
+prázdné, dokud je nedoplní tenhle krok. U firem, kde se v žádném rejstříku
+nenašel žádný NACE kód, se navíc doplní i **NACE** – jako odhad LLM, ne
+rejstříkový údaj (rozlišuje to sloupec **NACE - zdroj**). Tam, kde NACE
+z rejstříku už je, se nikdy nepřepisuje.
 
 ```bash
 python3 dodavatele.py vstup.csv -o vystup.xlsx --export-llm firmy.txt
