@@ -74,8 +74,10 @@ rozbalení potřeba aplikaci poprvé spustit přes pravé tlačítko → Otevř�
 
 ```bash
 pip install pyinstaller openpyxl
-pyinstaller --onefile --windowed --name Dodavatele gui.py    # Windows - .exe
-pyinstaller --windowed --name Dodavatele gui.py               # macOS - .app
+# Windows - .exe
+pyinstaller --onefile --windowed --name Dodavatele --add-data "taxonomie_data.json;." gui.py
+# macOS - .app
+pyinstaller --windowed --name Dodavatele --add-data "taxonomie_data.json:." gui.py
 ```
 
 PyInstaller neumí sestavit aplikaci pro jinou platformu, než na které běží –

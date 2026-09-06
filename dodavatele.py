@@ -61,9 +61,15 @@ UA = "supplier-lookup/1.0 (kontakt: nakup@example.com)"
 #     promptu pro LLM
 # Cela tabulka je v JSON vedle skriptu (TAXONOMIE_JSON) - je to cisty
 # ciselnik, ne kod, tak nema smysl mit ho jako .py.
-# ---------------------------------------------------------------------------
-
-TAXONOMIE_JSON = os.path.join(os.path.dirname(os.path.abspath(__file__)), "taxonomie_data.json")
+#
+# Cesta se resi pres sys._MEIPASS, kdyz beh jede jako zabalena appka
+# (gui.py pres PyInstaller, viz .github/workflows/build-gui.yml) - PyInstaller
+# do baliku zahrne jen to, co pozna staticky (importy), takhle otevirany JSON
+# soubor ne. Musi se proto explicitne pridat pres --add-data a najit za behu
+# v docasnem adresari, kam PyInstaller balik rozbali, jinak by zabalena appka
+# hned pri startu spadla na FileNotFoundError.
+_ZAKLADNI_ADRESAR = getattr(sys, "_MEIPASS", os.path.dirname(os.path.abspath(__file__)))
+TAXONOMIE_JSON = os.path.join(_ZAKLADNI_ADRESAR, "taxonomie_data.json")
 
 with open(TAXONOMIE_JSON, encoding="utf-8") as _f:
     _tax = json.load(_f)
