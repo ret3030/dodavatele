@@ -2041,8 +2041,8 @@ SLOUPCE_ZAKLAD = [
     ("jmeno", "Jméno"), ("ulice", "Ulice"), ("psc", "PSČ"), ("mesto", "Město"),
     ("zeme", "Země"), ("ico", "IČO"), ("dic", "DIČ"),
     ("nace_vse", "NACE"), ("stav", "Stav"), ("zdroj", "Zdroj dat"),
-    ("kod_kategorie", "Kód kategorie"), ("kategorie", "Kategorie dodavatele"),
-    ("popis", "Popis činnosti"),
+    ("kod_kategorie", "Kód kategorie"), ("skupina", "Skupina"),
+    ("kategorie", "Kategorie dodavatele"), ("popis", "Popis činnosti"),
 ]
 SLOUPCE_DOPLNKY = [
     ("nace_zdroj", "NACE - zdroj"),
@@ -2052,7 +2052,7 @@ SLOUPCE_DOPLNKY = [
 ]
 
 SIRKY = {"Jméno": 40, "Ulice": 30, "PSČ": 9, "Město": 20, "Země": 7, "IČO": 12, "DIČ": 15,
-         "Kód kategorie": 13, "Kategorie dodavatele": 42, "Popis činnosti": 46,
+         "Kód kategorie": 13, "Skupina": 24, "Kategorie dodavatele": 42, "Popis činnosti": 46,
          "Zdroj dat": 12, "Stav": 12, "LEI": 22, "NACE - zdroj": 22,
          "Registrační číslo": 18, "Rejstřík": 20, "Právní forma": 14,
          "Datum vzniku": 13, "NACE": 30, "Odkaz na rejstřík": 46, "Poznámka": 70}
