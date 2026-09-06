@@ -31,10 +31,14 @@ Kód kategorie | Kategorie dodavatele` a kontrolní sloupce navíc (vč. NACE
 danému řádku věřit. XLSX má navíc dva přehledové listy s číselníkem kategorií
 a číselníkem NACE.
 
-Firmy, u kterých se obor činnosti nedohledá automaticky (viz Známé limity
-v [DOCS.md](DOCS.md)), skončí v `XXX-00 Nezařazeno` – **teprve pak** má smysl
-sáhnout po ručním zařazení přes LLM chat (`--export-nezarazene` /
-`--kategorie-mapa`, viz DOCS.md), ne dřív.
+Kategorie se z NACE určí jen tam, kde je to **jisté** — každý zapsaný obor
+firmy musí určovat kategorii a všechny musí vést na tutéž. Stačí jeden obecný
+nebo odporující si obor a zůstane `XXX-00 Nezařazeno` místo zavádějícího
+zařazení. Na reálných datech to znamená necelých 9 % dodavatelů; zbytek se
+záměrně nehádá.
+Skutečnou činnost doplní krok přes LLM chat (`--export-llm` / `--llm-mapa`,
+viz DOCS.md) – exportují se všichni dodavatelé, protože zapsaný obor říká, jak
+je firma zaregistrovaná, ne co dodává.
 
 ## Chcete víc?
 

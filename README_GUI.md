@@ -61,7 +61,7 @@ přepínačů:
 * průběžný log a souhrn po doběhnutí.
 
 Pokročilé přepínače (`--workers`, `--pocet`, `--prah-ok`, `--taxonomy`,
-`--komparace`, `--export-nezarazene`, `--obnovit-nenalezene`...) appka
+`--komparace`, `--export-llm`, `--obnovit-nenalezene`...) appka
 zatím nenabízí - na to pořád slouží CLI, viz [DOCS.md](DOCS.md). Appka je
 zamýšlená jako rychlá cesta pro běžné použití, ne náhrada CLI pro
 pokročilé scénáře.

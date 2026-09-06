@@ -417,45 +417,25 @@ class Zaznam:
     jmena: list = field(default_factory=list)      # dalsi nazvy (jine jazyky/prepisy)
     aktivni: bool = True
     kandidati: list = field(default_factory=list)
-    nace_nejisty: bool = False   # jediny zapsany NACE je obecny/podpurny kod - viz PODPURNE_NACE
-    nace_llm: str = ""           # NACE dohledany rucne/LLM (--export-nezarazene), pro srovnani
+    nace_nejisty: bool = False   # rejstrikem deklarovana hlavni cinnost kategorii neurcuje
+    nace_llm: str = ""           # NACE dohledany rucne/LLM (--llm-mapa), pro srovnani
+    kategorie_llm: str = ""      # kod kategorie primo od LLM - pro kategorie, kam NACE nedosahne
+    cinnost_llm: str = ""        # cim se firma podle LLM zabyva - duvod k zarazeni, ke kontrole
 
 
 # ---------------------------------------------------------------------------
 # ARES (Ceska republika)
 # ---------------------------------------------------------------------------
 
-# Cinnosti, ktere ma zapsanou temer kazda firma a hlavni obor neurcuji.
-# Kody podle CZ-NACE 2025 (viz komentar u ares_prevazujici_nace) - par
-# tridit se cislem oproti CZ-NACE 2008 presunulo, viz jednotlive zmeny nize.
-PODPURNE_NACE = {"00", "0000", "68", "682", "6820", "68200", "70", "7010", "7020",
-                 "74", "7499", "77", "82", "8299", "46", "461", "4619",
-                 "469", "4690", "47", "471", "4778", "4791", "4792", "52", "5210"}
+# Ktery zapsany obor co znamena, uz neresi zdejsi seznam, ale taxonomie.NACE_KATEGORIE. Drive tu byl PODPURNE_NACE (obecne kody, ktere
+# ma zapsane kdekdo) a vyber_hlavni_nace(), ktera z vice zapsanych oboru vybirala
+# jeden "hlavni" podle poradi v seznamu. Ten udaj ale z rejstriku neplynul -
+# firma zpravidla zadny hlavni obor deklarovany nema (Asseco Central Europe jich
+# ma v ARES 23), takze slo o nas dopocet vydavany za fakt. Zarazeni proto pracuje
+# s celou mnozinou kodu (taxonomie.zarad(kody=...)) a pole `nace` se plni jen
+# tam, kde hlavni cinnost deklaruje SAM rejstrik - ceske RES (prevazujici
+# cinnost), francouzsky NAF nebo Scoris, kde je kod od zacatku jen jeden.
 
-
-def _je_podpurny(kod):
-    """
-    ARES obcas dopluje kod nulami na delsi tvar (napr. trida "4690" jako
-    petimistne "46900") - kontroluje se i tohle prodlouzeni o nuly navic,
-    ne jen presna shoda. NEJDE o shodu podle libovolne predpony - kod
-    "7021" (PR agentura) nesmi spadnout pod obecne "70" jen proto, ze
-    zacina stejne, proto se kontroluje jen doplneni same nulami.
-    """
-    if kod in PODPURNE_NACE:
-        return True
-    return any(kod.startswith(p) and set(kod[len(p):]) <= {"0"}
-               for p in PODPURNE_NACE if len(p) < len(kod))
-
-
-def vyber_hlavni_nace(kody):
-    """
-    ARES vraci vsechny registrovane cinnosti bez oznaceni hlavni. Bereme prvni
-    v poradi, ktera neni jen podpurna (pronajem, spravni cinnosti, obecny obchod).
-    """
-    if not kody:
-        return ""
-    hlavni = [k for k in kody if not _je_podpurny(k)]
-    return (hlavni or kody)[0]
 
 
 def _ares_ulice(sidlo):
@@ -486,10 +466,11 @@ def _ares_na_zaznam(s):
     # "czNace" = CZ-NACE 2025 (nova revize), "czNace2008" = starsi CZ-NACE
     # 2008 - stejna prednost nove revize jako u ares_prevazujici_nace vyse,
     # aby sloupec NACE (vsechny) nesl kody ve stejne soustave, jakou pouziva
-    # vlastni taxonomie.NACE_MAPA (jinak by tu zustaly zastarale kody i pote,
+    # vlastni taxonomie.NACE_KATEGORIE (jinak by tu zustaly zastarale kody i pote,
     # co uz byla prevazujici cinnost spravne prepsana na novou revizi).
     kody = s.get("czNace") or s.get("czNace2008") or []
-    nace = vyber_hlavni_nace(kody)
+    # ARES hlavni obor neoznacuje - `nace` proto zustava prazdne a doplni ho az
+    # doplr_prevazujici_nace() z RES, kde ho rejstrik skutecne deklaruje.
     ico = s.get("ico") or ""
     return Zaznam(
         jmeno=s.get("obchodniJmeno") or "",
@@ -499,8 +480,6 @@ def _ares_na_zaznam(s):
         zeme=sidlo.get("kodStatu") or "CZ",
         ico=ico,
         dic=s.get("dic") or "",
-        nace=nace,
-        nace_popis=taxonomie.nazev_nace(nace),
         nace_vse=",".join(kody),
         region=sidlo.get("nazevKraje") or "",
         pravni_forma=s.get("pravniForma") or "",
@@ -548,7 +527,7 @@ def ares_prevazujici_nace(klient, ico):
     statistiky od 1.1.2025, v RES vychozi od 1.1.2026) a "czNacePrevazujici2008"
     (starsi CZ-NACE 2008 = NACE Rev. 2, ktere RES drzi soubezne jen po
     prechodne obdobi, cca 4 roky od zavedeni). Preferuje se novejsi 2025
-    soustava - na ni je postavena i nase vlastni taxonomie.NACE_MAPA. Nejde
+    soustava - na ni je postavena i nase vlastni taxonomie.NACE_KATEGORIE. Nejde
     o "cerstvejsi hodnotu tehoz cisla" - jde o dve ruzne klasifikacni
     soustavy, kde stejne cislo muze v kazde znamenat neco jineho (napr.
     trida 58.12 byla v 2008 "vydavani adresaru", v 2025 uz "vydavani novin") -
@@ -559,7 +538,7 @@ def ares_prevazujici_nace(klient, ico):
     "00"/"0000" znamena u RES "neurceno" (subjekt nema prevazujici cinnost
     formalne nastavenou - typicky OSVC s vice zivnostmi bez oznacene hlavni)
     a neni to skutecny NACE kod - takovy zaznam se ignoruje, jinak by prepsal
-    i dobre urcenou cinnost z vyber_hlavni_nace nepouzitelnou hodnotou.
+    i skutecne deklarovanou cinnost nepouzitelnou hodnotou.
     """
     ico = re.sub(r"\D", "", str(ico)).zfill(8)
     data = json.loads(klient.ziskej(ARES_RES.format(ico=ico), ocisti=_ares_ocisti))
@@ -1313,15 +1292,16 @@ def doplnit_openregister_nace(klient, z, api_klic):
     data = json.loads(klient.ziskej(
         url, hlavicky={"Authorization": "Bearer %s" % api_klic},
         ocisti=_openregister_detail_ocisti))
-    kody = ((data.get("industry_codes") or {}).get("WZ2025") or [])
-    if kody:
-        kod = re.sub(r"\D", "", str(kody[0].get("code") or ""))
-        if kod:
-            z.nace = kod
-            z.nace_popis = taxonomie.nazev_nace(kod)
-            z.nace_vse = ",".join(sorted({
-                c for c in (re.sub(r"\D", "", str(k.get("code") or "")) for k in kody) if c}))
-            z.nace_zdroj = "WZ2025 (OpenRegister.de)"
+    # OpenRegister.de vraci WZ kody v poradi z rejstriku a hlavni neoznacuje,
+    # takze se zapisuji vsechny a zadny se nevybira.
+    cisla = []
+    for k in ((data.get("industry_codes") or {}).get("WZ2025") or []):
+        cislo = re.sub(r"\D", "", str(k.get("code") or ""))
+        if cislo and cislo not in cisla:
+            cisla.append(cislo)
+    if cisla:
+        z.nace_vse = ",".join(sorted(cisla))
+        z.nace_zdroj = "WZ2025 (OpenRegister.de)"
 
 
 # ---------------------------------------------------------------------------
@@ -1550,10 +1530,15 @@ def _gb_na_zaznam(radek):
     (company_number, name, status, category, incorporation_date,
      address1, address2, post_town, post_code, sic1, sic2, sic3, sic4) = radek
     ulice = ", ".join(x for x in (address1, address2) if x)
-    nace = _gb_nace_ze_sic(sic1)
-    nace_vse = ",".join(sorted({c for c in (
-        _gb_nace_ze_sic(sic1), _gb_nace_ze_sic(sic2),
-        _gb_nace_ze_sic(sic3), _gb_nace_ze_sic(sic4)) if c}))
+    # Companies House hlavni obor neoznacuje - SIC1..SIC4 jsou v poradi, v jakem
+    # je firma zapsala, ne podle vyznamu. Zapisuji se proto vsechny a zadny se
+    # nevybira jako hlavni.
+    kody = []
+    for sic in (sic1, sic2, sic3, sic4):
+        kod = _gb_nace_ze_sic(sic)
+        if kod and kod not in kody:
+            kody.append(kod)
+    nace_vse = ",".join(sorted(kody))
     aktivni = (status or "").strip().lower() == "active"
     return Zaznam(
         jmeno=name or "",
@@ -1561,10 +1546,8 @@ def _gb_na_zaznam(radek):
         reg_cislo=company_number or "",
         reg_rejstrik="Companies House",
         pravni_forma=category or "",
-        nace=nace,
-        nace_popis=taxonomie.nazev_nace(nace),
         nace_vse=nace_vse,
-        nace_zdroj="UK SIC 2007 (Companies House)" if nace else "",
+        nace_zdroj="UK SIC 2007 (Companies House)" if nace_vse else "",
         datum_vzniku=incorporation_date or "",
         aktivni=aktivni,
         zdroj="Companies House",
@@ -2354,10 +2337,10 @@ def zpracuj_radek(vstup, klient, n):
             # Nejde rozeznat, ktera situace nastala, bez skutecne znalosti
             # firmy - zaznam se proto NEPREKLADA jinam (bylo by to hadani,
             # napr. z nazvu firmy - viz README), jen se oznaci k rucni/LLM
-            # kontrole (--export-nezarazene zahrne i tyto zaznamy, ne jen
-            # XXX-00, viz nace_nejisty).
+            # kontrole (--export-llm zahrne vsechny firmy, viz nace_nejisty
+            # a poznamka nize).
             zakladni_kod = re.sub(r"\D", "", str(z.nace or ""))
-            if zakladni_kod and _je_podpurny(zakladni_kod):
+            if zakladni_kod and not taxonomie.kategorie_kodu(zakladni_kod):
                 z.nace_nejisty = True
                 neurceno = zakladni_kod.strip("0") == ""   # "00"/"0000" - doslova "neurceno"
                 popis_kodu = ("nema v ARES zapsanou zadnou hlavni cinnost (kod %s = neurceno)"
@@ -2373,8 +2356,8 @@ def zpracuj_radek(vstup, klient, n):
                              "muze jit o majetkovou/holdingovou firmu se spravnym "
                              "udajem, nebo jen o formalni registraci")
                     poznamky.append(
-                        "firma %s (jediny zapsany kod) - %s; doporucena kontrola "
-                        "pres --export-nezarazene" % (popis_kodu, duvod))
+                        "firma %s (jediny zapsany kod) - %s; overte skutecnou "
+                        "cinnost (--export-llm)" % (popis_kodu, duvod))
                     if z.stav == STAV_OK:
                         z.stav = STAV_OVERIT
         if z.stav != STAV_NENALEZENO and not n["bez_sk"]:
@@ -2447,8 +2430,15 @@ def zpracuj_radek(vstup, klient, n):
         # prednost, pak obor z Wikidat (strukturovany QID, ne odhad z textu).
         # Bez ani jednoho jde zaznam do XXX-00 - kategorie se z nazvu firmy
         # nehada (hrozi false positive, viz README)
-        k = taxonomie.zarad(nace=z.nace, mapa=n["mapa"], kategorie=n["kategorie_ciselnik"],
-                            obory=z.obory, mapa_oboru=n["mapa_oboru"])
+        # Zarazuje se z CELE mnoziny zapsanych oboru. Prevazujici cinnost z RES
+        # (z.nace) je jen dalsi kod v mnozine, ne autorita - merenim se ukazalo,
+        # ze i ona casto neodpovida tomu, co firma opravdu dela (viz DOCS.md).
+        vsechny_kody = [c for c in z.nace_vse.split(",") if c]
+        if z.nace and z.nace not in vsechny_kody:
+            vsechny_kody.append(z.nace)
+        k = taxonomie.zarad(kody=vsechny_kody, obory=z.obory,
+                            mapa=n["nace_kategorie"], kategorie=n["kategorie_ciselnik"],
+                            mapa_oboru=n["mapa_oboru"])
         z.kod_kategorie = k["kod"]
         z.kategorie = k["kategorie"]
         z.skupina = k["skupina"]
@@ -2587,6 +2577,7 @@ SLOUPCE_DOPLNKY = [
     ("pravni_forma", "Právní forma"), ("datum_vzniku", "Datum vzniku"),
     ("dic_overeno", "DIČ ověřeno (VIES)"), ("nace_vse", "NACE (všechny)"),
     ("nace_zdroj", "NACE - zdroj"), ("nace_llm", "NACE (LLM)"),
+    ("kategorie_llm", "Kategorie (LLM)"), ("cinnost_llm", "Činnost (LLM)"),
     ("klasifikace", "Klasifikace (US NAICS)"),
     ("odkaz", "Odkaz na rejstřík"), ("poznamka", "Poznámka"),
 ]
@@ -2606,7 +2597,9 @@ SIRKY = {"Jméno": 40, "Ulice": 30, "PSČ": 9, "Město": 20, "Země": 7, "IČO":
          "Kategorie dodavatele": 42, "Zařazeno podle": 14, "Zdroj dat": 12, "Shoda názvu": 11,
          "Stav": 12, "Hledaný název": 34, "Region": 18, "LEI": 22,
          "Registrační číslo": 18, "Rejstřík": 20, "Právní forma": 14,
-         "NACE - zdroj": 22, "NACE (LLM)": 12, "Klasifikace (US NAICS)": 34,
+         "NACE - zdroj": 22, "NACE (LLM)": 12, "Kategorie (LLM)": 15,
+         "Činnost (LLM)": 52,
+         "Klasifikace (US NAICS)": 34,
          "Datum vzniku": 13, "DIČ ověřeno (VIES)": 16, "NACE (všechny)": 30,
          "Odkaz na rejstřík": 46, "Poznámka": 70,
          "Název": 34, "Nalezené jméno": 34, "Typ čísla / rejstřík": 20,
@@ -2623,59 +2616,123 @@ SIRKY = {"Jméno": 40, "Ulice": 30, "PSČ": 9, "Město": 20, "Země": 7, "IČO":
 # v chatu mimo skript.
 # ---------------------------------------------------------------------------
 
-def _potrebuje_llm_pomoc(z):
-    """Firmy bez kategorie (XXX-00), nebo s jedinym zapsanym NACE, ktery je jen
-    obecny/podpurny kod (viz PODPURNE_NACE a nace_nejisty) - u obou pripadu
-    ma smysl dohledat obor rucne/LLM."""
-    return (z.kod_kategorie == taxonomie.VYCHOZI_KOD or z.nace_nejisty) and (z.hledany_nazev or z.jmeno)
-
-
-def zapis_export_llm(zaznamy, cesta, kategorie_ciselnik=None, davka=None):
+def zapis_export_llm(zaznamy, cesta, kategorie_ciselnik=None, davka=None, nace_kategorie=None):
     """
-    Vypise firmy bez spolehliveho oboru do textoveho souboru pripraveneho na
-    vlozeni do LLM chatu. Narozdil od drivejsi verze se LLM neptame primo na
-    nasi vlastni kategorii (vyzadovalo by to, aby LLM spravne pochopil nasi
-    ~95kategorii taxonomii jen z jednoho vypisu v promptu), ale na standardni
-    NACE kod - tu klasifikaci LLM uz dobre zna z trenovacich dat. Kategorii
-    z NACE pak dopocita stejny overeny mechanismus (taxonomie.zarad), jaky
-    se pouziva pro skutecny NACE z rejstriku - viz pouzij_nace_mapu().
+    Vypise dodavatele do textoveho souboru pripraveneho na vlozeni do LLM chatu
+    (Copilot, ChatGPT...) - bez API klice, stejny dvoukrokovy princip jako
+    --jen-id: mezikrok dela clovek v chatu mimo skript.
+
+    Exportuji se VSICHNI dodavatele, ne jen ti bez kategorie. Duvod: zapsany
+    NACE popisuje, jak je firma zaregistrovana, ne co dodava. Firma delajici
+    3D tisk muze mit zapsany "maloobchod pres internet" - kod je pravdivy,
+    ale jako zarazeni dodavatele nepouzitelny, a zadna heuristika to nepozna.
+    Proto se ptame u kazde firmy, i u te, ktera uz kategorii z NACE ma.
+
+    Ptame se na dva udaje najednou:
+
+      1. NACE kod - hlavni odpoved. Tuhle klasifikaci LLM dobre zna z
+         trenovacich dat a kategorii z ni dopocita stejny overeny mechanismus
+         (taxonomie.zarad), jaky se pouziva pro NACE z rejstriku. Zapsany NACE
+         navic zustane ve vystupu vedle toho rejstrikoveho, takze je odpoved
+         kontrolovatelna a prezije i pozdejsi upravu taxonomie.
+      2. kod nasi kategorie - zaloha pro pripady, kdy NACE na spravnou odpoved
+         proste nema kod (viz taxonomie.nedosazitelne_kategorie). Uplatni se
+         jen tam, viz pouzij_llm_mapu().
+
+    U kazde firmy se do promptu davaji VSECHNY zapsane obory jako napoveda
+    (ne jen ten vybrany hlavni) - rejstrik casto vede zastaraly nebo formalni
+    udaj a LLM tak dostane vic materialu k rozhodnuti.
+
     Vraci (pocet vypsanych firem, seznam zapsanych cest).
     """
-    nevyresene = [z for z in zaznamy if _potrebuje_llm_pomoc(z)]
-    if not nevyresene:
+    kategorie_ciselnik = kategorie_ciselnik or taxonomie.KATEGORIE
+    nedosazitelne = taxonomie.nedosazitelne_kategorie(nace_kategorie, kategorie_ciselnik)
+    kandidati = [z for z in zaznamy if z.hledany_nazev or z.jmeno]
+    if not kandidati:
         return 0, []
 
     def obsah(davka_zaznamu):
         radky = [
-            "U kazde z firem nize uved jeji skutecny hlavni obor podnikani jako "
+            "Pro kazdou z firem nize urci jeji SKUTECNOU hlavni cinnost jako "
             "NACE Rev. 2 kod (mezinarodni NACE, ceska varianta CZ-NACE nebo "
-            "obdoba v jine zemi - staci uroven divize/skupiny, napr. 4791 nebo "
-            "62.01). Nekterym firmam mame uz zapsany NACE, je to ale jen obecny/"
-            "formalni udaj (napr. pronajem nemovitosti) - u nich over, jestli "
-            "jde o provozni firmu s jinou skutecnou cinnosti, nebo skutecne "
-            "o majetkovou/holdingovou entitu, kde je zapsany udaj spravny (v tom "
-            "pripade napis zpet ten stejny kod). Pokud si u firmy nejsi jistý/á "
-            "nebo o ni nic nenajdes, napis misto kodu 'neznamo' - chybejici "
-            "udaj je lepsi nez neopodstatneny odhad.",
+            "obdoba v jine zemi - staci uroven skupiny/tridy, napr. 4791 nebo "
+            "62.01) - pouzij vlastni znalosti o firme (nazev casto napovi, "
+            "o jakou firmu jde). U kazde firmy je v hranate zavorce seznam "
+            "JEJICH oboru zapsanych v obchodnim rejstriku - ber je jen jako "
+            "napovedu, ne jako jistotu: rejstrik casto vede jen zastaraly nebo "
+            "formalni udaj (firma delajici 3D tisk muze mit zapsany "
+            "'maloobchod pres internet', firma na reklamni predmety 'vyrobu "
+            "odevu', protoze tak zacinala). Pokud podle tveho odhadu zadny "
+            "z uvedenych kodu neodpovida skutecne cinnosti, navrhni jiny, "
+            "vystiznejsi. Pokud si nejsi jisty/a nebo o firme nic nenajdes, "
+            "napis misto kodu 'neznamo' - chybejici udaj je lepsi nez "
+            "neopodstatneny odhad.",
             "",
-            "FIRMY K DOHLEDÁNÍ (%d):" % len(davka_zaznamu),
+            "Ke kazde firme VZDY pridej i kod kategorie z ciselniku nize - je to "
+            "stejne dulezity udaj jako NACE, ne doplnek. Kategorie vyjadruje, "
+            "co firma dodava jako dodavatel, coz NACE casto nezachyti (audit "
+            "ma v NACE spolecny kod s ucetnictvim, kyberbezpecnost vlastni kod "
+            "nema, u mnoha cinnosti mame jen hrubou NACE uroven). Vyber vzdy "
+            "tu nejblizsi kategorii; 'neznamo' napis jen tehdy, kdyz o firme "
+            "opravdu nic nevis.",
+            "",
+            "ČÍSELNÍK KATEGORIÍ:",
+        ]
+        radky += _ciselnik_do_promptu(kategorie_ciselnik, nedosazitelne)
+        radky += [
+            "",
+            "FIRMY K URČENÍ (%d):" % len(davka_zaznamu),
         ]
         for z in davka_zaznamu:
             udaje = [x for x in (z.zeme, z.ulice, z.psc, z.mesto) if x]
-            kontext = " [uz zapsany NACE: %s %s]" % (z.nace, z.nace_popis or "") if z.nace_nejisty and z.nace else ""
+            # Kody se vypisuji i s urednim nazvem - LLM (a clovek pri kontrole)
+            # cte "4791 Intermediation service activities" mnohem lip nez "4791".
+            popsane = []
+            for c in dict.fromkeys(x for x in z.nace_vse.split(",") if x):
+                nazev = taxonomie.nazev_nace(c)
+                popsane.append("%s %s" % (c, nazev) if nazev else c)
+            kontext = (" [zapsane obory: %s]" % "; ".join(popsane) if popsane
+                       else " [bez zapsaneho oboru]")
             radky.append("- %s%s%s" % (z.hledany_nazev or z.jmeno,
                                        " (%s)" % ", ".join(udaje) if udaje else "", kontext))
         radky += [
             "",
             "Odpověz přesně v tomto formátu, jeden řádek na firmu, oddělovač ';', "
             "beze změny pořadí a bez dalšího textu okolo:",
-            "Původní název;NACE kód;Stručné zdůvodnění",
+            "Původní název;NACE kód;Kód kategorie;Čím se firma zabývá",
+            "",
+            "Poslední sloupec napiš vlastními slovy (pár slov až věta) - co firma "
+            "skutečně dodává. Slouží ke kontrole, aby šlo posoudit, jestli kód "
+            "a kategorie sedí, aniž by to musel někdo dohledávat znovu.",
         ]
         return "\n".join(radky)
 
-    davky = _rozdel_davky(nevyresene, davka)
+    davky = _rozdel_davky(kandidati, davka)
     cesty = _zapis_davky(cesta, davky, obsah)
-    return len(nevyresene), cesty
+    return len(kandidati), cesty
+
+
+
+def _ciselnik_do_promptu(kategorie_ciselnik, nedosazitelne=()):
+    """
+    Ciselnik kategorii pro vlozeni do promptu - serazeny po skupinach, jeden
+    radek na kategorii. U kategorii, ktere pres NACE vyjadrit nejdou, je
+    hvezdicka: prave tam je odpoved ve sloupci s kategorii jedina cesta, jak
+    se k nim dostat, tak at je LLM neprehlidne.
+    """
+    radky, skupina_predchozi = [], None
+    for kod, skupina, nazev in sorted(
+            (k, v[0], v[1]) for k, v in kategorie_ciselnik.items()
+            if k != taxonomie.VYCHOZI_KOD):
+        if skupina != skupina_predchozi:
+            radky.append("  [%s]" % skupina)
+            skupina_predchozi = skupina
+        radky.append("    %s = %s%s" % (
+            kod, nazev, "  *" if kod in nedosazitelne else ""))
+    if any(k in nedosazitelne for k in kategorie_ciselnik):
+        radky.append("  (* = kategorie, kterou NACE kodem vyjadrit nelze - "
+                     "u techto firem je kod kategorie rozhodujici)")
+    return radky
 
 
 def _rozdel_davky(polozky, velikost):
@@ -2707,100 +2764,22 @@ def _zapis_davky(cesta, davky, obsah_davky):
     return cesty
 
 
-def zapis_export_overeni(zaznamy, cesta, davka=None):
+_KATEGORIE_KOD_RE = re.compile(r"\b[A-Z]{2,4}-\d{2}\b")
+
+
+def nacti_nace_mapu(cesta, kategorie_ciselnik=None):
     """
-    Plosny export VSECH dodavatelu (ne jen tech bez spolehliveho oboru, viz
-    zapis_export_llm vyse) pro nezavisle LLM overeni - resi pripady, kdy ma
-    firma v rejstriku zapsany specificky, duveryhodne vypadajici NACE kod,
-    ktery je ale vecne zastaraly/spatny (napr. firma na personalizovane
-    reklamni predmety s "hlavni cinnosti" zapsanou jako vyroba odevu - kod
-    sam o sobe je specificky, takze to neodhali zadna heuristika, jen
-    nekdo/neco, kdo firmu skutecne zna).
-
-    Na rozdil od zapis_export_llm se neuvadi jen jeden "hlavni" kod (ten muze
-    byt prave ten zastaraly/formalni udaj), ale VSECHNY zapsane obory - LLM
-    dostane vic materialu k rozhodnuti, ktery (pripadne jiny) kod firmu
-    skutecne nejlepe vystihuje. CLI-only funkce, do GUI se nezapojuje.
+    Nacte rucne/LLM dohledany NACE a kod kategorie (Nazev;NACE;Kategorie[;...])
+    z odpovedi LLM chatu. Vraci {klic nazvu: {"nace": kod, "kategorie": kod}}.
+    Starsi odpovedi jeste bez sloupce s kategorii se nactou taky - kategorie
+    zustane prazdna a chova se to pak stejne jako driv.
     """
-    kandidati = [z for z in zaznamy if z.hledany_nazev or z.jmeno]
-    if not kandidati:
-        return 0, []
-
-    def obsah(davka_zaznamu):
-        radky = [
-            "Pro kazdou z firem nize urci jeji SKUTECNOU hlavni cinnost jako "
-            "NACE Rev. 2 kod (staci uroven divize/skupiny, napr. 4791 nebo "
-            "62.01) - pouzij vlastni znalosti o firme (nazev casto napovi, "
-            "o jakou firmu jde). U kazde firmy je v hranate zavorce uveden "
-            "seznam JEJI zapsanych oboru v obchodnim rejstriku - ber je jen "
-            "jako napovedu, ne jako jistotu: rejstrik casto vede jen "
-            "zastaraly nebo formalni udaj (napr. firma vyrabejici reklamni "
-            "predmety muze mit formalne zapsanou 'vyrobu odevu', protoze tak "
-            "zacinala). Pokud podle tveho vlastniho odhadu zadny z uvedenych "
-            "kodu neodpovida skutecne cinnosti firmy, navrhni jiny, "
-            "vystiznejsi NACE kod. Pokud si nejsi jisty/a vubec, napis misto "
-            "kodu 'neznamo' - chybejici udaj je lepsi nez neopodstatneny odhad.",
-            "",
-            "FIRMY K OVERENI (%d):" % len(davka_zaznamu),
-        ]
-        for z in davka_zaznamu:
-            udaje = [x for x in (z.zeme, z.ulice, z.psc, z.mesto) if x]
-            obory = ", ".join(dict.fromkeys(c for c in z.nace_vse.split(",") if c))
-            kontext = " [registrovane obory: %s]" % obory if obory else " [bez zapsaneho oboru]"
-            radky.append("- %s%s%s" % (z.hledany_nazev or z.jmeno,
-                                       " (%s)" % ", ".join(udaje) if udaje else "", kontext))
-        radky += [
-            "",
-            "Odpověz přesně v tomto formátu, jeden řádek na firmu, oddělovač ';', "
-            "beze změny pořadí a bez dalšího textu okolo:",
-            "Původní název;NACE kód;Stručné zdůvodnění",
-        ]
-        return "\n".join(radky)
-
-    davky = _rozdel_davky(kandidati, davka)
-    cesty = _zapis_davky(cesta, davky, obsah)
-    return len(kandidati), cesty
-
-
-def pouzij_mapu_overeni(zaznamy, mapa, nace_mapa=None, kategorie_ciselnik=None, mapa_oboru=None):
-    """
-    Aplikuje plosne LLM overeni (zapis_export_overeni) - na rozdil od
-    pouzij_nace_mapu prepise kategorii u KAZDEHO zaznamu, pro ktery mapa
-    obsahuje odpoved (ne jen u tech bez spolehliveho oboru), protoze ucelem
-    je prave odhalit i sebejiste, ale vecne spatne zarazene firmy. Puvodni
-    NACE z rejstriku (sloupec NACE) zustava beze zmeny - LLM navrh se zapisuje
-    jen do NACE (LLM) a z nej odvozene kategorie, takze oboji zustava vedle
-    sebe k porovnani. Vraci pocet zmen.
-    """
-    zmeny = 0
-    for z in zaznamy:
-        if not (z.hledany_nazev or z.jmeno):
-            continue
-        klic = normalizuj_nazev(z.hledany_nazev or z.jmeno)
-        kod_nace = mapa.get(klic)
-        if not kod_nace:
-            continue
-        z.nace_llm = kod_nace
-        k = taxonomie.zarad(nace=kod_nace, mapa=nace_mapa, kategorie=kategorie_ciselnik,
-                            mapa_oboru=mapa_oboru)
-        if k["kod"] == taxonomie.VYCHOZI_KOD:
-            continue
-        z.kod_kategorie = k["kod"]
-        z.kategorie = k["kategorie"]
-        z.skupina = k["skupina"]
-        z.zdroj_kategorie = "rucne (LLM - plosne overeni)"
-        zmeny += 1
-    return zmeny
-
-
-def nacti_nace_mapu(cesta):
-    """Nacte rucne/LLM dohledany NACE (Nazev;NACE[;...]) z odpovedi LLM chatu."""
     mapa = {}
     with open(cesta, encoding="utf-8-sig", newline="") as f:
         vzorek = f.read(4096)
         f.seek(0)
         # Format vzdy pozadujeme se strednikem (viz zapis_export_llm/
-        # zapis_export_overeni), ale sloupec se zduvodnenim casto obsahuje
+        # zapis_export_llm), ale sloupec se zduvodnenim casto obsahuje
         # carku v beznem textu - u kratkych/jednoradkovych souboru (posledni
         # davka pri --export-davka) to csv.Sniffer bez dalsich signalu
         # spolehlive plete s carkou jako oddelovacem a tise vrati prazdnou
@@ -2829,44 +2808,113 @@ def nacti_nace_mapu(cesta):
             # odpovida instrukci LLM dat jednu rozhodujici hodnotu, a
             # nehrozi ani nechtene slouceni cislic dvou ruznych kodu do
             # jednoho zavadejiciho retezce.
-            zbytek = " ".join(radek[1:])
-            shoda = _NACE_KOD_RE.search(zbytek)
-            kod = re.sub(r"\D", "", shoda.group()) if shoda else ""
-            if not nazev or not kod:
+            # Nejdriv se zkusi POZICE podle vyzadaneho formatu
+            # (Nazev;NACE;Kategorie;Cinnost). Posledni sloupec je volny text
+            # a hledat v nem kody by bylo nebezpecne - popis "dodava 500 kusu"
+            # by dal NACE "500". Prohledavani celeho radku zustava jen jako
+            # zaloha pro odpovedi, ktere format nedodrzely.
+            kod = _nace_z_pole(radek[1] if len(radek) > 1 else "")
+            kod_kat = _kategorie_z_pole(radek[2] if len(radek) > 2 else "",
+                                        kategorie_ciselnik)
+            cinnost = radek[3].strip() if len(radek) > 3 else ""
+            if not kod and not kod_kat:
+                # Kod kategorie se ze zbytku nejdriv VYJME, az potom se hleda
+                # NACE: kody jako "PRO-03" konci dvema cislicemi, na kterych
+                # _NACE_KOD_RE kvuli hranici slova po pomlcce zabira, takze
+                # u firmy s NACE 'neznamo' by z "PRO-03" vznikl NACE "03".
+                zbytek = " ".join(radek[1:])
+                kod_kat = _kategorie_z_pole(zbytek, kategorie_ciselnik)
+                kod = _nace_z_pole(_KATEGORIE_KOD_RE.sub(" ", zbytek))
+                cinnost = ""
+            if not nazev or not (kod or kod_kat):
                 continue
             klic = normalizuj_nazev(nazev)
             if klic:
-                mapa[klic] = kod
+                mapa[klic] = {"nace": kod, "kategorie": kod_kat, "cinnost": cinnost}
     return mapa
 
 
-def pouzij_nace_mapu(zaznamy, mapa, nace_mapa=None, kategorie_ciselnik=None, mapa_oboru=None):
+def _nace_z_pole(text):
+    """Prvni rozpoznatelny NACE kod v poli, jen cislice ('62.01' -> '6201')."""
+    shoda = _NACE_KOD_RE.search(text or "")
+    return re.sub(r"\D", "", shoda.group()) if shoda else ""
+
+
+def _kategorie_z_pole(text, kategorie_ciselnik=None):
+    """Kod kategorie v poli; kod mimo ciselnik (preklep/halucinace) se zahodi."""
+    shoda = _KATEGORIE_KOD_RE.search(text or "")
+    kod = shoda.group() if shoda else ""
+    if kod and kategorie_ciselnik is not None and kod not in kategorie_ciselnik:
+        return ""
+    return kod
+
+
+def pouzij_llm_mapu(zaznamy, mapa, nace_kategorie=None, kategorie_ciselnik=None, mapa_oboru=None):
     """
-    Aplikuje rucne/LLM dohledany NACE na zaznamy, ktere ho potrebuji (viz
-    _potrebuje_llm_pomoc) - kategorii z nej dopocita taxonomie.zarad(), stejne
-    jako u skutecneho NACE z rejstriku, takze LLM neresi nasi vlastni
-    taxonomii, jen (pro nej znamejsi) standardni NACE klasifikaci.
-    Vraci pocet zmen.
+    Aplikuje odpoved z LLM chatu (viz zapis_export_llm) na zaznamy. Prepisuje
+    kategorii u KAZDE firmy, pro kterou mapa obsahuje odpoved - ne jen u tech
+    bez kategorie: ucelem je zjistit skutecnou cinnost, a ta se muze lisit
+    i u firmy, ktera ma v rejstriku zapsany specificky, duveryhodne vypadajici
+    kod (napr. firma na personalizovane reklamni predmety s "hlavni cinnosti"
+    zapsanou jako vyroba odevu). Puvodni NACE z rejstriku (sloupec NACE) zustava
+    beze zmeny - navrh LLM se zapisuje do NACE (LLM) a Kategorie (LLM), takze
+    oboji zustava vedle sebe k porovnani.
+
+    Prednost ma NACE: kategorii z nej dopocita taxonomie.zarad(), stejne jako
+    u skutecneho NACE z rejstriku. Diky tomu vede stejny kod vzdycky na stejnou
+    kategorii bez ohledu na to, odkud prisel.
+
+    Kod kategorie primo od LLM se pouzije jen ve dvou pripadech:
+        1. NACE chybi, nebo na zadnou nasi kategorii nevede (vysledek XXX-00) -
+           vc. pripadu, kdy kod kategorii neurcuje
+        2. LLM navrhlo kategorii, kterou NACE kodem vyjadrit NELZE - tedy tu,
+           na kterou v mape nevede zadny kod (taxonomie.nedosazitelne_kategorie).
+           Tady navrh z NACE nutne minul, protoze spravnou odpoved zapsat neumel:
+           auditorska firma dostane NACE 6920 (spolecny kod pro ucetnictvi
+           i audit), z ktereho vzdycky vypadne PRO-02, nikdy PRO-03.
+
+    Kdyz se kategorie z NACE a kategorie od LLM lisi, ale OBE jsou z NACE
+    dosazitelne, zustava ta z NACE - rozpor se jen spocita a vypise, protoze
+    znamena bud chybu v odpovedi, nebo diru v tabulce kodu, a oboji je vec pro
+    cloveka, ne pro tichy prepis.
+
+    Vraci (pocet zmen, pocet rozporu).
     """
-    zmeny = 0
+    kategorie_ciselnik = kategorie_ciselnik or taxonomie.KATEGORIE
+    nedosazitelne = taxonomie.nedosazitelne_kategorie(nace_kategorie, kategorie_ciselnik)
+    zmeny, rozpory = 0, 0
     for z in zaznamy:
-        if not _potrebuje_llm_pomoc(z):
+        if not (z.hledany_nazev or z.jmeno):
             continue
         klic = normalizuj_nazev(z.hledany_nazev or z.jmeno)
-        kod_nace = mapa.get(klic)
-        if not kod_nace:
+        odpoved = mapa.get(klic)
+        if not odpoved:
             continue
+        kod_nace, kod_kat = odpoved.get("nace", ""), odpoved.get("kategorie", "")
         z.nace_llm = kod_nace
-        k = taxonomie.zarad(nace=kod_nace, mapa=nace_mapa, kategorie=kategorie_ciselnik,
-                            mapa_oboru=mapa_oboru)
-        if k["kod"] == taxonomie.VYCHOZI_KOD:
+        z.kategorie_llm = kod_kat
+        z.cinnost_llm = odpoved.get("cinnost", "")
+        k = taxonomie.zarad(nace=kod_nace, mapa=nace_kategorie,
+                            kategorie=kategorie_ciselnik, mapa_oboru=mapa_oboru)
+        z_nace = k["kod"] != taxonomie.VYCHOZI_KOD
+        if kod_kat and kod_kat in kategorie_ciselnik and (
+                not z_nace or kod_kat in nedosazitelne):
+            skupina, nazev_kat = kategorie_ciselnik[kod_kat]
+            z.kod_kategorie, z.kategorie, z.skupina = kod_kat, nazev_kat, skupina
+            z.zdroj_kategorie = ("rucne (LLM - kategorie mimo NACE)" if z_nace
+                                 else "rucne (LLM - kategorie)")
+            zmeny += 1
             continue
+        if not z_nace:
+            continue
+        if kod_kat and kod_kat != k["kod"]:
+            rozpory += 1
         z.kod_kategorie = k["kod"]
         z.kategorie = k["kategorie"]
         z.skupina = k["skupina"]
         z.zdroj_kategorie = "rucne (LLM pres NACE)"
         zmeny += 1
-    return zmeny
+    return zmeny, rozpory
 
 
 def _stylizuj_hlavicku_xlsx(ws, hlavicka, sirky=None):
@@ -2888,7 +2936,8 @@ def _stylizuj_hlavicku_xlsx(ws, hlavicka, sirky=None):
     return hlavicka_font, vypln
 
 
-def zapis_vystup(zaznamy, cesta, oddelovac=";", kompakt=False, jen_id=False):
+def zapis_vystup(zaznamy, cesta, oddelovac=";", kompakt=False, jen_id=False,
+                 nace_kategorie=None):
     if jen_id:
         sloupce = SLOUPCE_ID
     else:
@@ -2938,15 +2987,20 @@ def zapis_vystup(zaznamy, cesta, oddelovac=";", kompakt=False, jen_id=False):
 
         # treti list: ciselnik CZ-NACE divizi (2 cislice) - aby si klient mohl
         # dohledat, co ktery kod ve sloupci NACE znamena, bez hledani mimo sesit
+        # Cela nomenklatura NACE, ne jen divize: 86 divizi, 286 skupin a 650 trid
+        # Rev. 2.1 plus kody, ktere zily jen ve stare Rev. 2 a rejstriky je porad
+        # vraci. Sloupce "Verdikt" a "Kategorie" ukazuji, co ktery kod znamena pro
+        # zarazeni dodavatele - vc. toho, ktere kody na posouzeni teprve cekaji.
         ws3 = wb.create_sheet("Číselník NACE")
-        ws3.append(["Kód (divize)", "Název"])
-        for kod, nazev in taxonomie.prehled_nace_divizi():
-            ws3.append([kod, nazev])
+        ws3.append(["Kód", "Úroveň", "Název (EN)", "Sekce", "Revize", "Kategorie"])
+        for radek in taxonomie.prehled_nace(nace_kategorie):
+            ws3.append(list(radek))
         for b in ws3[1]:
             b.font = hlavicka_font
             b.fill = vypln
         ws3.freeze_panes = "A2"
-        for i, s in enumerate((14, 60), 1):
+        ws3.auto_filter.ref = ws3.dimensions
+        for i, s in enumerate((8, 9, 62, 46, 8, 11), 1):
             ws3.column_dimensions[get_column_letter(i)].width = s
 
     wb.save(cesta)
@@ -3145,29 +3199,20 @@ def main(argv=None):
     p.add_argument("--jen-id", action="store_true",
                    help="jen dohledat ICO/registracni cislo (bez plneho obohaceni) - "
                         "vystup jde rovnou pouzit jako vstup druheho, plneho behu")
-    p.add_argument("--export-nezarazene", metavar="SOUBOR",
-                   help="vypsat firmy bez spolehliveho oboru (bez kategorie, nebo jen "
-                        "s obecnym/podpurnym NACE) do textu pripraveneho na vlozeni "
-                        "do LLM chatu (Copilot, ChatGPT...) - ptame se na NACE kod, "
-                        "ne primo na nasi kategorii")
-    p.add_argument("--nace-mapa", metavar="SOUBOR",
-                   help="CSV s rucne/LLM dohledanym NACE (Nazev;NACE) - odpoved z LLM "
-                        "chatu, kategorie se z nej dopocita stejne jako u NACE "
-                        "z rejstriku, aplikuje se pred zapisem vystupu")
-    p.add_argument("--export-overeni", metavar="SOUBOR",
-                   help="[jen CLI] plosny export VSECH dodavatelu (ne jen bez oboru) "
-                        "pro nezavisle LLM overeni - u kazde firmy uvede vsechny "
-                        "zapsane obory (ne jen hlavni), pro pripady kdy je zapsany "
-                        "'hlavni' kod specificky, ale vecne zastaraly/spatny")
+    p.add_argument("--export-llm", metavar="SOUBOR",
+                   help="vypsat dodavatele do textu pripraveneho na vlozeni do LLM "
+                        "chatu (Copilot, ChatGPT...) - ptame se na skutecnou hlavni "
+                        "cinnost jako NACE kod a na kod nasi kategorie; u kazde firmy "
+                        "se uvedou vsechny zapsane obory jako napoveda")
     p.add_argument("--export-davka", type=int, metavar="N",
-                   help="rozdelit --export-overeni (pripadne --export-nezarazene) "
-                        "do vice souboru po N firmach - pro vkladani do LLM chatu "
-                        "po castech u velkych seznamu")
-    p.add_argument("--overeni-mapa", metavar="SOUBOR", nargs="+",
-                   help="jeden nebo vice CSV souboru s odpovedi na --export-overeni "
-                        "(pri vice davkach jeden soubor na davku) - na rozdil od "
-                        "--nace-mapa prepise kategorii u VSECH zaznamu, pro ktere "
-                        "mapa obsahuje odpoved, ne jen u tech bez spolehliveho oboru")
+                   help="rozdelit --export-llm do vice souboru po N firmach - pro "
+                        "vkladani do LLM chatu po castech u velkych seznamu")
+    p.add_argument("--llm-mapa", metavar="SOUBOR", nargs="+",
+                   help="jeden nebo vice CSV souboru s odpovedi na --export-llm "
+                        "(pri vice davkach jeden soubor na davku) ve tvaru "
+                        "Nazev;NACE;Kategorie[;Zduvodneni] - aplikuje se na vsechny "
+                        "zaznamy, pro ktere mapa obsahuje odpoved, pred zapisem "
+                        "vystupu")
     p.add_argument("--workers", type=int, default=4, help="pocet soubeznych dotazu (vychozi: 4)")
     p.add_argument("--prodleva", type=float, default=0.25,
                    help="min. prodleva mezi dotazy na jeden server v s (vychozi: 0.25)")
@@ -3275,10 +3320,10 @@ def spustit(a, na_radek=None):
     radku (navic k prubeznemu vypisu na stderr) - GUI si tim aktualizuje
     progress bar bez nutnosti parsovat konzolovy vystup.
     """
-    mapa, ciselnik, mapa_oboru = None, None, None
+    nace_kategorie, ciselnik, mapa_oboru = None, None, None
     if a.taxonomy:
         with open(a.taxonomy, encoding="utf-8") as f:
-            mapa, ciselnik, mapa_oboru = taxonomie.z_json(json.load(f))
+            nace_kategorie, ciselnik, mapa_oboru = taxonomie.z_json(json.load(f))
 
     radky = nacti_vstup(a.vstup, a.sloupec)
     if not radky:
@@ -3293,7 +3338,8 @@ def spustit(a, na_radek=None):
          "scoris_klic": a.scoris_api_klic,
          "bez_gleif": a.bez_gleif, "bez_gleif_popisy": a.bez_gleif_popisy,
          "bez_edgar": a.bez_edgar, "bez_wikidata": a.bez_wikidata,
-         "mapa": mapa, "kategorie_ciselnik": ciselnik, "mapa_oboru": mapa_oboru}
+         "nace_kategorie": nace_kategorie, "kategorie_ciselnik": ciselnik,
+         "mapa_oboru": mapa_oboru}
 
     k_obnove = None
     if a.obnovit_nenalezene:
@@ -3330,38 +3376,28 @@ def spustit(a, na_radek=None):
 
     klient.uloz_cache()
 
-    if a.nace_mapa:
-        mapa_llm = nacti_nace_mapu(a.nace_mapa)
-        zmeny = pouzij_nace_mapu(zaznamy, mapa_llm, nace_mapa=mapa, kategorie_ciselnik=ciselnik,
-                                 mapa_oboru=mapa_oboru)
-        print("Rucni/LLM zarazeni z %s: pouzito %d/%d" % (a.nace_mapa, zmeny, len(mapa_llm)),
-              file=sys.stderr)
+    if a.llm_mapa:
+        mapa_llm = {}
+        for cesta_mapy in a.llm_mapa:
+            mapa_llm.update(nacti_nace_mapu(cesta_mapy, kategorie_ciselnik=ciselnik))
+        zmeny, rozpory = pouzij_llm_mapu(zaznamy, mapa_llm, nace_kategorie=nace_kategorie,
+                                         kategorie_ciselnik=ciselnik, mapa_oboru=mapa_oboru)
+        print("Zarazeni z odpovedi LLM (%s): pouzito %d/%d" % (
+            ", ".join(a.llm_mapa), zmeny, len(mapa_llm)), file=sys.stderr)
+        if rozpory:
+            print("  z toho %d firem, kde se kategorie od LLM lisi od kategorie z jeho "
+                  "vlastniho NACE - ponechana ta z NACE, viz sloupec Kategorie (LLM)"
+                  % rozpory, file=sys.stderr)
 
-    if a.overeni_mapa:
-        mapa_overeni = {}
-        for cesta_mapy in a.overeni_mapa:
-            mapa_overeni.update(nacti_nace_mapu(cesta_mapy))
-        zmeny = pouzij_mapu_overeni(zaznamy, mapa_overeni, nace_mapa=mapa,
-                                    kategorie_ciselnik=ciselnik, mapa_oboru=mapa_oboru)
-        print("Plosne LLM overeni z %s: pouzito %d/%d" % (
-            ", ".join(a.overeni_mapa), zmeny, len(mapa_overeni)), file=sys.stderr)
-
-    if a.export_nezarazene:
-        pocet, cesty = zapis_export_llm(zaznamy, a.export_nezarazene, ciselnik, davka=a.export_davka)
+    if a.export_llm:
+        pocet, cesty = zapis_export_llm(zaznamy, a.export_llm, ciselnik,
+                                        davka=a.export_davka, nace_kategorie=nace_kategorie)
         if pocet:
-            print("Export pro LLM chat -> %s (%d firem bez kategorie)" % (
-                ", ".join(cesty), pocet), file=sys.stderr)
-        else:
-            print("Vsechny firmy maji kategorii, export pro LLM chat se nevytvaril.",
-                  file=sys.stderr)
-
-    if a.export_overeni:
-        pocet, cesty = zapis_export_overeni(zaznamy, a.export_overeni, davka=a.export_davka)
-        if pocet:
-            print("Plosny export pro LLM overeni -> %s (%d firem)" % (
+            print("Export pro LLM chat -> %s (%d firem)" % (
                 ", ".join(cesty), pocet), file=sys.stderr)
 
-    zapis_vystup(zaznamy, a.vystup, a.oddelovac, a.kompakt, jen_id=a.jen_id)
+    zapis_vystup(zaznamy, a.vystup, a.oddelovac, a.kompakt, jen_id=a.jen_id,
+                 nace_kategorie=nace_kategorie)
 
     souhrn = {}
     for z in zaznamy:

@@ -18,6 +18,8 @@ pro "6201" ma prednost pred obecnym "62".
 # Ciselnik kategorii:  kod -> (skupina, nazev kategorie)
 # ---------------------------------------------------------------------------
 
+import nace_nomenklatura
+
 KATEGORIE = {
     # --- ICT a technologie -------------------------------------------------
     "ICT-01": ("ICT a technologie", "Vyvoj software a aplikaci na zakazku"),
@@ -153,185 +155,1320 @@ VYCHOZI_KOD = "XXX-00"
 
 
 # ---------------------------------------------------------------------------
-# Mapa NACE -> kod kategorie (prefix; delsi prefix vyhrava)
+# Co ktery NACE kod znamena pro zarazeni dodavatele
 # ---------------------------------------------------------------------------
+#
+# Kod -> kategorie, nebo None, kdyz kod o predmetu dodavky nerika nic pouzitelneho
+# (obecne a formalni registrace jako pronajem nemovitosti nebo "ostatni podpurne
+# cinnosti", a narodni pseudo-kody jako britske "99999 Dormant company").
+#
+# Tabulka je UPLNA - obsahuje kazdy kod z nomenklatury (nace_nomenklatura.py),
+# takze nepritomnost kodu je chyba k nahlaseni, ne tiche "plati neco obecneho".
+# Kdyz kod v tabulce chybi, chova se jako None.
 
-# Postaveno na NACE Rev. 2.1 / CZ-NACE 2025 (zavazna pro EU statistiku od
-# 1.1.2025, v ARES vychozi od 1.1.2026 - viz komentar u ares_prevazujici_nace
-# v dodavatele.py). Vetsina divizi ma stejne cislo a rozsah jako v predchozi
-# revizi NACE Rev. 2 / CZ-NACE 2008, proto tabulka funguje i pro zdroje, ktere
-# jeste hlasi stara cisla (napr. francouzske INSEE/NAF k 2026 stale vraci
-# 2008-style kody) - konflikt hrozi jen u par explicitne vyznacenych kodu
-# nize, kde revize 2025 cislo skutecne presunula/zmenila vyznam.
-NACE_MAPA = {
-    # Zemedelstvi, lesnictvi, tezba
-    "01": "MAT-09", "02": "MAT-11", "03": "MAT-09",
-    "05": "MAT-10", "06": "ENE-03", "07": "MAT-10", "08": "MAT-05", "09": "MAT-10",
+NACE_KATEGORIE = {
 
-    # Zpracovatelsky prumysl
-    "10": "MAT-08", "11": "MAT-08", "12": "MAT-08",
-    "13": "MAT-06", "14": "MAT-06", "15": "MAT-06",
-    "16": "MAT-11", "17": "MAT-04", "18": "MKT-03", "19": "ENE-03",
-    "20": "MAT-02", "21": "ZDR-03", "22": "MAT-03", "23": "MAT-05",
-    "24": "MAT-01", "25": "TEC-07", "2562": "TEC-03",
-    "26": "MAT-07", "2611": "MAT-07", "2620": "ICT-07", "2630": "ICT-08",
-    "2651": "TEC-02", "2660": "ZDR-03", "2670": "TEC-02",
-    "27": "TEC-04", "28": "TEC-01", "29": "TEC-05", "30": "TEC-05",
-    "31": "FAC-07", "32": "OST-02", "3250": "ZDR-03",
-    "33": "TEC-03", "3312": "TEC-03", "3313": "TEC-02", "3314": "TEC-04", "3320": "TEC-03",
+    # --- ?  kody mimo nomenklaturu / narodni ---
+    "00": None,        # 
+    "0000": None,      # 
 
-    # Energie, voda, odpady
-    "35": "ENE-01", "3512": "ENE-01", "3513": "ENE-01", "3514": "ENE-01",
-    "3521": "ENE-01", "3522": "ENE-01", "3523": "ENE-01", "3530": "ENE-02",
-    "36": "ENE-04", "37": "ENE-04",
-    "38": "ODP-01", "39": "ODP-03",
-    # ODP-02 (skartace a likvidace nosicu dat) nema vlastni NACE kod v zadne
-    # revizi - 38.31 je spalovani odpadu, ne likvidace dat - dosazitelne jen rucne
+    # --- A  Agriculture, forestry and fishing ---
+    "01": "MAT-09",    # Crop and animal production, hunting and related service acti
+    "011": "MAT-09",   # Growing of non-perennial crops
+    "0111": "MAT-09",  # Growing of cereals, other than rice, leguminous crops and oi
+    "0112": "MAT-09",  # Growing of rice
+    "0113": "MAT-09",  # Growing of vegetables and melons, roots and tubers
+    "0114": "MAT-09",  # Growing of sugar cane
+    "0115": "MAT-09",  # Growing of tobacco
+    "0116": "MAT-09",  # Growing of fibre crops
+    "0119": "MAT-09",  # Growing of other non-perennial crops
+    "012": "MAT-09",   # Growing of perennial crops
+    "0121": "MAT-09",  # Growing of grapes
+    "0122": "MAT-09",  # Growing of tropical and subtropical fruits
+    "0123": "MAT-09",  # Growing of citrus fruits
+    "0124": "MAT-09",  # Growing of pome fruits and stone fruits
+    "0125": "MAT-09",  # Growing of other tree and bush fruits and nuts
+    "0126": "MAT-09",  # Growing of oleaginous fruits
+    "0127": "MAT-09",  # Growing of beverage crops
+    "0128": "MAT-09",  # Growing of spices, aromatic, drug and pharmaceutical crops
+    "0129": "MAT-09",  # Growing of other perennial crops
+    "013": "MAT-09",   # Plant propagation
+    "0130": "MAT-09",  # Plant propagation
+    "014": "MAT-09",   # Animal production
+    "0141": "MAT-09",  # Raising of dairy cattle
+    "0142": "MAT-09",  # Raising of other cattle and buffaloes
+    "0143": "MAT-09",  # Raising of horses and other equines
+    "0144": "MAT-09",  # Raising of camels and camelids
+    "0145": "MAT-09",  # Raising of sheep and goats
+    "0146": "MAT-09",  # Raising of swine and pigs
+    "0147": "MAT-09",  # Raising of poultry
+    "0148": "MAT-09",  # Raising of other animals
+    "0149": "MAT-09",  # Raising of other animals
+    "015": "MAT-09",   # Mixed farming
+    "0150": "MAT-09",  # Mixed farming
+    "016": "MAT-09",   # Support activities to agriculture and post-harvest crop acti
+    "0161": "MAT-09",  # Support activities for crop production
+    "0162": "MAT-09",  # Support activities for animal production
+    "0163": "MAT-09",  # Post-harvest crop activities and seed processing for propaga
+    "0164": "MAT-09",  # Seed processing for propagation
+    "017": "MAT-09",   # Hunting, trapping and related service activities
+    "0170": "MAT-09",  # Hunting, trapping and related service activities
+    "02": "MAT-11",    # Forestry and logging
+    "021": "MAT-11",   # Silviculture and other forestry activities
+    "0210": "MAT-11",  # Silviculture and other forestry activities
+    "022": "MAT-11",   # Logging
+    "0220": "MAT-11",  # Logging
+    "023": "MAT-11",   # Gathering of wild growing non-wood products
+    "0230": "MAT-11",  # Gathering of wild growing non-wood products
+    "024": "MAT-11",   # Support services to forestry
+    "0240": "MAT-11",  # Support services to forestry
+    "03": "MAT-09",    # Fishing and aquaculture
+    "031": "MAT-09",   # Fishing
+    "0311": "MAT-09",  # Marine fishing
+    "0312": "MAT-09",  # Freshwater fishing
+    "032": "MAT-09",   # Aquaculture
+    "0321": "MAT-09",  # Marine aquaculture
+    "0322": "MAT-09",  # Freshwater aquaculture
+    "033": "MAT-09",   # Support activities for fishing and aquaculture
+    "0330": "MAT-09",  # Support activities for fishing and aquaculture
 
-    # Stavebnictvi
-    "41": "STA-01", "42": "STA-02", "43": "STA-03", "4321": "STA-04", "4322": "FAC-03",
+    # --- B  Mining and quarrying ---
+    "05": "MAT-10",    # Mining of coal and lignite
+    "051": "MAT-10",   # Mining of hard coal
+    "0510": "MAT-10",  # Mining of hard coal
+    "052": "MAT-10",   # Mining of lignite
+    "0520": "MAT-10",  # Mining of lignite
+    "06": "ENE-03",    # Extraction of crude petroleum and natural gas
+    "061": "ENE-03",   # Extraction of crude petroleum
+    "0610": "ENE-03",  # Extraction of crude petroleum
+    "062": "ENE-03",   # Extraction of natural gas
+    "0620": "ENE-03",  # Extraction of natural gas
+    "07": "MAT-10",    # Mining of metal ores
+    "071": "MAT-10",   # Mining of iron ores
+    "0710": "MAT-10",  # Mining of iron ores
+    "072": "MAT-10",   # Mining of non-ferrous metal ores
+    "0721": "MAT-10",  # Mining of uranium and thorium ores
+    "0729": "MAT-10",  # Mining of other non-ferrous metal ores
+    "08": "MAT-05",    # Other mining and quarrying
+    "081": "MAT-05",   # Quarrying of stone, sand and clay
+    "0811": "MAT-05",  # Quarrying of ornamental stone, limestone, gypsum, slate and 
+    "0812": "MAT-05",  # Operation of gravel and sand pits and mining of clay and kao
+    "089": "MAT-05",   # Mining and quarrying n.e.c.
+    "0891": "MAT-05",  # Mining of chemical and fertiliser minerals
+    "0892": "MAT-05",  # Extraction of peat
+    "0893": "MAT-05",  # Extraction of salt
+    "0899": "MAT-05",  # Other mining and quarrying n.e.c.
+    "09": "MAT-10",    # Mining support service activities
+    "091": "MAT-10",   # Support activities for petroleum and natural gas extraction
+    "0910": "MAT-10",  # Support activities for petroleum and natural gas extraction
+    "099": "MAT-10",   # Support activities for other mining and quarrying
+    "0990": "MAT-10",  # Support activities for other mining and quarrying
 
-    # Obchod - divize 45 (motorova vozidla) v revizi 2025 zanikla: prodej a
-    # servis vozidel se presunul jinam (viz nize 467/478/953)
-    "46": "OBC-01", "47": "OBC-02",
-    "467": "OBC-03",     # 46.7 Velkoobchod s motorovymi vozidly/motocykly (byv. cast divize 45)
-    "478": "OBC-03",     # 47.8 Maloobchod s motorovymi vozidly/motocykly (byv. cast divize 45)
-    "4650": "ICT-07",    # 46.50 Velkoobchod s pocitacovym a komunikacnim zarizenim (2008: zvlast 4651/4652)
-    "4740": "ICT-07",    # 47.40 Maloobchod s pocitacovym a komunikacnim zarizenim (2008: 4741)
-    "4646": "ZDR-03", "4773": "ZDR-03",
-    "4647": "FAC-07",    # 46.47 Velkoobchod s nabytkem... (2008: 4665)
-    "4681": "ENE-03",    # 46.81 Velkoobchod s pevnymi/kapalnymi/plynnymi palivy (2008: 4671 - presunuto ze skupiny 46.7 do 46.8)
+    # --- C  Manufacturing ---
+    "10": "MAT-08",    # Manufacture of food products
+    "101": "MAT-08",   # Processing and preserving of meat and production of meat pro
+    "1011": "MAT-08",  # Processing and preserving of meat, except of poultry meat
+    "1012": "MAT-08",  # Processing and preserving of poultry meat
+    "1013": "MAT-08",  # Production of meat and poultry meat products
+    "102": "MAT-08",   # Processing and preserving of fish, crustaceans and molluscs
+    "1020": "MAT-08",  # Processing and preserving of fish, crustaceans and molluscs
+    "103": "MAT-08",   # Processing and preserving of fruit and vegetables
+    "1031": "MAT-08",  # Processing and preserving of potatoes
+    "1032": "MAT-08",  # Manufacture of fruit and vegetable juice
+    "1039": "MAT-08",  # Other processing and preserving of fruit and vegetables
+    "104": "MAT-08",   # Manufacture of vegetable and animal oils and fats
+    "1041": "MAT-08",  # Manufacture of oils and fats
+    "1042": "MAT-08",  # Manufacture of margarine and similar edible fats
+    "105": "MAT-08",   # Manufacture of dairy products and edible ice
+    "1051": "MAT-08",  # Manufacture of dairy products
+    "1052": "MAT-08",  # Manufacture of ice cream and other edible ice
+    "106": "MAT-08",   # Manufacture of grain mill products, starches and starch prod
+    "1061": "MAT-08",  # Manufacture of grain mill products
+    "1062": "MAT-08",  # Manufacture of starches and starch products
+    "107": "MAT-08",   # Manufacture of bakery and farinaceous products
+    "1071": "MAT-08",  # Manufacture of bread; manufacture of fresh pastry goods and 
+    "1072": "MAT-08",  # Manufacture of rusks, biscuits, preserved pastries and cakes
+    "1073": "MAT-08",  # Manufacture of farinaceous products
+    "108": "MAT-08",   # Manufacture of other food products
+    "1081": "MAT-08",  # Manufacture of sugar
+    "1082": "MAT-08",  # Manufacture of cocoa, chocolate and sugar confectionery
+    "1083": "MAT-08",  # Processing of tea and coffee
+    "1084": "MAT-08",  # Manufacture of condiments and seasonings
+    "1085": "MAT-08",  # Manufacture of prepared meals and dishes
+    "1086": "MAT-08",  # Manufacture of homogenised food preparations and dietetic fo
+    "1089": "MAT-08",  # Manufacture of other food products n.e.c.
+    "109": "MAT-08",   # Manufacture of prepared animal feeds
+    "1091": "MAT-08",  # Manufacture of prepared feeds for farm animals
+    "1092": "MAT-08",  # Manufacture of prepared pet foods
+    "11": "MAT-08",    # Manufacture of beverages
+    "110": "MAT-08",   # Manufacture of beverages
+    "1101": "MAT-08",  # Distilling, rectifying and blending of spirits
+    "1102": "MAT-08",  # Manufacture of wine from grape
+    "1103": "MAT-08",  # Manufacture of cider and other fruit fermented beverages
+    "1104": "MAT-08",  # Manufacture of other non-distilled fermented beverages
+    "1105": "MAT-08",  # Manufacture of beer
+    "1106": "MAT-08",  # Manufacture of malt
+    "1107": "MAT-08",  # Manufacture of soft drinks and bottled waters
+    "12": "MAT-08",    # Manufacture of tobacco products
+    "120": "MAT-08",   # Manufacture of tobacco products
+    "1200": "MAT-08",  # Manufacture of tobacco products
+    "13": "MAT-06",    # Manufacture of textiles
+    "131": "MAT-06",   # Preparation and spinning of textile fibres
+    "1310": "MAT-06",  # Preparation and spinning of textile fibres
+    "132": "MAT-06",   # Weaving of textiles
+    "1320": "MAT-06",  # Weaving of textiles
+    "133": "MAT-06",   # Finishing of textiles
+    "1330": "MAT-06",  # Finishing of textiles
+    "139": "MAT-06",   # Manufacture of other textiles
+    "1391": "MAT-06",  # Manufacture of knitted and crocheted fabrics
+    "1392": "MAT-06",  # Manufacture of household textiles and made-up furnishing art
+    "1393": "MAT-06",  # Manufacture of carpets and rugs
+    "1394": "MAT-06",  # Manufacture of cordage, rope, twine and netting
+    "1395": "MAT-06",  # Manufacture of non-wovens and non-woven articles
+    "1396": "MAT-06",  # Manufacture of other technical and industrial textiles
+    "1399": "MAT-06",  # Manufacture of other textiles n.e.c.
+    "14": "MAT-06",    # Manufacture of wearing apparel
+    "141": "MAT-06",   # Manufacture of knitted and crocheted apparel
+    "1410": "MAT-06",  # Manufacture of knitted and crocheted apparel
+    "1411": "MAT-06",  # Manufacture of leather clothes
+    "1412": "MAT-06",  # Manufacture of workwear
+    "1413": "MAT-06",  # Manufacture of other outerwear
+    "1414": "MAT-06",  # Manufacture of underwear
+    "1419": "MAT-06",  # Manufacture of other wearing apparel and accessories
+    "142": "MAT-06",   # Manufacture of other wearing apparel and accessories
+    "1420": "MAT-06",  # Manufacture of articles of fur
+    "1421": "MAT-06",  # Manufacture of outerwear
+    "1422": "MAT-06",  # Manufacture of underwear
+    "1423": "MAT-06",  # Manufacture of workwear
+    "1424": "MAT-06",  # Manufacture of leather clothes and fur apparel
+    "1429": "MAT-06",  # Manufacture of other wearing apparel and accessories n.e.c.
+    "143": "MAT-06",   # Manufacture of knitted and crocheted apparel
+    "1431": "MAT-06",  # Manufacture of knitted and crocheted hosiery
+    "1439": "MAT-06",  # Manufacture of other knitted and crocheted apparel
+    "15": "MAT-06",    # Manufacture of leather and related products of other materia
+    "151": "MAT-06",   # Tanning, dyeing, dressing of leather and fur; manufacture of
+    "1511": "MAT-06",  # Tanning, dressing, dyeing of leather and fur
+    "1512": "MAT-06",  # Manufacture of luggage, handbags, saddlery and harness of an
+    "152": "MAT-06",   # Manufacture of footwear
+    "1520": "MAT-06",  # Manufacture of footwear
+    "16": None,        # Manufacture of wood and of products of wood and cork, except
+    "161": "MAT-11",   # Sawmilling and planing of wood; processing and finishing of 
+    "1610": "MAT-11",  # Sawmilling and planing of wood
+    "1611": "MAT-11",  # Sawmilling and planing of wood
+    "1612": "MAT-11",  # Processing and finishing of wood
+    "162": None,       # Manufacture of products of wood, cork, straw and plaiting ma
+    "1621": "MAT-11",  # Manufacture of veneer sheets and wood-based panels
+    "1622": "MAT-11",  # Manufacture of assembled parquet floors
+    "1623": "MAT-11",  # Manufacture of other builders' carpentry and joinery
+    "1624": "MAT-11",  # Manufacture of wooden containers
+    "1625": "MAT-11",  # Manufacture of doors and windows of wood
+    "1626": "ENE-03",  # Manufacture of solid fuels from vegetable biomass
+    "1627": "MAT-11",  # Finishing of wooden products
+    "1628": "MAT-11",  # Manufacture of other products of wood and articles of cork, 
+    "1629": "MAT-11",  # Manufacture of other products of wood; manufacture of articl
+    "17": "MAT-04",    # Manufacture of paper and paper products
+    "171": "MAT-04",   # Manufacture of pulp, paper and paperboard
+    "1711": "MAT-04",  # Manufacture of pulp
+    "1712": "MAT-04",  # Manufacture of paper and paperboard
+    "172": "MAT-04",   # Manufacture of articles of paper and paperboard
+    "1721": "MAT-04",  # Manufacture of corrugated paper, paperboard and containers o
+    "1722": "MAT-04",  # Manufacture of household and sanitary goods and of toilet re
+    "1723": "MAT-04",  # Manufacture of paper stationery
+    "1724": "MAT-04",  # Manufacture of wallpaper
+    "1725": "MAT-04",  # Manufacture of other articles of paper and paperboard
+    "1729": "MAT-04",  # Manufacture of other articles of paper and paperboard
+    "18": "MKT-03",    # Printing and reproduction of recorded media
+    "181": "MKT-03",   # Printing and service activities related to printing
+    "1811": "MKT-03",  # Printing of newspapers
+    "1812": "MKT-03",  # Other printing
+    "1813": "MKT-03",  # Pre-press and pre-media services
+    "1814": "MKT-03",  # Binding and related services
+    "182": "MKT-03",   # Reproduction of recorded media
+    "1820": "MKT-03",  # Reproduction of recorded media
+    "19": "ENE-03",    # Manufacture of coke and refined petroleum products
+    "191": "ENE-03",   # Manufacture of coke oven products
+    "1910": "ENE-03",  # Manufacture of coke oven products
+    "192": "ENE-03",   # Manufacture of refined petroleum products and fossil fuel pr
+    "1920": "ENE-03",  # Manufacture of refined petroleum products and fossil fuel pr
+    "20": "MAT-02",    # Manufacture of chemicals and chemical products
+    "201": "MAT-02",   # Manufacture of basic chemicals, fertilisers and nitrogen com
+    "2011": "MAT-02",  # Manufacture of industrial gases
+    "2012": "MAT-02",  # Manufacture of dyes and pigments
+    "2013": "MAT-02",  # Manufacture of other inorganic basic chemicals
+    "2014": "MAT-02",  # Manufacture of other organic basic chemicals
+    "2015": "MAT-02",  # Manufacture of fertilisers and nitrogen compounds
+    "2016": "MAT-02",  # Manufacture of plastics in primary forms
+    "2017": "MAT-02",  # Manufacture of synthetic rubber in primary forms
+    "202": "MAT-02",   # Manufacture of pesticides, disinfectants and other agrochemi
+    "2020": "MAT-02",  # Manufacture of pesticides, disinfectants and other agrochemi
+    "203": "MAT-02",   # Manufacture of paints, varnishes and similar coatings, print
+    "2030": "MAT-02",  # Manufacture of paints, varnishes and similar coatings, print
+    "204": "MAT-02",   # Manufacture of washing, cleaning and polishing preparations
+    "2041": "MAT-02",  # Manufacture of soap and detergents, cleaning and polishing p
+    "2042": "MAT-02",  # Manufacture of perfumes and toilet preparations
+    "205": "MAT-02",   # Manufacture of other chemical products
+    "2051": "MAT-02",  # Manufacture of liquid biofuels
+    "2052": "MAT-02",  # Manufacture of glues
+    "2053": "MAT-02",  # Manufacture of essential oils
+    "2059": "MAT-02",  # Manufacture of other chemical products n.e.c.
+    "206": "MAT-02",   # Manufacture of man-made fibres
+    "2060": "MAT-02",  # Manufacture of man-made fibres
+    "21": "ZDR-03",    # Manufacture of basic pharmaceutical products and pharmaceuti
+    "211": "ZDR-03",   # Manufacture of basic pharmaceutical products
+    "2110": "ZDR-03",  # Manufacture of basic pharmaceutical products
+    "212": "ZDR-03",   # Manufacture of pharmaceutical preparations
+    "2120": "ZDR-03",  # Manufacture of pharmaceutical preparations
+    "22": None,        # Manufacture of rubber and plastic products
+    "221": "MAT-03",   # Manufacture of rubber products
+    "2211": "MAT-03",  # Manufacture, retreading and rebuilding of rubber tyres and m
+    "2212": "MAT-03",  # Manufacture of other rubber products
+    "2219": "MAT-03",  # Manufacture of other rubber products
+    "222": None,       # Manufacture of plastics products
+    "2221": "MAT-03",  # Manufacture of plastic plates, sheets, tubes and profiles
+    "2222": "MAT-04",  # Manufacture of plastic packing goods
+    "2223": "MAT-05",  # Manufacture of doors and windows of plastic
+    "2224": "MAT-05",  # Manufacture of builders’ ware of plastic
+    "2225": "MAT-03",  # Processing and finishing of plastic products
+    "2226": "MAT-03",  # Manufacture of other plastic products
+    "2229": "MAT-03",  # Manufacture of other plastic products
+    "23": "MAT-05",    # Manufacture of other non-metallic mineral products
+    "231": "MAT-05",   # Manufacture of glass and glass products
+    "2311": "MAT-05",  # Manufacture of flat glass
+    "2312": "MAT-05",  # Shaping and processing of flat glass
+    "2313": "MAT-05",  # Manufacture of hollow glass
+    "2314": "MAT-05",  # Manufacture of glass fibres
+    "2315": "MAT-05",  # Manufacture and processing of other glass, including technic
+    "2319": "MAT-05",  # Manufacture and processing of other glass, including technic
+    "232": "MAT-05",   # Manufacture of refractory products
+    "2320": "MAT-05",  # Manufacture of refractory products
+    "233": "MAT-05",   # Manufacture of clay building materials
+    "2331": "MAT-05",  # Manufacture of ceramic tiles and flags
+    "2332": "MAT-05",  # Manufacture of bricks, tiles and construction products, in b
+    "234": "MAT-05",   # Manufacture of other porcelain and ceramic products
+    "2341": "MAT-05",  # Manufacture of ceramic household and ornamental articles
+    "2342": "MAT-05",  # Manufacture of ceramic sanitary fixtures
+    "2343": "MAT-05",  # Manufacture of ceramic insulators and insulating fittings
+    "2344": "MAT-05",  # Manufacture of other technical ceramic products
+    "2345": "MAT-05",  # Manufacture of other ceramic products
+    "2349": "MAT-05",  # Manufacture of other ceramic products
+    "235": "MAT-05",   # Manufacture of cement, lime and plaster
+    "2351": "MAT-05",  # Manufacture of cement
+    "2352": "MAT-05",  # Manufacture of lime and plaster
+    "236": "MAT-05",   # Manufacture of articles of concrete, cement and plaster
+    "2361": "MAT-05",  # Manufacture of concrete products for construction purposes
+    "2362": "MAT-05",  # Manufacture of plaster products for construction purposes
+    "2363": "MAT-05",  # Manufacture of ready-mixed concrete
+    "2364": "MAT-05",  # Manufacture of mortars
+    "2365": "MAT-05",  # Manufacture of fibre cement
+    "2366": "MAT-05",  # Manufacture of other articles of concrete, plaster and cemen
+    "2369": "MAT-05",  # Manufacture of other articles of concrete, plaster and cemen
+    "237": "MAT-05",   # Cutting, shaping and finishing of stone
+    "2370": "MAT-05",  # Cutting, shaping and finishing of stone
+    "239": "MAT-05",   # Manufacture of abrasive products and non-metallic mineral pr
+    "2391": "MAT-05",  # Manufacture of abrasive products
+    "2399": "MAT-05",  # Manufacture of other non-metallic mineral products n.e.c.
+    "24": "MAT-01",    # Manufacture of basic metals
+    "241": "MAT-01",   # Manufacture of basic iron and steel and of ferro-alloys
+    "2410": "MAT-01",  # Manufacture of basic iron and steel and of ferro-alloys
+    "242": "MAT-01",   # Manufacture of tubes, pipes, hollow profiles and related fit
+    "2420": "MAT-01",  # Manufacture of tubes, pipes, hollow profiles and related fit
+    "243": "MAT-01",   # Manufacture of other products of first processing of steel
+    "2431": "MAT-01",  # Cold drawing of bars
+    "2432": "MAT-01",  # Cold rolling of narrow strip
+    "2433": "MAT-01",  # Cold forming or folding
+    "2434": "MAT-01",  # Cold drawing of wire
+    "244": "MAT-01",   # Manufacture of basic precious and other non-ferrous metals
+    "2441": "MAT-01",  # Precious metals production
+    "2442": "MAT-01",  # Aluminium production
+    "2443": "MAT-01",  # Lead, zinc and tin production
+    "2444": "MAT-01",  # Copper production
+    "2445": "MAT-01",  # Other non-ferrous metal production
+    "2446": "MAT-01",  # Processing of nuclear fuel
+    "245": "MAT-01",   # Casting of metals
+    "2451": "MAT-01",  # Casting of iron
+    "2452": "MAT-01",  # Casting of steel
+    "2453": "MAT-01",  # Casting of light metals
+    "2454": "MAT-01",  # Casting of other non-ferrous metals
+    "25": None,        # Manufacture of fabricated metal products, except machinery a
+    "251": "TEC-07",   # Manufacture of structural metal products
+    "2511": "TEC-07",  # Manufacture of metal structures and parts of structures
+    "2512": "TEC-07",  # Manufacture of doors and windows of metal
+    "252": "TEC-07",   # Manufacture of tanks, reservoirs and containers of metal
+    "2521": "TEC-07",  # Manufacture of central heating radiators, steam generators a
+    "2522": "TEC-07",  # Manufacture of other tanks, reservoirs and containers of met
+    "2529": "TEC-07",  # Manufacture of other tanks, reservoirs and containers of met
+    "253": "TEC-07",   # Manufacture of weapons and ammunition
+    "2530": "TEC-07",  # Manufacture of weapons and ammunition
+    "254": "TEC-07",   # Forging and shaping metal and powder metallurgy
+    "2540": "TEC-07",  # Forging and shaping metal and powder metallurgy
+    "255": "TEC-07",   # Treatment and coating of metals; machining
+    "2550": "TEC-07",  # Forging, pressing, stamping and roll-forming of metal; powde
+    "2551": "TEC-07",  # Coating of metals
+    "2552": "TEC-07",  # Heat treatment of metals
+    "2553": "TEC-07",  # Machining of metals
+    "256": "TEC-07",   # Manufacture of cutlery, tools and general hardware
+    "2561": "TEC-07",  # Manufacture of cutlery
+    "2562": "TEC-07",  # Manufacture of locks and hinges
+    "2563": "TEC-07",  # Manufacture of tools
+    "257": "TEC-07",   # Manufacture of cutlery, tools and general hardware
+    "2571": "TEC-07",  # Manufacture of cutlery
+    "2572": "TEC-07",  # Manufacture of locks and hinges
+    "2573": "TEC-07",  # Manufacture of tools
+    "259": None,       # Manufacture of other fabricated metal products
+    "2591": "MAT-04",  # Manufacture of steel drums and similar containers
+    "2592": "MAT-04",  # Manufacture of light metal packaging
+    "2593": "TEC-07",  # Manufacture of wire products, chain and springs
+    "2594": "TEC-07",  # Manufacture of fasteners and screw machine products
+    "2599": "TEC-07",  # Manufacture of other fabricated metal products n.e.c.
+    "26": None,        # Manufacture of computer, electronic and optical products
+    "261": "MAT-07",   # Manufacture of electronic components and boards
+    "2611": "MAT-07",  # Manufacture of electronic components
+    "2612": "MAT-07",  # Manufacture of loaded electronic boards
+    "262": "ICT-07",   # Manufacture of computers and peripheral equipment
+    "2620": "ICT-07",  # Manufacture of computers and peripheral equipment
+    "263": "ICT-08",   # Manufacture of communication equipment
+    "2630": "ICT-08",  # Manufacture of communication equipment
+    "264": "ICT-07",   # Manufacture of consumer electronics
+    "2640": "ICT-07",  # Manufacture of consumer electronics
+    "265": None,       # Manufacture of measuring testing instruments, clocks and wat
+    "2651": "TEC-02",  # Manufacture of instruments and appliances for measuring, tes
+    "2652": "OST-02",  # Manufacture of watches and clocks
+    "266": "ZDR-03",   # Manufacture of irradiation, electromedical and electrotherap
+    "2660": "ZDR-03",  # Manufacture of irradiation, electromedical and electrotherap
+    "267": "MAT-07",   # Manufacture of optical instruments, magnetic and optical med
+    "2670": "MAT-07",  # Manufacture of optical instruments, magnetic and optical med
+    "268": "MAT-07",   # Manufacture of magnetic and optical media
+    "2680": "MAT-07",  # Manufacture of magnetic and optical media
+    "27": None,        # Manufacture of electrical equipment
+    "271": "TEC-04",   # Manufacture of electric motors, generators, transformers and
+    "2711": "TEC-04",  # Manufacture of electric motors, generators and transformers
+    "2712": "TEC-04",  # Manufacture of electricity distribution and control apparatu
+    "272": "TEC-04",   # Manufacture of batteries and accumulators
+    "2720": "TEC-04",  # Manufacture of batteries and accumulators
+    "273": "MAT-07",   # Manufacture of wiring and wiring devices
+    "2731": "MAT-07",  # Manufacture of fibre optic cables
+    "2732": "MAT-07",  # Manufacture of other electronic and electric wires and cable
+    "2733": "MAT-07",  # Manufacture of wiring devices
+    "274": "TEC-04",   # Manufacture of lighting equipment
+    "2740": "TEC-04",  # Manufacture of lighting equipment
+    "275": "TEC-04",   # Manufacture of domestic appliances
+    "2751": "TEC-04",  # Manufacture of electric domestic appliances
+    "2752": "TEC-04",  # Manufacture of non-electric domestic appliances
+    "279": "TEC-04",   # Manufacture of other electrical equipment
+    "2790": "TEC-04",  # Manufacture of other electrical equipment
+    "28": "TEC-01",    # Manufacture of machinery and equipment n.e.c.
+    "281": "TEC-01",   # Manufacture of general-purpose machinery
+    "2811": "TEC-01",  # Manufacture of engines and turbines, except aircraft, vehicl
+    "2812": "TEC-01",  # Manufacture of fluid power equipment
+    "2813": "TEC-01",  # Manufacture of other pumps and compressors
+    "2814": "TEC-01",  # Manufacture of other taps and valves
+    "2815": "TEC-01",  # Manufacture of bearings, gears, gearing and driving elements
+    "282": "TEC-01",   # Manufacture of other general-purpose machinery
+    "2821": "TEC-01",  # Manufacture of ovens, furnaces and permanent household heati
+    "2822": "TEC-01",  # Manufacture of lifting and handling equipment
+    "2823": "TEC-01",  # Manufacture of office machinery and equipment, except comput
+    "2824": "TEC-01",  # Manufacture of power-driven hand tools
+    "2825": "TEC-01",  # Manufacture of non-domestic air conditioning equipment
+    "2829": "TEC-01",  # Manufacture of other general-purpose machinery n.e.c.
+    "283": "TEC-01",   # Manufacture of agricultural and forestry machinery
+    "2830": "TEC-01",  # Manufacture of agricultural and forestry machinery
+    "284": "TEC-01",   # Manufacture of metal forming machinery and machine tools
+    "2841": "TEC-01",  # Manufacture of metal forming machinery and machine tools for
+    "2842": "TEC-01",  # Manufacture of other machine tools
+    "2849": "TEC-01",  # Manufacture of other machine tools
+    "289": "TEC-01",   # Manufacture of other special-purpose machinery
+    "2891": "TEC-01",  # Manufacture of machinery for metallurgy
+    "2892": "TEC-01",  # Manufacture of machinery for mining, quarrying and construct
+    "2893": "TEC-01",  # Manufacture of machinery for food, beverage and tobacco proc
+    "2894": "TEC-01",  # Manufacture of machinery for textile, apparel and leather pr
+    "2895": "TEC-01",  # Manufacture of machinery for paper and paperboard production
+    "2896": "TEC-01",  # Manufacture of plastics and rubber machinery
+    "2897": "TEC-01",  # Manufacture of additive manufacturing machinery
+    "2899": "TEC-01",  # Manufacture of other special-purpose machinery n.e.c.
+    "29": "TEC-05",    # Manufacture of motor vehicles, trailers and semi-trailers
+    "291": "TEC-05",   # Manufacture of motor vehicles
+    "2910": "TEC-05",  # Manufacture of motor vehicles
+    "292": "TEC-05",   # Manufacture of bodies and coachwork for motor vehicles; manu
+    "2920": "TEC-05",  # Manufacture of bodies and coachwork for motor vehicles; manu
+    "293": "TEC-05",   # Manufacture of motor vehicle parts and accessories
+    "2931": "TEC-05",  # Manufacture of electrical and electronic equipment for motor
+    "2932": "TEC-05",  # Manufacture of other parts and accessories for motor vehicle
+    "30": "TEC-05",    # Manufacture of other transport equipment
+    "301": "TEC-05",   # Building of ships and boats
+    "3011": "TEC-05",  # Building of civilian ships and floating structures
+    "3012": "TEC-05",  # Building of pleasure and sporting boats
+    "3013": "TEC-05",  # Building of military ships and vessels
+    "302": "TEC-05",   # Manufacture of railway locomotives and rolling stock
+    "3020": "TEC-05",  # Manufacture of railway locomotives and rolling stock
+    "303": "TEC-05",   # Manufacture of air and spacecraft and related machinery
+    "3030": "TEC-05",  # Manufacture of air and spacecraft and related machinery
+    "3031": "TEC-05",  # Manufacture of civilian air and spacecraft and related machi
+    "3032": "TEC-05",  # Manufacture of military air and spacecraft and related machi
+    "304": "TEC-05",   # Manufacture of military fighting vehicles
+    "3040": "TEC-05",  # Manufacture of military fighting vehicles
+    "309": "TEC-05",   # Manufacture of transport equipment n.e.c.
+    "3091": "TEC-05",  # Manufacture of motorcycles
+    "3092": "TEC-05",  # Manufacture of bicycles and invalid carriages
+    "3099": "TEC-05",  # Manufacture of other transport equipment n.e.c.
+    "31": "FAC-07",    # Manufacture of furniture
+    "310": "FAC-07",   # Manufacture of furniture
+    "3100": "FAC-07",  # Manufacture of furniture
+    "3101": "FAC-07",  # Manufacture of office and shop furniture
+    "3102": "FAC-07",  # Manufacture of kitchen furniture
+    "3103": "FAC-07",  # Manufacture of mattresses
+    "3109": "FAC-07",  # Manufacture of other furniture
+    "32": None,        # Other manufacturing
+    "321": "OST-02",   # Manufacture of jewellery, bijouterie and related articles
+    "3211": "OST-02",  # Striking of coins
+    "3212": "OST-02",  # Manufacture of jewellery and related articles
+    "3213": "OST-02",  # Manufacture of imitation jewellery and related articles
+    "322": "OST-02",   # Manufacture of musical instruments
+    "3220": "OST-02",  # Manufacture of musical instruments
+    "323": "OST-02",   # Manufacture of sports goods
+    "3230": "OST-02",  # Manufacture of sports goods
+    "324": "OST-02",   # Manufacture of games and toys
+    "3240": "OST-02",  # Manufacture of games and toys
+    "325": "ZDR-03",   # Manufacture of medical and dental instruments and supplies
+    "3250": "ZDR-03",  # Manufacture of medical and dental instruments and supplies
+    "329": "OST-02",   # Manufacturing n.e.c.
+    "3291": "OST-02",  # Manufacture of brooms and brushes
+    "3299": "OST-02",  # Other manufacturing n.e.c.
+    "33": "TEC-03",    # Repair, maintenance and installation of machinery and equipm
+    "331": "TEC-03",   # Repair and maintenance of fabricated metal products, machine
+    "3311": "TEC-03",  # Repair and maintenance of fabricated metal products
+    "3312": "TEC-03",  # Repair and maintenance of machinery
+    "3313": "TEC-03",  # Repair and maintenance of electronic and optical equipment
+    "3314": "TEC-03",  # Repair and maintenance of electrical equipment
+    "3315": "TEC-03",  # Repair and maintenance of civilian ships and boats
+    "3316": "TEC-03",  # Repair and maintenance of civilian air and spacecraft
+    "3317": "TEC-03",  # Repair and maintenance of other civilian transport equipment
+    "3318": "TEC-03",  # Repair and maintenance of military fighting vehicles, ships,
+    "3319": "TEC-03",  # Repair and maintenance of other equipment
+    "332": "TEC-03",   # Installation of industrial machinery and equipment
+    "3320": "TEC-03",  # Installation of industrial machinery and equipment
 
-    # Doprava a skladovani
-    "49": "LOG-01", "50": "LOG-02", "51": "LOG-02",
-    "52": "LOG-04", "53": "LOG-05",
-    "5225": "LOG-03",    # 52.25 Logisticke cinnosti (nova samostatna trida v revizi 2025)
-    "5226": "LOG-03",    # 52.26 Ostatni podpurne cinnosti pro dopravu (2008: 5229)
-    "5229": "LOG-03",    # stejny vyznam jako 5226, jen podle stareho cislovani (INSEE aj.)
+    # --- D  Electricity, gas, steam and air conditioning supply ---
+    "35": None,        # Electricity, gas, steam and air conditioning supply
+    "351": "ENE-01",   # Electric power generation, transmission and distribution
+    "3511": "ENE-01",  # Production of electricity from non-renewable sources
+    "3512": "ENE-01",  # Production of electricity from renewable sources
+    "3513": "ENE-01",  # Transmission of electricity
+    "3514": "ENE-01",  # Distribution of electricity
+    "3515": "ENE-01",  # Trade of electricity
+    "3516": "ENE-01",  # Storage of electricity
+    "352": "ENE-01",   # Manufacture of gas, and distribution of gaseous fuels throug
+    "3521": "ENE-01",  # Manufacture of gas
+    "3522": "ENE-01",  # Distribution of gaseous fuels through mains
+    "3523": "ENE-01",  # Trade of gas through mains
+    "3524": "ENE-01",  # Storage of gas as part of network supply services
+    "353": "ENE-02",   # Steam and air conditioning supply
+    "3530": "ENE-02",  # Steam and air conditioning supply
+    "354": "ENE-01",   # Activities of brokers and agents for electric power and natu
+    "3540": "ENE-01",  # Activities of brokers and agents for electric power and natu
 
-    # Ubytovani a stravovani
-    "55": "FAC-08", "56": "FAC-04",
+    # --- E  Water supply; sewerage, waste management and remediation activities ---
+    "36": "ENE-04",    # Water collection, treatment and supply
+    "360": "ENE-04",   # Water collection, treatment and supply
+    "3600": "ENE-04",  # Water collection, treatment and supply
+    "37": "ENE-04",    # Sewerage
+    "370": "ENE-04",   # Sewerage
+    "3700": "ENE-04",  # Sewerage
+    "38": None,        # Waste collection, recovery and disposal activities
+    "381": "ODP-01",   # Waste collection
+    "3811": "ODP-01",  # Collection of non-hazardous waste
+    "3812": "ODP-01",  # Collection of hazardous waste
+    "382": None,       # Waste recovery
+    "3821": "ODP-01",  # Materials recovery
+    "3822": "ENE-02",  # Energy recovery
+    "3823": "ODP-01",  # Other waste recovery
+    "383": "ODP-01",   # Waste disposal without recovery
+    "3831": "ODP-01",  # Incineration without energy recovery
+    "3832": "ODP-01",  # Landfilling or permanent storage
+    "3833": "ODP-01",  # Other waste disposal
+    "39": "ODP-03",    # Remediation activities and other waste management service ac
+    "390": "ODP-03",   # Remediation activities and other waste management service ac
+    "3900": "ODP-03",  # Remediation activities and other waste management service ac
 
-    # Informacni a komunikacni cinnosti
-    "58": "MKT-03", "581": "MKT-03", "582": "ICT-02",
-    # 58.12/58.13 (noviny/casopisy) v revizi 2025 prohodily cisla oproti 2008
-    # (2008: 5813=noviny; 2025: 5812=noviny, 5813=casopisy) - nevadi, oboji
-    # spada pod "581" skupinu se stejnou kategorii MKT-03
-    "59": "MKT-05", "60": "MKT-05", "61": "ICT-09",
-    "62": "ICT-05", "6201": "ICT-01", "6202": "ICT-05", "6203": "ICT-04", "6209": "ICT-04",
-    "63": "ICT-03",
-    "6391": "ICT-12",    # 63.91 Cinnosti webovych vyhledavacich portalu (2025 - v 2008 tu byly tiskove agentury, viz nize)
-    # Tiskove agentury/zurnalistika (2008: 6391) se v revizi 2025 presunuly
-    # primo do divize 60 (60.31 Cinnosti zpravodajskych kancelari a agentur)
-    # - uz pokryto obecnym "60"->MKT-05 vyse, zadny zvlastni zaznam netreba
+    # --- F  Construction ---
+    "41": "STA-01",    # Construction of residential and non-residential buildings
+    "410": "STA-01",   # Construction of residential and non-residential buildings
+    "4100": "STA-01",  # Construction of residential and non-residential buildings
+    "411": "STA-01",   # Development of building projects
+    "4110": "STA-01",  # Development of building projects
+    "412": "STA-01",   # Construction of residential and non-residential buildings
+    "4120": "STA-01",  # Construction of residential and non-residential buildings
+    "42": "STA-02",    # Civil engineering
+    "421": "STA-02",   # Construction of roads and railways
+    "4211": "STA-02",  # Construction of roads and motorways
+    "4212": "STA-02",  # Construction of railways and underground railways
+    "4213": "STA-02",  # Construction of bridges and tunnels
+    "422": "STA-02",   # Construction of utility projects
+    "4221": "STA-02",  # Construction of utility projects for fluids
+    "4222": "STA-02",  # Construction of utility projects for electricity and telecom
+    "429": "STA-02",   # Construction of other civil engineering projects
+    "4291": "STA-02",  # Construction of water projects
+    "4299": "STA-02",  # Construction of other civil engineering projects n.e.c.
+    "43": None,        # Specialised construction activities
+    "431": "STA-03",   # Demolition and site preparation
+    "4311": "STA-03",  # Demolition
+    "4312": "STA-03",  # Site preparation
+    "4313": "STA-03",  # Test drilling and boring
+    "432": None,       # Electrical, plumbing and other construction installation act
+    "4321": "STA-04",  # Electrical installation
+    "4322": "STA-03",  # Plumbing, heat and air-conditioning installation
+    "4323": "STA-03",  # Installation of insulation
+    "4324": "STA-03",  # Other construction installation
+    "4329": "STA-03",  # Other construction installation
+    "433": "STA-03",   # Building completion and finishing
+    "4331": "STA-03",  # Plastering
+    "4332": "STA-03",  # Joinery installation
+    "4333": "STA-03",  # Floor and wall covering
+    "4334": "STA-03",  # Painting and glazing
+    "4335": "STA-03",  # Other building completion and finishing
+    "4339": "STA-03",  # Other building completion and finishing
+    "434": "STA-03",   # Specialised construction activities in construction of build
+    "4341": "STA-03",  # Roofing activities
+    "4342": "STA-03",  # Other specialised construction activities in construction of
+    "435": "STA-03",   # Specialised construction activities in civil engineering
+    "4350": "STA-03",  # Specialised construction activities in civil engineering
+    "436": None,       # Intermediation service activities for specialised constructi
+    "4360": None,      # Intermediation service activities for specialised constructi
+    "439": None,       # Other specialised construction activities
+    "4391": "STA-03",  # Masonry and bricklaying activities
+    "4399": None,      # Other specialised construction activities n.e.c.
 
-    # Finance a pojisteni
-    "64": "FIN-05", "6419": "FIN-01", "6491": "FIN-04", "6492": "FIN-04",
-    "65": "FIN-03", "66": "FIN-05", "6611": "FIN-02", "6619": "FIN-02", "6622": "FIN-03",
+    # --- G  Wholesale and retail trade ---
+    "45": "OBC-03",    # Wholesale and retail trade and repair of motor vehicles and 
+    "451": "OBC-03",   # Sale of motor vehicles
+    "4511": "OBC-03",  # Sale of cars and light motor vehicles
+    "4519": "OBC-03",  # Sale of other motor vehicles
+    "452": "OBC-03",   # Maintenance and repair of motor vehicles
+    "4520": "OBC-03",  # Maintenance and repair of motor vehicles
+    "453": "OBC-03",   # Sale of motor vehicle parts and accessories
+    "4531": "OBC-03",  # Wholesale trade of motor vehicle parts and accessories
+    "4532": "OBC-03",  # Retail trade of motor vehicle parts and accessories
+    "454": "OBC-03",   # Sale, maintenance and repair of motorcycles and related part
+    "4540": "OBC-03",  # Sale, maintenance and repair of motorcycles and related part
+    "46": None,        # Wholesale trade
+    "461": None,     # Wholesale on a fee or contract basis
+    "4611": "OBC-01",  # Activities of agents involved in the wholesale of agricultur
+    "4612": "OBC-01",  # Activities of agents involved in the wholesale of fuels, ore
+    "4613": "OBC-01",  # Activities of agents involved in the wholesale of timber and
+    "4614": "OBC-01",  # Activities of agents involved in the wholesale of machinery,
+    "4615": "OBC-01",  # Activities of agents involved in the wholesale of furniture,
+    "4616": "OBC-01",  # Activities of agents involved in the wholesale of textiles, 
+    "4617": "OBC-01",  # Activities of agents involved in the wholesale of food, beve
+    "4618": "OBC-01",  # Activities of agents involved in the wholesale of other part
+    "4619": None,      # Activities of agents involved in non-specialised wholesale
+    "462": None,       # Wholesale of agricultural raw materials and live animals
+    "4621": "MAT-08",  # Wholesale of grain, unmanufactured tobacco, seeds and animal
+    "4622": "MAT-09",  # Wholesale of flowers and plants
+    "4623": "MAT-09",  # Wholesale of live animals
+    "4624": "MAT-06",  # Wholesale of hides, skins and leather
+    "463": "MAT-08",   # Wholesale of food, beverages and tobacco
+    "4631": "MAT-08",  # Wholesale of fruit and vegetables
+    "4632": "MAT-08",  # Wholesale of meat, meat products, fish and fish products
+    "4633": "MAT-08",  # Wholesale of dairy products, eggs and edible oils and fats
+    "4634": "MAT-08",  # Wholesale of beverages
+    "4635": "MAT-08",  # Wholesale of tobacco products
+    "4636": "MAT-08",  # Wholesale of sugar, chocolate and sugar confectionery
+    "4637": "MAT-08",  # Wholesale of coffee, tea, cocoa and spices
+    "4638": "MAT-08",  # Wholesale of other food
+    "4639": "MAT-08",  # Non-specialised wholesale of food, beverages and tobacco
+    "464": None,       # Wholesale of household goods
+    "4641": "MAT-06",  # Wholesale of textiles
+    "4642": "MAT-06",  # Wholesale of clothing and footwear
+    "4643": "OBC-01",  # Wholesale of electrical household appliances
+    "4644": "OBC-01",  # Wholesale of china and glassware and cleaning materials
+    "4645": "OBC-01",  # Wholesale of perfume and cosmetics
+    "4646": "ZDR-03",  # Wholesale of pharmaceutical and medical goods
+    "4647": "FAC-07",  # Wholesale of household, office and shop furniture, carpets a
+    "4648": "OBC-01",  # Wholesale of watches and jewellery
+    "4649": "OBC-01",  # Wholesale of other household goods
+    "465": None,       # Wholesale of information and communication equipment
+    "4650": "ICT-07",  # Wholesale of information and communication equipment
+    "4651": "ICT-07",  # Wholesale of computers, computer peripheral equipment and so
+    "4652": "MAT-07",  # Wholesale of electronic and telecommunications equipment and
+    "466": None,       # Wholesale of other machinery, equipment and supplies
+    "4661": "TEC-01",  # Wholesale of agricultural machinery, equipment and supplies
+    "4662": "TEC-01",  # Wholesale of machine tools
+    "4663": "TEC-01",  # Wholesale of mining, construction and civil engineering mach
+    "4664": "TEC-01",  # Wholesale of other machinery and equipment
+    "4665": "FAC-07",  # Wholesale of office furniture
+    "4666": "FAC-06",  # Wholesale of other office machinery and equipment
+    "4669": "TEC-01",  # Wholesale of other machinery and equipment
+    "467": None,       # Wholesale of motor vehicles, motorcycles and related parts a
+    "4671": "OBC-03",  # Wholesale of motor vehicles
+    "4672": "OBC-03",  # Wholesale of motor vehicle parts and accessories
+    "4673": "OBC-03",  # Wholesale of motorcycles, motorcycle parts and accessories
+    "4674": "MAT-05",  # Wholesale of hardware, plumbing and heating equipment and su
+    "4675": "MAT-02",  # Wholesale of chemical products
+    "4676": "OBC-01",  # Wholesale of other intermediate products
+    "4677": "ODP-01",  # Wholesale of waste and scrap
+    "468": None,       # Other specialised wholesale
+    "4681": "ENE-03",  # Wholesale of solid, liquid and gaseous fuels and related pro
+    "4682": "MAT-01",  # Wholesale of metals and metal ores
+    "4683": "MAT-05",  # Wholesale of wood, construction materials and sanitary equip
+    "4684": "MAT-05",  # Wholesale of hardware, plumbing and heating equipment and su
+    "4685": "MAT-02",  # Wholesale of chemical products
+    "4686": "OBC-01",  # Wholesale of other intermediate products
+    "4687": "ODP-01",  # Wholesale of waste and scrap
+    "4689": "OBC-01",  # Other specialised wholesale n.e.c.
+    "469": None,       # Non-specialised wholesale trade
+    "4690": None,      # Non-specialised wholesale trade
+    "47": None,        # Retail trade
+    "471": None,       # Non-specialised retail sale
+    "4711": "OBC-02",  # Non-specialised retail sale of predominately food, beverages
+    "4712": None,      # Other non-specialised retail sale
+    "4719": None,      # Other retail sale in non-specialised stores
+    "472": "MAT-08",   # Retail sale of food, beverages and tobacco
+    "4721": "MAT-08",  # Retail sale of fruit and vegetables
+    "4722": "MAT-08",  # Retail sale of meat and meat products
+    "4723": "MAT-08",  # Retail sale of fish, crustaceans and molluscs
+    "4724": "MAT-08",  # Retail sale of bread, cake and confectionery
+    "4725": "MAT-08",  # Retail sale of beverages
+    "4726": "MAT-08",  # Retail sale of tobacco products
+    "4727": "MAT-08",  # Retail sale of other food
+    "4729": "MAT-08",  # Other retail sale of food in specialised stores
+    "473": "ENE-03",   # Retail sale of automotive fuel
+    "4730": "ENE-03",  # Retail sale of automotive fuel
+    "474": None,       # Retail sale of information and communication equipment
+    "4740": "ICT-07",  # Retail sale of information and communication equipment
+    "4741": "ICT-07",  # Retail sale of computers, peripheral units and software in s
+    "4742": "ICT-07",  # Retail sale of telecommunications equipment in specialised s
+    "4743": "OBC-02",  # Retail sale of audio and video equipment in specialised stor
+    "475": None,       # Retail sale of other household equipment
+    "4751": "MAT-06",  # Retail sale of textiles
+    "4752": "MAT-05",  # Retail sale of hardware, building materials, paints and glas
+    "4753": "FAC-07",  # Retail sale of carpets, rugs, wall and floor coverings
+    "4754": "OBC-02",  # Retail sale of electrical household appliances
+    "4755": "FAC-07",  # Retail sale of furniture, lighting equipment, tableware and 
+    "4759": "FAC-07",  # Retail sale of furniture, lighting equipment and other house
+    "476": "OBC-02",   # Retail sale of cultural and recreational goods
+    "4761": "OBC-02",  # Retail sale of books
+    "4762": "OBC-02",  # Retail sale of newspapers, and other periodical publications
+    "4763": "OBC-02",  # Retail sale of sporting equipment
+    "4764": "OBC-02",  # Retail sale of games and toys
+    "4765": "OBC-02",  # Retail sale of games and toys in specialised stores
+    "4769": "OBC-02",  # Retail sale of cultural and recreational goods n.e.c.
+    "477": None,       # Retail sale of other goods, except motor vehicles and motorc
+    "4771": "MAT-06",  # Retail sale of clothing
+    "4772": "MAT-06",  # Retail sale of footwear and leather goods
+    "4773": "ZDR-03",  # Retail sale of pharmaceutical products
+    "4774": "ZDR-03",  # Retail sale of medical and orthopaedic goods
+    "4775": "OBC-02",  # Retail sale of cosmetic and toilet articles
+    "4776": "OBC-02",  # Retail sale of flowers, plants, fertilisers, pets and pet fo
+    "4777": "OBC-02",  # Retail sale of watches and jewellery
+    "4778": None,      # Retail sale of other new goods
+    "4779": "OBC-02",  # Retail sale of second-hand goods
+    "478": "OBC-03",   # Retail sale of motor vehicles, motorcycles and related parts
+    "4781": "OBC-03",  # Retail sale of motor vehicles
+    "4782": "OBC-03",  # Retail sale of motor vehicle parts and accessories
+    "4783": "OBC-03",  # Retail sale of motorcycles, motorcycle parts and accessories
+    "4789": None,      # Retail sale via stalls and markets of other goods
+    "479": None,       # Intermediation service activities for retail sale
+    "4791": None,      # Intermediation service activities for non-specialised retail
+    "4792": None,      # Intermediation service activities for specialised retail sal
+    "4799": None,      # Other retail sale not in stores, stalls or markets
 
-    # Nemovitosti
-    "68": "FAC-05",
+    # --- H  Transportation and storage ---
+    "49": "LOG-01",    # Land transport and transport via pipelines
+    "491": "LOG-01",   # Passenger rail transport
+    "4910": "LOG-01",  # Passenger rail transport, interurban
+    "4911": "LOG-01",  # Passenger heavy rail transport
+    "4912": "LOG-01",  # Other passenger rail transport
+    "492": "LOG-01",   # Freight rail transport
+    "4920": "LOG-01",  # Freight rail transport
+    "493": "LOG-01",   # Other passenger land transport
+    "4931": "LOG-01",  # Scheduled passenger transport by road
+    "4932": "LOG-01",  # Non-scheduled passenger transport by road
+    "4933": "LOG-01",  # On-demand passenger transport service activities by vehicle 
+    "4934": "LOG-01",  # Passenger transport by cableways and ski lifts
+    "4939": "LOG-01",  # Other passenger land transport n.e.c.
+    "494": "LOG-01",   # Freight transport by road and removal services
+    "4941": "LOG-01",  # Freight transport by road
+    "4942": "LOG-01",  # Removal services
+    "495": "LOG-01",   # Transport via pipeline
+    "4950": "LOG-01",  # Transport via pipeline
+    "50": "LOG-02",    # Water transport
+    "501": "LOG-02",   # Sea and coastal passenger water transport
+    "5010": "LOG-02",  # Sea and coastal passenger water transport
+    "502": "LOG-02",   # Sea and coastal freight water transport
+    "5020": "LOG-02",  # Sea and coastal freight water transport
+    "503": "LOG-02",   # Inland passenger water transport
+    "5030": "LOG-02",  # Inland passenger water transport
+    "504": "LOG-02",   # Inland freight water transport
+    "5040": "LOG-02",  # Inland freight water transport
+    "51": "LOG-02",    # Air transport
+    "511": "LOG-02",   # Passenger air transport
+    "5110": "LOG-02",  # Passenger air transport
+    "512": "LOG-02",   # Freight air transport and space transport
+    "5121": "LOG-02",  # Freight air transport
+    "5122": "LOG-02",  # Space transport
+    "52": None,        # Warehousing, storage and support activities for transportati
+    "521": "LOG-04",   # Warehousing and storage
+    "5210": None,    # Warehousing and storage
+    "522": "LOG-04",   # Support activities for transportation
+    "5221": "LOG-04",  # Service activities incidental to land transportation
+    "5222": "LOG-04",  # Service activities incidental to water transportation
+    "5223": "LOG-04",  # Service activities incidental to air transportation
+    "5224": "LOG-04",  # Cargo handling
+    "5225": "LOG-04",  # Logistics service activities
+    "5226": "LOG-04",  # Other support activities for transportation
+    "5229": "LOG-04",  # Other transportation support activities
+    "523": "LOG-03",   # Intermediation service activities for transportation
+    "5231": "LOG-03",  # Intermediation service activities for freight transportation
+    "5232": "LOG-03",  # Intermediation service activities for passenger transportati
+    "53": "LOG-05",    # Postal and courier activities
+    "531": "LOG-05",   # Postal activities under universal service obligation
+    "5310": "LOG-05",  # Postal activities under universal service obligation
+    "532": "LOG-05",   # Other postal and courier activities
+    "5320": "LOG-05",  # Other postal and courier activities
+    "533": "LOG-05",   # Intermediation service activities for postal and courier act
+    "5330": "LOG-05",  # Intermediation service activities for postal and courier act
 
-    # Profesni, vedecke a technicke cinnosti
-    "69": "PRO-01", "6910": "PRO-01", "6920": "PRO-02",
-    "70": "PRO-04",
-    "71": "PRO-05", "7111": "PRO-05", "7112": "PRO-05", "7120": "PRO-06",
-    "72": "PRO-07",
-    "73": "MKT-01", "7311": "MKT-01", "7312": "MKT-01", "732": "MKT-02",
-    "733": "MKT-01",     # 73.3 Vztahy s verejnosti (PR) - nova skupina v revizi 2025 (2008: PR bylo pod 70.21)
-    "74": "PRO-09", "741": "MKT-01", "7420": "MKT-03", "7430": "PRO-08", "749": "PRO-09",
-    "75": "ZDR-05",
+    # --- I  Accommodation and food service activities ---
+    "55": "FAC-08",    # Accommodation
+    "551": "FAC-08",   # Hotels and similar accommodation
+    "5510": "FAC-08",  # Hotels and similar accommodation
+    "552": "FAC-08",   # Holiday and other short-stay accommodation
+    "5520": "FAC-08",  # Holiday and other short-stay accommodation
+    "553": "FAC-08",   # Camping grounds and recreational vehicle parks
+    "5530": "FAC-08",  # Camping grounds and recreational vehicle parks
+    "554": "FAC-08",   # Intermediation service activities for accommodation
+    "5540": "FAC-08",  # Intermediation service activities for accommodation
+    "559": "FAC-08",   # Other accommodation
+    "5590": "FAC-08",  # Other accommodation
+    "56": "FAC-04",    # Food and beverage service activities
+    "561": "FAC-04",   # Restaurants and mobile food service activities
+    "5610": "FAC-04",  # Restaurants and mobile food service activities
+    "5611": "FAC-04",  # Restaurant activities
+    "5612": "FAC-04",  # Mobile food service activities
+    "562": "FAC-04",   # Event catering, contract catering service activities and oth
+    "5621": "FAC-04",  # Event catering activities
+    "5622": "FAC-04",  # Contract catering service activities and other food service 
+    "5629": "FAC-04",  # Other food service activities
+    "563": "FAC-04",   # Beverage serving activities
+    "5630": "FAC-04",  # Beverage serving activities
+    "564": "FAC-04",   # Intermediation service activities for food and beverage serv
+    "5640": "FAC-04",  # Intermediation service activities for food and beverage serv
 
-    # Administrativni a podpurne cinnosti
-    "77": "TEC-06", "7733": "ICT-07", "7735": "LOG-02",
-    "78": "HR-01", "7810": "HR-01", "7820": "HR-02",
-    # 78.3 (ostatni poskytovani lidskych zdroju) v revizi 2025 zaniklo,
-    # slouceno do 78.2 - jiz pokryto vyse
-    "79": "FAC-08",
-    "80": "SEC-01",
-    "8001": "SEC-01",    # 80.01 Patraci cinnosti a soukrome bezpecnostni agentury
-    "8009": "SEC-02",    # 80.09 Bezpecnostni cinnosti j.n. (2008: 8020) - technicke zabezpeceni
-    "81": "FAC-02", "8121": "FAC-01", "8122": "FAC-01", "8123": "FAC-01", "8130": "FAC-02",
-    "82": "ICT-10", "8210": "ICT-10", "8220": "ICT-10",
-    "8230": "MKT-04", "8291": "FIN-06", "8292": "MAT-04", "8299": "ICT-10",
+    # --- J  Publishing, broadcasting, and content production and distribution activities ---
+    "58": None,        # Publishing activities
+    "581": "MKT-03",   # Publishing of books, newspapers and other publishing activit
+    "5811": "MKT-03",  # Publishing of books
+    "5812": "MKT-03",  # Publishing of newspapers
+    "5813": "MKT-03",  # Publishing of journals and periodicals
+    "5814": "MKT-03",  # Publishing of journals and periodicals
+    "5819": "MKT-03",  # Other publishing activities, except software publishing
+    "582": "ICT-02",   # Software publishing
+    "5821": "ICT-02",  # Publishing of video games
+    "5829": "ICT-02",  # Other software publishing
+    "59": "MKT-05",    # Motion picture, video and television programme production, s
+    "591": "MKT-05",   # Motion picture, video and television programme activities
+    "5911": "MKT-05",  # Motion picture, video and television programme production ac
+    "5912": "MKT-05",  # Motion picture, video and television programme post-producti
+    "5913": "MKT-05",  # Motion picture and video distribution activities
+    "5914": "MKT-05",  # Motion picture projection activities
+    "592": "MKT-05",   # Sound recording and music publishing activities
+    "5920": "MKT-05",  # Sound recording and music publishing activities
+    "60": "MKT-05",    # Programming, broadcasting, news agency and other content dis
+    "601": "MKT-05",   # Radio broadcasting and audio distribution activities
+    "6010": "MKT-05",  # Radio broadcasting and audio distribution activities
+    "602": "MKT-05",   # Television programming, broadcasting and video distribution 
+    "6020": "MKT-05",  # Television programming, broadcasting and video distribution 
+    "603": "MKT-05",   # News agency and other content distribution activities
+    "6031": "MKT-05",  # News agency activities
+    "6039": "MKT-05",  # Other content distribution activities
 
-    # Verejna sprava, vzdelavani, zdravotnictvi
-    "84": "VER-01", "85": "HR-04", "8510": "VER-03", "8520": "VER-03",
-    "853": "VER-03", "854": "VER-03", "8559": "HR-04",
-    "86": "ZDR-01", "8691": "ZDR-02", "87": "ZDR-04", "88": "ZDR-04",
+    # --- K  Telecommunication, computer programming, consulting, computing infrastructure and other information service activities ---
+    "61": "ICT-09",    # Telecommunication
+    "611": "ICT-09",   # Wired, wireless, and satellite telecommunication activities
+    "6110": "ICT-09",  # Wired, wireless, and satellite telecommunication activities
+    "612": "ICT-09",   # Telecommunication reselling activities and intermediation se
+    "6120": "ICT-09",  # Telecommunication reselling activities and intermediation se
 
-    # Ostatni
-    "90": "OST-01", "91": "OST-01", "92": "OST-01", "93": "OST-01",
-    "94": "VER-02",
-    "95": "ICT-11",      # bezpecnostni sit pro cokoli neupresnene nize
-    "9510": "ICT-11",    # 95.10 Opravy pocitacu a komunikacnich zarizeni (2008: zvlast 9511/9512)
-    "952": "OST-02",     # 95.2 Opravy vyrobku pro osobni potrebu/domacnost
-    "953": "OBC-03",     # 95.3 Opravy motorovych vozidel a motocyklu - nova cast divize 95 (byv. cast divize 45)
-    "96": "OST-02", "97": "OST-02", "98": "OST-02", "99": "VER-02",
-}
+    # --- J  Publishing, broadcasting, and content production and distribution activities ---
+    "613": "ICT-09",   # Satellite telecommunications activities
+    "6130": "ICT-09",  # Satellite telecommunications activities
 
+    # --- K  Telecommunication, computer programming, consulting, computing infrastructure and other information service activities ---
+    "619": "ICT-09",   # Other telecommunications activities
+    "6190": "ICT-09",  # Other telecommunications activities
+    "62": None,        # Computer programming, consultancy and related activities
 
+    # --- J  Publishing, broadcasting, and content production and distribution activities ---
+    "620": None,       # Computer programming, consultancy and related activities
+    "6201": "ICT-01",  # Computer programming activities
+    "6202": "ICT-05",  # Computer consultancy activities
+    "6203": "ICT-04",  # Computer facilities management activities
+    "6209": "ICT-04",  # Other information technology and computer service activities
 
+    # --- K  Telecommunication, computer programming, consulting, computing infrastructure and other information service activities ---
+    "621": "ICT-01",   # Computer programming activities
+    "6210": "ICT-01",  # Computer programming activities
+    "622": None,       # Computer consultancy and computer facilities management acti
+    "6220": None,      # Computer consultancy and computer facilities management acti
+    "629": "ICT-04",   # Other information technology and computer service activities
+    "6290": "ICT-04",  # Other information technology and computer service activities
+    "63": None,        # Computing infrastructure, data processing, hosting and other
+    "631": None,       # Computing infrastructure, data processing, hosting and relat
+    "6310": "ICT-03",  # Computing infrastructure, data processing, hosting and relat
 
-# ---------------------------------------------------------------------------
-# Nazvy NACE divizi (2 mistne) - pro citelnost vystupu
-# ---------------------------------------------------------------------------
+    # --- J  Publishing, broadcasting, and content production and distribution activities ---
+    "6311": "ICT-03",  # Data processing, hosting and related activities
+    "6312": "ICT-12",  # Web portals
 
-# Podle CZ-NACE 2025 (viz komentar u NACE_MAPA vyse)
-NACE_DIVIZE = {
-    "01": "Rostlinna a zivocisna vyroba, myslivost a souvisejici cinnosti", "02": "Lesnictvi a tezba dreva",
-    "03": "Rybolov a akvakultura", "05": "Tezba cerneho a hnedeho uhli",
-    "06": "Tezba ropy a zemniho plynu", "07": "Tezba rud",
-    "08": "Tezba a dobyvani ostatnich nerostnych surovin", "09": "Podpurne cinnosti pro tezbu a dobyvani nerostnych surovin",
-    "10": "Vyroba potravinarskych vyrobku", "11": "Vyroba napoju",
-    "12": "Vyroba tabakovych vyrobku", "13": "Vyroba textilii",
-    "14": "Vyroba odevu", "15": "Vyroba usni a souvisejicich vyrobku z jakychkoli materialu",
-    "16": "Zpracovani dreva, vyroba drevenych, korkovych, proutenych a slamenych vyrobku, krome nabytku", "17": "Vyroba papiru a vyrobku z papiru",
-    "18": "Tisk a rozmnozovani nahranych nosicu", "19": "Vyroba koksu a rafinovanych ropnych produktu",
-    "20": "Vyroba chemickych latek a chemickych vyrobku", "21": "Vyroba zakladnich farmaceutickych vyrobku a farmaceutickych pripravku",
-    "22": "Vyroba pryzovych a plastovych vyrobku", "23": "Vyroba ostatnich nekovovych mineralnich vyrobku",
-    "24": "Vyroba zakladnich kovu", "25": "Vyroba kovovych vyrobku, krome stroju a zarizeni",
-    "26": "Vyroba pocitacu a elektronickych a optickych pristroju a zarizeni", "27": "Vyroba elektrickych zarizeni",
-    "28": "Vyroba stroju a zarizeni j. n.", "29": "Vyroba motorovych vozidel, privesu a navesu",
-    "30": "Vyroba ostatnich dopravnich prostredku a zarizeni", "31": "Vyroba nabytku",
-    "32": "Ostatni zpracovatelsky prumysl", "33": "Opravy, udrzba a instalace stroju a zarizeni",
-    "35": "Dodavani elektriny, plynu, pary a klimatizovaneho vzduchu", "36": "Shromazdovani, uprava a distribuce vody",
-    "37": "Cinnosti souvisejici s odpadnimi vodami", "38": "Sber odpadu, zpracovani odpadu k dalsimu vyuziti a odstranovani odpadu",
-    "39": "Sanace a jine cinnosti souvisejici s odpady", "41": "Vystavba bytovych a nebytovych budov",
-    "42": "Vystavba inzenyrskych del", "43": "Specializovane stavebni cinnosti",
-    "46": "Velkoobchod", "47": "Maloobchod",
-    "49": "Pozemni a potrubni doprava", "50": "Vodni doprava",
-    "51": "Letecka doprava", "52": "Skladovani a podpurne cinnosti pro dopravu",
-    "53": "Postovni a kuryrni cinnosti", "55": "Poskytovani ubytovani",
-    "56": "Poskytovani stravovani a podavani napoju", "58": "Vydavatelske cinnosti",
-    "59": "Cinnosti v oblasti filmu, videozaznamu a televiznich poradu, porizovani zvukovych nahravek a hudebni vydavatelske cinnosti",
-    "60": "Tvorba programu, vysilani, cinnosti zpravodajskych tiskovych kancelari a agentur a ostatni cinnosti souvisejici s distribuci obsahu",
-    "61": "Telekomunikacni cinnosti", "62": "Pocitacove programovani, poradenstvi a souvisejici cinnosti",
-    "63": "Poskytovani pocitacove infrastruktury, zpracovani dat, hosting a ostatni informacni cinnosti",
-    "64": "Financni cinnosti, krome pojistovani a penzijniho financovani",
-    "65": "Pojistovaci a zajistovaci cinnosti, penzijni financovani, krome povinneho socialniho zabezpeceni",
-    "66": "Pomocne cinnosti k financnim a pojistovacim cinnostem",
-    "68": "Cinnosti v oblasti nemovitosti", "69": "Pravni a ucetnicke cinnosti",
-    "70": "Cinnosti rizeni podniku a poradenstvi v oblasti podnikani",
-    "71": "Architektonicke a inzenyrske cinnosti; technicke zkousky a analyzy",
-    "72": "Vyzkum a vyvoj", "73": "Cinnosti v oblasti reklamy, pruzkumu trhu a vztahu s verejnosti",
-    "74": "Ostatni odborne, vedecke a technicke cinnosti", "75": "Veterinarni cinnosti",
-    "77": "Cinnosti v oblasti pronajmu a leasingu", "78": "Cinnosti souvisejici se zamestnanim",
-    "79": "Cinnosti cestovnich agentur, kancelari a ostatni rezervacni a souvisejici cinnosti",
-    "80": "Patraci a bezpecnostni cinnosti",
-    "81": "Cinnosti souvisejici se stavbami a upravou krajiny",
-    "82": "Administrativni, kancelarske a jine podpurne cinnosti pro podnikani",
-    "84": "Cinnosti v oblasti verejne spravy, obrany a povinneho socialniho zabezpeceni", "85": "Vzdelavani",
-    "86": "Zdravotni pece", "87": "Pobytove sluzby socialni pece",
-    "88": "Ambulantni nebo terenni socialni sluzby", "90": "Umelecka tvorba a cinnosti v oblasti scenickych umeni",
-    "91": "Cinnosti knihoven, archivu, muzei a jinych kulturnich zarizeni", "92": "Cinnosti heren, kasin a sazkovych kancelari",
-    "93": "Cinnosti v oblasti sportu, zabavy a rekreace",
-    "94": "Cinnosti organizaci sdruzujicich osoby za ucelem prosazovani spolecnych a verejnych zajmu",
-    "95": "Opravy a udrzba pocitacu, vyrobku pro osobni potrebu a prevazne pro domacnost a motorovych vozidel a motocyklu",
-    "96": "Poskytovani osobnich sluzeb",
-    "97": "Cinnosti domacnosti jako zamestnavatelu domaciho personalu",
-    "98": "Cinnosti domacnosti produkujicich blize neurcene vyrobky a sluzby pro vlastni potrebu",
-    "99": "Cinnosti exteritorialnich organizaci a instituci",
+    # --- K  Telecommunication, computer programming, consulting, computing infrastructure and other information service activities ---
+    "639": "ICT-12",   # Web search portal activities and other information service a
+    "6391": "ICT-12",  # Web search portal activities
+    "6392": "ICT-12",  # Other information service activities
+
+    # --- J  Publishing, broadcasting, and content production and distribution activities ---
+    "6399": "ICT-12",  # Other information service activities n.e.c.
+
+    # --- L  Financial and insurance activities ---
+    "64": None,        # Financial service activities, except insurance and pension f
+    "641": "FIN-01",   # Monetary intermediation
+    "6411": "FIN-01",  # Central banking
+    "6419": "FIN-01",  # Other monetary intermediation
+    "642": None,       # Activities of holding companies and financing conduits
+
+    # --- K  Telecommunication, computer programming, consulting, computing infrastructure and other information service activities ---
+    "6420": None,      # Activities of holding companies
+
+    # --- L  Financial and insurance activities ---
+    "6421": None,      # Activities of holding companies
+    "6422": "FIN-05",  # Activities of financing conduits
+    "643": "FIN-05",   # Activities of trusts, funds and similar financial entities
+
+    # --- K  Telecommunication, computer programming, consulting, computing infrastructure and other information service activities ---
+    "6430": "FIN-05",  # Trusts, funds and similar financial entities
+
+    # --- L  Financial and insurance activities ---
+    "6431": "FIN-05",  # Activities of money market and non-money market investments 
+    "6432": "FIN-05",  # Activities of trust, estate and agency accounts
+    "649": None,       # Other financial service activities, except insurance and pen
+    "6491": "FIN-04",  # Financial leasing
+    "6492": "FIN-04",  # Other credit granting
+    "6499": "FIN-05",  # Other financial service activities, except insurance and pen
+    "65": "FIN-03",    # Insurance, reinsurance and pension funding, except compulsor
+    "651": "FIN-03",   # Insurance
+    "6511": "FIN-03",  # Life insurance
+    "6512": "FIN-03",  # Non-life insurance
+    "652": "FIN-03",   # Reinsurance
+    "6520": "FIN-03",  # Reinsurance
+    "653": "FIN-03",   # Pension funding
+    "6530": "FIN-03",  # Pension funding
+    "66": None,        # Activities auxiliary to financial services and insurance act
+    "661": "FIN-05",   # Activities auxiliary to financial services, except insurance
+    "6611": "FIN-05",  # Administration of financial markets
+    "6612": "FIN-05",  # Security and commodity contracts brokerage
+    "6619": "FIN-05",  # Other activities auxiliary to financial services, except ins
+    "662": "FIN-03",   # Activities auxiliary to insurance and pension funding
+    "6621": "FIN-03",  # Risk and damage evaluation
+    "6622": "FIN-03",  # Activities of insurance agents and brokers
+    "6629": "FIN-03",  # Activities auxiliary to insurance and pension funding n.e.c.
+    "663": "FIN-05",   # Fund management activities
+    "6630": "FIN-05",  # Fund management activities
+
+    # --- M  Real estate activities ---
+    "68": None,        # Real estate activities
+    "681": None,       # Real estate activities with own property and development of
+
+    # --- L  Financial and insurance activities ---
+    "6810": None,      # Buying and selling of own real estate
+
+    # --- M  Real estate activities ---
+    "6811": None,      # Buying and selling of own real estate
+    "6812": "STA-01",  # Development of building projects
+    "682": None,       # Rental and operating of own or leased real estate
+    "6820": None,      # Rental and operating of own or leased real estate
+
+    # --- ?  kody mimo nomenklaturu / narodni ---
+    "68200": None,     # 
+
+    # --- M  Real estate activities ---
+    "683": None,       # Real estate activities on a fee or contract basis
+    "6831": "FAC-05",  # Intermediation service activities for real estate activities
+    "6832": "FAC-02",  # Other real estate activities on a fee or contract basis
+
+    # --- N  Professional, scientific and technical activities ---
+    "69": None,        # Legal and accounting activities
+    "691": "PRO-01",   # Legal activities
+    "6910": "PRO-01",  # Legal activities
+    "692": "PRO-02",   # Accounting, bookkeeping and auditing activities; tax consult
+    "6920": "PRO-02",  # Accounting, bookkeeping and auditing activities; tax consult
+    "70": None,        # Activities of head offices and management consultancy
+    "701": None,       # Activities of head offices
+    "7010": None,      # Activities of head offices
+    "702": None,       # Business and other management consultancy activities
+    "7020": None,    # Business and other management consultancy activities
+
+    # --- M  Real estate activities ---
+    "7021": "MKT-01",  # Public relations and communication activities
+    "7022": "PRO-04",  # Business and other management consultancy activities
+
+    # --- N  Professional, scientific and technical activities ---
+    "71": None,        # Architectural and engineering activities; technical testing 
+    "711": "PRO-05",   # Architectural and engineering activities and related technic
+    "7111": "PRO-05",  # Architectural activities
+    "7112": "PRO-05",  # Engineering activities and related technical consultancy
+    "712": "PRO-06",   # Technical testing and analysis
+    "7120": "PRO-06",  # Technical testing and analysis
+    "72": "PRO-07",    # Scientific research and development
+    "721": "PRO-07",   # Research and experimental development on natural sciences an
+    "7210": "PRO-07",  # Research and experimental development on natural sciences an
+
+    # --- M  Real estate activities ---
+    "7211": "PRO-07",  # Research and experimental development on biotechnology
+    "7219": "PRO-07",  # Other research and experimental development on natural scien
+
+    # --- N  Professional, scientific and technical activities ---
+    "722": "PRO-07",   # Research and experimental development on social sciences and
+    "7220": "PRO-07",  # Research and experimental development on social sciences and
+    "73": None,        # Activities of advertising, market research and public relati
+    "731": "MKT-01",   # Advertising
+    "7311": "MKT-01",  # Activities of advertising agencies
+    "7312": "MKT-01",  # Media representation
+    "732": "MKT-02",   # Market research and public opinion polling
+    "7320": "MKT-02",  # Market research and public opinion polling
+    "733": "MKT-01",   # Public relations and communication activities
+    "7330": "MKT-01",  # Public relations and communication activities
+    "74": None,        # Other professional, scientific and technical activities
+    "741": None,       # Specialised design activities
+
+    # --- M  Real estate activities ---
+    "7410": "PRO-09",  # Specialised design activities
+
+    # --- N  Professional, scientific and technical activities ---
+    "7411": "PRO-09",  # Industrial product and fashion design activities
+    "7412": "MKT-01",  # Graphic design and visual communication activities
+    "7413": "FAC-07",  # Interior design activities
+    "7414": "PRO-09",  # Other specialised design activities
+    "742": "MKT-05",   # Photographic activities
+    "7420": "MKT-05",  # Photographic activities
+    "743": "PRO-08",   # Translation and interpretation activities
+    "7430": "PRO-08",  # Translation and interpretation activities
+    "749": None,       # Other professional, scientific and technical activities n.e.
+
+    # --- M  Real estate activities ---
+    "7490": None,      # Other professional, scientific and technical activities n.e.
+
+    # --- N  Professional, scientific and technical activities ---
+    "7491": "PRO-01",  # Patent brokering and marketing service activities
+    "7499": None,      # All other professional, scientific and technical activities 
+    "75": "ZDR-05",    # Veterinary activities
+    "750": "ZDR-05",   # Veterinary activities
+    "7500": "ZDR-05",  # Veterinary activities
+
+    # --- O  Administrative and support service activities ---
+    "77": None,        # Rental and leasing activities
+    "771": "TEC-06",   # Rental and leasing of motor vehicles
+    "7711": "TEC-06",  # Rental and leasing of cars and light motor vehicles
+    "7712": "TEC-06",  # Rental and leasing of trucks
+    "772": "TEC-06",   # Rental and leasing of personal and household goods
+    "7721": "TEC-06",  # Rental and leasing of recreational and sports goods
+    "7722": "TEC-06",  # Rental and leasing of other personal and household goods
+
+    # --- N  Professional, scientific and technical activities ---
+    "7729": "TEC-06",  # Renting and leasing of other personal and household goods
+
+    # --- O  Administrative and support service activities ---
+    "773": None,       # Rental and leasing of other machinery, equipment and tangibl
+    "7731": "TEC-06",  # Rental and leasing of agricultural machinery and equipment
+    "7732": "TEC-06",  # Rental and leasing of construction and civil engineering mac
+    "7733": "ICT-07",  # Rental and leasing of office machinery, equipment and comput
+    "7734": "TEC-06",  # Rental and leasing of water transport equipment
+    "7735": "TEC-06",  # Rental and leasing of air transport equipment
+    "7739": "TEC-06",  # Rental and leasing of other machinery, equipment and tangibl
+    "774": "FIN-05",   # Leasing of intellectual property and similar products, excep
+    "7740": "FIN-05",  # Leasing of intellectual property and similar products, excep
+    "775": "TEC-06",   # Intermediation service activities for rental and leasing of 
+    "7751": "TEC-06",  # Intermediation service activities for rental and leasing of 
+    "7752": "TEC-06",  # Intermediation service activities for rental and leasing of 
+    "78": None,        # Employment activities
+    "781": "HR-01",    # Activities of employment placement agencies
+    "7810": "HR-01",   # Activities of employment placement agencies
+    "782": "HR-02",    # Temporary employment agency activities and other human resou
+    "7820": "HR-02",   # Temporary employment agency activities and other human resou
+
+    # --- N  Professional, scientific and technical activities ---
+    "783": "HR-02",    # Other human resources provision
+    "7830": "HR-02",   # Other human resources provision
+
+    # --- O  Administrative and support service activities ---
+    "79": "FAC-08",    # Travel agency, tour operator and other reservation service a
+    "791": "FAC-08",   # Travel agency and tour operator activities
+    "7911": "FAC-08",  # Travel agency activities
+    "7912": "FAC-08",  # Tour operator activities
+    "799": "FAC-08",   # Other reservation service and related activities
+    "7990": "FAC-08",  # Other reservation service and related activities
+    "80": None,        # Investigation and security activities
+    "800": None,       # Investigation and security activities
+    "8001": "SEC-01",  # Investigation and private security activities
+    "8009": "SEC-02",  # Security activities n.e.c.
+
+    # --- N  Professional, scientific and technical activities ---
+    "801": "SEC-01",   # Private security activities
+    "8010": "SEC-01",  # Private security activities
+    "802": "SEC-02",   # Security systems service activities
+    "8020": "SEC-02",  # Security systems service activities
+    "803": "SEC-01",   # Investigation activities
+    "8030": "SEC-01",  # Investigation activities
+
+    # --- O  Administrative and support service activities ---
+    "81": None,        # Services to buildings and landscape activities
+    "811": "FAC-02",   # Combined facilities support activities
+    "8110": "FAC-02",  # Combined facilities support activities
+    "812": "FAC-01",   # Cleaning activities
+    "8121": "FAC-01",  # General cleaning of buildings
+    "8122": "FAC-01",  # Other building and industrial cleaning activities
+    "8123": "FAC-01",  # Other cleaning activities
+
+    # --- N  Professional, scientific and technical activities ---
+    "8129": "FAC-01",  # Other cleaning activities
+
+    # --- O  Administrative and support service activities ---
+    "813": "FAC-03",   # Landscape service activities
+    "8130": "FAC-03",  # Landscape service activities
+    "82": None,        # Office administrative, office support and other business sup
+    "821": None,       # Office administrative and support activities
+    "8210": None,      # Office administrative and support activities
+
+    # --- N  Professional, scientific and technical activities ---
+    "8211": None,      # Combined office administrative service activities
+    "8219": "MKT-03",  # Photocopying, document preparation and other specialised off
+
+    # --- O  Administrative and support service activities ---
+    "822": "ICT-10",   # Activities of call centres
+    "8220": "ICT-10",  # Activities of call centres
+    "823": "MKT-04",   # Organisation of conventions and trade shows
+    "8230": "MKT-04",  # Organisation of conventions and trade shows
+    "824": None,       # Intermediation service activities for business support servi
+    "8240": None,      # Intermediation service activities for business support servi
+    "829": None,       # Business support service activities n.e.c.
+    "8291": "FIN-06",  # Activities of collection agencies and credit bureaus
+    "8292": "MAT-04",  # Packaging activities
+    "8299": None,      # Other business support service activities n.e.c.
+
+    # --- P  Public administration and defence; compulsory social security ---
+    "84": "VER-01",    # Public administration and defence; compulsory social securit
+    "841": "VER-01",   # Administration of the State and the economic, social and env
+    "8411": "VER-01",  # General public administration activities
+    "8412": "VER-01",  # Regulation of health care, education, cultural services and 
+    "8413": "VER-01",  # Regulation of and contribution to more efficient operation o
+    "842": "VER-01",   # Provision of services to the community as a whole
+    "8421": "VER-01",  # Foreign affairs
+    "8422": "VER-01",  # Defence activities
+    "8423": "VER-01",  # Justice and judicial activities
+    "8424": "VER-01",  # Public order and safety activities
+    "8425": "VER-01",  # Fire service activities
+    "843": "VER-01",   # Compulsory social security activities
+    "8430": "VER-01",  # Compulsory social security activities
+
+    # --- Q  Education ---
+    "85": None,        # Education
+    "851": "VER-03",   # Pre-primary education
+    "8510": "VER-03",  # Pre-primary education
+    "852": "VER-03",   # Primary education
+    "8520": "VER-03",  # Primary education
+    "853": "VER-03",   # Secondary and post-secondary non-tertiary education
+    "8531": "VER-03",  # General secondary education
+    "8532": "VER-03",  # Vocational secondary education
+    "8533": "VER-03",  # Post-secondary non-tertiary education
+    "854": "VER-03",   # Tertiary education
+    "8540": "VER-03",  # Tertiary education
+
+    # --- P  Public administration and defence; compulsory social security ---
+    "8541": "VER-03",  # Post-secondary non-tertiary education
+    "8542": "VER-03",  # Tertiary education
+
+    # --- Q  Education ---
+    "855": "HR-04",    # Other education
+    "8551": "HR-04",   # Sports and recreation education
+    "8552": "HR-04",   # Cultural education
+    "8553": "HR-04",   # Driving school activities
+    "8559": "HR-04",   # Other education n.e.c.
+    "856": "HR-04",    # Educational support activities
+
+    # --- P  Public administration and defence; compulsory social security ---
+    "8560": "HR-04",   # Educational support activities
+
+    # --- Q  Education ---
+    "8561": "HR-04",   # Intermediation service activities for courses and tutors
+    "8569": "HR-04",   # Educational support activities n.e.c.
+
+    # --- R  Human health and social work activities ---
+    "86": None,        # Human health activities
+    "861": "ZDR-01",   # Hospital activities
+    "8610": "ZDR-01",  # Hospital activities
+    "862": "ZDR-01",   # Medical and dental practice activities
+    "8621": "ZDR-01",  # General medical practice activities
+    "8622": "ZDR-01",  # Medical specialists activities
+    "8623": "ZDR-01",  # Dental practice care activities
+    "869": None,       # Other human health activities
+
+    # --- Q  Education ---
+    "8690": "ZDR-01",  # Other human health activities
+
+    # --- R  Human health and social work activities ---
+    "8691": "ZDR-02",  # Diagnostic imaging services and medical laboratory activitie
+    "8692": "ZDR-01",  # Patient transportation by ambulance
+    "8693": "ZDR-01",  # Activities of psychologists and psychotherapists, except med
+    "8694": "ZDR-01",  # Nursing and midwifery activities
+    "8695": "ZDR-01",  # Physiotherapy activities
+    "8696": "ZDR-01",  # Traditional, complementary and alternative medicine activiti
+    "8697": "ZDR-01",  # Intermediation service activities for medical, dental and ot
+    "8699": "ZDR-01",  # Other human health activities n.e.c.
+    "87": "ZDR-04",    # Residential care activities
+    "871": "ZDR-04",   # Residential nursing care activities
+    "8710": "ZDR-04",  # Residential nursing care activities
+    "872": "ZDR-04",   # Residential care activities for persons living with or havin
+    "8720": "ZDR-04",  # Residential care activities for persons living with or havin
+    "873": "ZDR-04",   # Residential care activities for older persons or persons wit
+    "8730": "ZDR-04",  # Residential care activities for older persons or persons wit
+    "879": "ZDR-04",   # Other residential care activities
+
+    # --- Q  Education ---
+    "8790": "ZDR-04",  # Other residential care activities
+
+    # --- R  Human health and social work activities ---
+    "8791": "ZDR-04",  # Intermediation service activities for residential care activ
+    "8799": "ZDR-04",  # Other residential care activities n.e.c.
+    "88": "ZDR-04",    # Social work activities without accommodation
+    "881": "ZDR-04",   # Social work activities without accommodation for older perso
+    "8810": "ZDR-04",  # Social work activities without accommodation for older perso
+    "889": "ZDR-04",   # Other social work activities without accommodation
+    "8891": "ZDR-04",  # Child day-care activities
+    "8899": "ZDR-04",  # Other social work activities without accommodation n.e.c.
+
+    # --- S  Arts, sports and recreation ---
+    "90": "OST-01",    # Arts creation and performing arts activities
+
+    # --- R  Human health and social work activities ---
+    "900": "OST-01",   # Creative, arts and entertainment activities
+    "9001": "OST-01",  # Performing arts
+    "9002": "OST-01",  # Support activities to performing arts
+    "9003": "OST-01",  # Artistic creation
+    "9004": "OST-01",  # Operation of arts facilities
+
+    # --- S  Arts, sports and recreation ---
+    "901": "OST-01",   # Arts creation activities
+    "9011": "OST-01",  # Literary creation and musical composition activities
+    "9012": "OST-01",  # Visual arts creation activities
+    "9013": "OST-01",  # Other arts creation activities
+    "902": "OST-01",   # Activities of performing arts
+    "9020": "OST-01",  # Activities of performing arts
+    "903": "OST-01",   # Support activities to arts creation and performing arts
+    "9031": "OST-01",  # Operation of arts facilities and sites
+    "9039": "OST-01",  # Other support activities to arts and performing arts
+    "91": "OST-01",    # Libraries, archives, museums and other cultural activities
+
+    # --- R  Human health and social work activities ---
+    "910": "OST-01",   # Libraries, archives, museums and other cultural activities
+    "9101": "OST-01",  # Library and archives activities
+    "9102": "OST-01",  # Museums activities
+    "9103": "OST-01",  # Operation of historical sites and buildings and similar visi
+    "9104": "OST-01",  # Botanical and zoological gardens and nature reserves activit
+
+    # --- S  Arts, sports and recreation ---
+    "911": "OST-01",   # Library and archive activities
+    "9111": "OST-01",  # Library activities
+    "9112": "OST-01",  # Archive activities
+    "912": "OST-01",   # Museum, collection, historical site and monument activities
+    "9121": "OST-01",  # Museum and collection activities
+    "9122": "OST-01",  # Historical site and monument activities
+    "913": "OST-01",   # Conservation, restoration and other support activities for c
+    "9130": "OST-01",  # Conservation, restoration and other support activities for c
+    "914": "OST-01",   # Botanical and zoological garden and nature reserve activitie
+    "9141": "OST-01",  # Botanical and zoological garden activities
+    "9142": "OST-01",  # Nature reserve activities
+    "92": "OST-01",    # Gambling and betting activities
+    "920": "OST-01",   # Gambling and betting activities
+    "9200": "OST-01",  # Gambling and betting activities
+    "93": "OST-01",    # Sports activities and amusement and recreation activities
+    "931": "OST-01",   # Sports activities
+    "9311": "OST-01",  # Operation of sports facilities
+    "9312": "OST-01",  # Activities of sport clubs
+    "9313": "OST-01",  # Activities of fitness centres
+    "9319": "OST-01",  # Sports activities n.e.c.
+    "932": "OST-01",   # Amusement and recreation activities
+    "9321": "OST-01",  # Activities of amusement parks and theme parks
+    "9329": "OST-01",  # Amusement and recreation activities n.e.c.
+
+    # --- T  Other service activities ---
+    "94": "VER-02",    # Activities of membership organisations
+    "941": "VER-02",   # Activities of business, employers and professional membershi
+    "9411": "VER-02",  # Activities of business and employers membership organisation
+    "9412": "VER-02",  # Activities of professional membership organisations
+    "942": "VER-02",   # Activities of trade unions
+    "9420": "VER-02",  # Activities of trade unions
+    "949": "VER-02",   # Activities of other membership organisations
+    "9491": "VER-02",  # Activities of religious organisations
+    "9492": "VER-02",  # Activities of political organisations
+    "9499": "VER-02",  # Activities of other membership organisations n.e.c.
+    "95": None,        # Repair and maintenance of computers, personal and household 
+    "951": "ICT-11",   # Repair and maintenance of computers and communication equipm
+    "9510": "ICT-11",  # Repair and maintenance of computers and communication equipm
+
+    # --- S  Arts, sports and recreation ---
+    "9511": "ICT-11",  # Repair of computers and peripheral equipment
+    "9512": "ICT-11",  # Repair of communication equipment
+
+    # --- T  Other service activities ---
+    "952": None,       # Repair and maintenance of personal and household goods
+    "9521": "ICT-11",  # Repair and maintenance of consumer electronics
+    "9522": "OST-02",  # Repair and maintenance of household appliances and home and 
+    "9523": "OST-02",  # Repair and maintenance of footwear and leather goods
+    "9524": "OST-02",  # Repair and maintenance of furniture and home furnishings
+    "9525": "OST-02",  # Repair and maintenance of watches, clocks and jewellery
+    "9529": "OST-02",  # Repair and maintenance of personal and household goods n.e.c
+    "953": "OBC-03",   # Repair and maintenance of motor vehicles and motorcycles
+    "9531": "OBC-03",  # Repair and maintenance of motor vehicles
+    "9532": "OBC-03",  # Repair and maintenance of motorcycles
+    "954": "OST-02",   # Intermediation service activities for repair and maintenance
+    "9540": "OST-02",  # Intermediation service activities for repair and maintenance
+    "96": "OST-02",    # Personal service activities
+
+    # --- S  Arts, sports and recreation ---
+    "960": "OST-02",   # Other personal service activities
+    "9601": "OST-02",  # Washing and (dry-)cleaning of textile and fur products
+    "9602": "OST-02",  # Hairdressing and other beauty treatment
+    "9603": "OST-02",  # Funeral and related activities
+    "9604": "OST-02",  # Physical well-being activities
+    "9609": "OST-02",  # Other personal service activities n.e.c.
+
+    # --- T  Other service activities ---
+    "961": "OST-02",   # Washing and cleaning of textile and fur products
+    "9610": "OST-02",  # Washing and cleaning of textile and fur products
+    "962": "OST-02",   # Hairdressing, beauty treatment, day spa and similar activiti
+    "9621": "OST-02",  # Hairdressing and barber activities
+    "9622": "OST-02",  # Beauty care and other beauty treatment activities
+    "9623": "OST-02",  # Day spa, sauna and steam bath activities
+    "963": "OST-02",   # Funeral and related activities
+    "9630": "OST-02",  # Funeral and related activities
+    "964": "OST-02",   # Intermediation service activities for personal services
+    "9640": "OST-02",  # Intermediation service activities for personal services
+    "969": "OST-02",   # Other personal service activities
+    "9691": "OST-02",  # Provision of domestic personal service activities
+    "9699": "OST-02",  # Other personal service activities n.e.c.
+
+    # --- U  Activities of households as employers and undifferentiated goods- and service-producing activities of households for own use ---
+    "97": None,        # Activities of households as employers of domestic personnel
+    "970": None,       # Activities of households as employers of domestic personnel
+    "9700": None,      # Activities of households as employers of domestic personnel
+    "98": None,        # Undifferentiated goods- and service-producing activities of 
+    "981": None,       # Undifferentiated goods-producing activities of private house
+    "9810": None,      # Undifferentiated goods-producing activities of private house
+    "982": None,       # Undifferentiated service-producing activities of private hou
+    "9820": None,      # Undifferentiated service-producing activities of private hou
+    "99": "VER-02",    # Activities of extraterritorial organisations and bodies
+    "990": "VER-02",   # Activities of extraterritorial organisations and bodies
+    "9900": "VER-02",  # Activities of extraterritorial organisations and bodies
+
+    # --- ?  kody mimo nomenklaturu / narodni ---
+    "99999": None,     # 
 }
 
 # Hrube mapovani US SIC -> NACE (pro data ze SEC EDGAR)
@@ -624,7 +1761,12 @@ NAICS_SEKTORY = {
 # ---------------------------------------------------------------------------
 
 def _prefix(kod, mapa):
-    """Vrati hodnotu pro nejdelsi prefix kodu, ktery je v mape."""
+    """
+    Vrati hodnotu pro nejdelsi prefix kodu, ktery je v mape. Pouziva se uz jen
+    pro prevodniky US SIC (SIC_NA_NACE, SIC_NA_NAICS), kde jsou klice na urovni
+    odvetvi a prefixove hledani je tam na miste - zarazeni dodavatele se timhle
+    zpusobem uz nedela, o tom rozhoduje kategorie_kodu() nad NACE_KATEGORIE.
+    """
     if not kod:
         return None
     kod = "".join(ch for ch in str(kod) if ch.isdigit())
@@ -688,54 +1830,108 @@ def obor_na_kategorii(qidy, mapa_oboru=None):
 
 
 def nazev_nace(kod):
-    """Cesky nazev NACE divize podle prvnich dvou cislic."""
-    if not kod:
-        return ""
-    cislice = "".join(ch for ch in str(kod) if ch.isdigit())
-    return NACE_DIVIZE.get(cislice[:2], "")
+    """Uredni nazev cinnosti z nomenklatury (anglicky, viz nace_nomenklatura)."""
+    return nace_nomenklatura.nazev(kod)
 
 
-def zarad(nace=None, mapa=None, kategorie=None, obory=None, mapa_oboru=None):
+def kategorie_kodu(kod, mapa=None):
     """
-    Zaradi dodavatele do vlastni taxonomie.
+    Kategorie pro NACE kod, nebo None kdyz kod kategorii neurcuje.
 
-    Poradi duveryhodnosti podkladu:
-        1. NACE z rejstriku (CZ, FR, ...)  - nejpresnejsi, skutecny udaj
-        2. obor cinnosti z Wikidat (QID)   - strukturovany udaj, ne odhad z
-                                             textu; jazykove nezavisly, funguje
-                                             i pro korejskou nebo tureckou firmu
-
-    Zamerne se NEODHADUJE kategorie z klicovych slov v nazvu firmy - shoda
-    slova v nazvu neni fakt o oboru cinnosti a muze byt vylozene mylna
-    (napr. "Deutsche Akkreditierungsstelle" nema nic spolecneho s uverem,
-    i kdyz "kredit" jako podretezec sedi). Bez NACE nebo oboru z Wikidat
-    jde zaznam do XXX-00 k rucnimu dohledani, misto nejisteho odhadu.
-
-    Vrati dict:
-        kod       - kod kategorie, napr. "ICT-03"
-        kategorie - nazev kategorie
-        skupina   - nadrazena skupina
-        zdroj     - 'nace' | 'obor' | 'vychozi'
-        nace      - odhad NACE z oboru, pokud zadny NACE na vstupu nebyl
+    Prochazi se od nejdelsiho prefixu kvuli narodnim kodum s cislici navic -
+    britska UK SIC "62012" i nemecka WZ "62.01.0" vedou na tridu "6210".
     """
-    mapa = mapa if mapa is not None else NACE_MAPA
+    mapa = mapa if mapa is not None else NACE_KATEGORIE
+    cislice = "".join(ch for ch in str(kod or "") if ch.isdigit())
+    for delka in range(len(cislice), 1, -1):
+        if cislice[:delka] in mapa:
+            return mapa[cislice[:delka]]
+    return None
+
+
+def zarad(kody=None, obory=None, nace=None, mapa=None, kategorie=None, mapa_oboru=None):
+    """
+    Zaradi dodavatele do vlastni taxonomie. Kategorii priradi, jen kdyz je
+    jista - jinak vrati XXX-00 a skutecnou cinnost dohleda krok --export-llm.
+
+    Pravidlo je jedno jedine:
+
+        KAZDY zapsany obor firmy musi urcovat kategorii a vsechny musi vest
+        na tutez. Staci jeden obor, ktery kategorii neurcuje nebo ukazuje
+        jinam, a zaznam jde k overeni.
+
+    Neurcujici obor tedy zaznam NEDISKVALIFIKUJE jen sam za sebe - bere se jako
+    znamka, ze zapis firmy je "ozdobny" (kody nabrane pri zalozeni pro jistotu),
+    a pak nejde verit ani tem konkretnim. Merenim to sedi: na 25 rucne overenych
+    firmach toto pravidlo odchytilo VSECH 9 pripadu, kde zapsany kod neodpovidal
+    skutecne cinnosti (hudebni klub zapsany jako destilace lihovin, truhlarstvi
+    jako vystavba budov, penzion jako restaurace).
+
+    Firma nema jeden hlavni obor - ma jich zapsanych vic (Asseco Central Europe
+    23, CEZ 36) a rejstriky mezi nimi nerozlisuji. Prevazujici cinnost z ceskeho
+    RES je proto jen dalsi kod v mnozine, ne autorita: merenim se ukazalo, ze
+    i ona casto neodpovida tomu, co firma opravdu dela (viz DOCS.md).
+
+    Kdyz zadny zapsany obor kategorii neurci, zkusi se jeste obor cinnosti
+    z Wikidat (QID) - mapa oboru je psana po jednom QID, takze je to tvrzeni
+    o oboru firmy, ne dopocet z odvetvi.
+
+    Kategorie se NEHADA z nazvu firmy: shoda slova v nazvu neni fakt o oboru
+    cinnosti a muze byt vylozene mylna (napr. "Deutsche Akkreditierungsstelle"
+    nema nic spolecneho s uverem, i kdyz "kredit" jako podretezec sedi).
+
+    Argumenty:
+        kody  - vsechny zapsane NACE kody firmy
+        obory - QID oboru cinnosti z Wikidat
+        nace  - zkratka pro jediny kod (kody=[nace])
+
+    Vrati dict: kod, kategorie, skupina, zdroj ('nace' | 'obor' | 'vychozi'),
+    nace (odhad NACE z oboru, pokud zadny NACE na vstupu nebyl).
+    """
+    mapa = mapa if mapa is not None else NACE_KATEGORIE
     kategorie = kategorie if kategorie is not None else KATEGORIE
+    kody = list(kody or ([nace] if nace else []))
 
     kod, zdroj, nace_odhad = None, "vychozi", ""
-    if nace:
-        kod = _prefix(nace, mapa)
-        if kod:
-            zdroj = "nace"
+
+    nalezene = {kategorie_kodu(c, mapa) for c in kody}
+    if kody and len(nalezene) == 1 and None not in nalezene:
+        kod, zdroj = nalezene.pop(), "nace"
+
     if not kod and obory:
         kod, nace_odhad = obor_na_kategorii(obory, mapa_oboru)
         if kod:
             zdroj = "obor"
+
     if not kod:
         kod = VYCHOZI_KOD
 
     skupina, nazev_kat = kategorie.get(kod, kategorie[VYCHOZI_KOD])
-    return {"kod": kod, "kategorie": nazev_kat, "skupina": skupina, "zdroj": zdroj,
-            "nace": nace_odhad}
+    return {"kod": kod, "kategorie": nazev_kat, "skupina": skupina,
+            "zdroj": zdroj, "nace": nace_odhad}
+
+
+def nedosazitelne_kategorie(mapa=None, kategorie=None):
+    """
+    Kategorie, na ktere nevede zadny NACE kod - tedy ty, ktere se pres NACE
+    vyjadrit nedaji, at uz je kod jakkoli spravny.
+
+    Mnozina se ODVOZUJE z tabulky, nevypisuje se rucne: kdyz nejaky kod dostane
+    kategorii nebo se prida nova kategorie, odpoved se zmeni sama (plati i pro
+    vlastni taxonomii nactenou pres --taxonomie).
+
+    Vznikaji proto, ze nase taxonomie je misty jemnejsi nez NACE: 6920 je
+    "Accounting, bookkeeping and auditing activities" - jeden kod pro nase
+    PRO-02 i PRO-03, vest muze jen na jednu z nich. Pro kyberbezpecnost, payroll
+    nebo skartaci nosicu dat NACE zvlastni kod vubec nema.
+
+    Prave u techto kategorii ma smysl vzit primy navrh kategorie od LLM misto
+    kategorie z NACE - viz pouzij_llm_mapu() v dodavatele.py.
+    """
+    mapa = mapa if mapa is not None else NACE_KATEGORIE
+    kategorie = kategorie if kategorie is not None else KATEGORIE
+    dosazitelne = {k for k in mapa.values() if k}
+    return {k for k in kategorie if k not in dosazitelne and k != VYCHOZI_KOD}
 
 
 def prehled_kategorii():
@@ -743,15 +1939,40 @@ def prehled_kategorii():
     return sorted(((k, v[0], v[1]) for k, v in KATEGORIE.items()))
 
 
-def prehled_nace_divizi():
-    """Serazeny seznam (kod, nazev) NACE divizi (2 cislice) - pro ciselnik ve vystupu."""
-    return sorted(NACE_DIVIZE.items())
+def chybejici_kody(mapa=None):
+    """
+    Kody z nomenklatury, ktere v tabulce nejsou. Tabulka ma byt UPLNA, takze
+    neprazdny vysledek je defekt, ne varianta chovani.
+    """
+    mapa = mapa if mapa is not None else NACE_KATEGORIE
+    return sorted(k for k in nace_nomenklatura.NACE if k not in mapa)
+
+
+def pokryti(mapa=None):
+    """Kolik kodu kategorii urcuje a kolik ne, + kolik jich v tabulce chybi."""
+    mapa = mapa if mapa is not None else NACE_KATEGORIE
+    urcuje = sum(1 for k in mapa.values() if k)
+    return {"urcuje": urcuje, "neurcuje": len(mapa) - urcuje,
+            "chybi": len(chybejici_kody(mapa))}
+
+
+def prehled_nace(mapa=None):
+    """
+    Cela nomenklatura NACE pro list ve vystupu: seznam
+    (kod, uroven, nazev, sekce, revize, kategorie). Prazdna kategorie znamena,
+    ze kod o predmetu dodavky nerika nic pouzitelneho.
+    """
+    mapa = mapa if mapa is not None else NACE_KATEGORIE
+    return [(kod, nace_nomenklatura.uroven(kod), nazev,
+             "%s - %s" % (sekce, nace_nomenklatura.SEKCE.get(sekce, "")),
+             revize, mapa.get(kod) or "")
+            for kod, nazev, sekce, revize in nace_nomenklatura.vsechny()]
 
 
 def jako_json():
     return {
         "kategorie": {k: list(v) for k, v in KATEGORIE.items()},
-        "nace_mapa": NACE_MAPA,
+        "nace_kategorie": NACE_KATEGORIE,
         "vychozi_kod": VYCHOZI_KOD,
         "sic_na_nace": SIC_NA_NACE,
         "sic_na_naics": SIC_NA_NAICS,
@@ -760,9 +1981,9 @@ def jako_json():
 
 
 def z_json(data):
-    """Vrati (mapa, kategorie, mapa_oboru) z JSON podoby taxonomie."""
+    """Vrati (mapa NACE, kategorie, mapa_oboru) z JSON podoby taxonomie."""
     kat = {k: tuple(v) for k, v in data.get("kategorie", {}).items()} or KATEGORIE
-    mapa = data.get("nace_mapa") or NACE_MAPA
+    mapa = data.get("nace_kategorie") or NACE_KATEGORIE
     oboru = ({k: tuple(v) for k, v in data.get("wikidata_obory", {}).items()}
              or WIKIDATA_OBORY)
     return mapa, kat, oboru

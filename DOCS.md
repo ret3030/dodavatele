@@ -8,8 +8,7 @@ seznam přepínačů/kategorií.
 - [Vstup](#vstup)
 - [Výstup](#výstup)
 - [Dohledání identifikátoru pro zahraniční firmy (--jen-id)](#dohledání-identifikátoru-pro-zahraniční-firmy---jen-id)
-- [Ruční zařazení nekategorizovaných firem přes LLM chat (--export-nezarazene)](#ruční-zařazení-nekategorizovaných-firem-přes-llm-chat---export-nezarazene)
-- [Plošné ověření kategorie přes LLM (--export-overeni)](#plošné-ověření-kategorie-přes-llm---export-overeni-jen-cli)
+- [Zařazení dodavatelů přes LLM chat (--export-llm)](#zařazení-dodavatelů-přes-llm-chat---export-llm)
 - [Komparace NACE s externím zdrojem (--komparace)](#komparace-nace-s-externím-zdrojem---komparace)
 - [Zdroje dat](#zdroje-dat)
 - [Taxonomie kategorií](#taxonomie-kategorií)
@@ -88,17 +87,26 @@ pro kontrolu (`--kompakt` je vypne):
   zvlášť nezobrazuje, aby nepůsobil jako jistota, kterou často není.
 * **NACE - zdroj** – rozlišuje skutečný NACE z rejstříku (ARES, INSEE) od
   odhadu z oboru na Wikidatech, který je méně přesný.
-* **NACE (LLM)** – vyplní se jen po použití `--nace-mapa`/`--overeni-mapa`
-  (viz "Ruční zařazení" níže) - NACE kód, který k firmě dohledal člověk/LLM
-  chat, vedle zapsaných kódů z rejstříku ve sloupci NACE (všechny).
+* **NACE (LLM)** – vyplní se jen po použití `--llm-mapa` (viz "Zařazení
+  dodavatelů přes LLM chat" níže) - NACE kód, který k firmě dohledal
+  člověk/LLM chat, vedle zapsaných kódů z rejstříku ve sloupci NACE (všechny).
+* **Kategorie (LLM)** – kód kategorie, který k firmě navrhl přímo LLM chat
+  (`--llm-mapa`). U většiny firem je to rozhodující údaj, protože z NACE se
+  kategorie určí jen u konkrétních tříd - viz "Kdy se kategorie určí z NACE".
 * **Klasifikace (US NAICS)** – u amerických dodavatelů severoamerická obdoba
   NACE (NACE se u USA jen odhaduje pro účely vlastní taxonomie).
 
 XLSX má druhý list **Číselník kategorií** s celou taxonomií a počtem
-dodavatelů v každé kategorii, a třetí list **Číselník NACE** s názvy všech
-NACE divizí (2místné kódy) - aby šlo kód ze sloupce NACE (všechny) dohledat
-v plném znění i bez opuštění sešitu (pro klienta apod.). Jde jen o hlavní
-divize, ne o kompletní podrobnou nomenklaturu (tisíce 4-6místných tříd).
+dodavatelů v každé kategorii, a třetí list **Číselník NACE** s **kompletní
+nomenklaturou** - 86 divizí, 286 skupin a 650 tříd NACE Rev. 2.1 plus 132
+kódů, které žily jen ve staré Rev. 2 a rejstříky je pořád vracejí. Každý kód
+má úřední anglický název, sekci, revizi a kategorii, do které vede — prázdná
+kategorie znamená, že kód o předmětu dodávky nic neříká. List má autofiltr.
+
+Názvy jsou anglické záměrně - jsou to citace číselníku a překlad by z nich
+udělal náš text, který už nejde ověřit proti zdroji. Nomenklatura je
+v `nace_nomenklatura.py`, generovaná z Eurostat SDMX (codelisty
+`ESTAT/NACE_R2_1` a `ESTAT/NACE_R2`); URL je uvedená v hlavičce souboru.
 
 ### Sloupec „Stav“
 
@@ -173,32 +181,95 @@ už neexistuje, takže nemá smysl vyplňovat aktuální adresu/NACE. Pokud ani 
 nic nenajde, ověřte IČO ručně např. v insolvenčním rejstříku nebo Obchodním
 věstníku.
 
-#### Firma má v ARES víc oborů podnikání a kategorie nesedí
+#### Firma má víc oborů podnikání a kategorie nesedí
 
-U českých firem se kategorie určuje z pole **převažující činnost** (RES),
-které ARES vede jako oficiální označení hlavního oboru napříč všemi
-zapsanými NACE kódy — u firem s víc obory (typicky OSVČ s víc živnostmi)
-tak nejde o náhodný výběr, ale o údaj, který přímo rejstřík označuje jako
-hlavní.
+Kategorie se vždycky počítá z **jednoho** kódu (sloupec **NACE (všechny)** je
+jen informativní). Který to je, závisí na rejstříku:
 
-Dvě situace, kdy to přesto nesedí:
+| Zdroj | Hlavní NACE |
+|---|---|
+| **ČR** (ARES) | **převažující činnost** z RES; když chybí, první nepodpůrný kód ze seznamu — viz níže |
+| **FR** (INSEE) | NAF/APE — rejstřík vede jediný oficiální kód hlavní činnosti |
+| **Scoris** (Pobaltí, SE/FI) | jediný kód `nace_code` z API |
+| **GB** (Companies House) | první nepodpůrný z `SIC1`..`SIC4` (rejstřík hlavní kód neoznačuje) |
+| **DE** (OpenRegister.de) | první nepodpůrný z WZ2025 (rejstřík hlavní kód neoznačuje) |
+| bez rejstříku | žádný NACE → obor činnosti z Wikidat (QID) |
 
-* **Firma nemá převažující činnost formálně nastavenou.** RES pak vrací
-  kód `00` ("neurčeno") — nástroj ho ignoruje (jinak by přepsal i dobře
-  určený obor nepoužitelnou hodnotou) a spadne zpět na první nepodpůrný kód
-  ze seznamu všech zapsaných NACE. Pokud i to selže, zůstává `XXX-00` —
-  firma opravdu žádný použitelný kód nemá.
-* **Převažující činnost je obecný/podpůrný kód** (např. `6820` pronájem
-  nemovitostí — mnoho firem ho má zapsaný jen jako formální rezervu při
-  založení, ne jako skutečnou náplň podnikání; jiné firmy jsou naopak čistě
-  majetková/holdingová entita v rámci skupiny, kde je "pronájem" fakticky
-  správný údaj, i když název firmy evokuje jiný byznys operující firmy ve
-  skupině). Nástroj takový kód nepřehazuje za jiný ani nehádá z názvu firmy
-  (obojí by bylo hádání bez záruky) — pokud má firma zapsaný i jiný kód,
-  doplní do **Poznámky** upozornění a odkáže na sloupec **NACE (všechny)**
-  k ručnímu porovnání. Pokud je to **jediný** zapsaný kód, nemá se s čím
-  porovnat — řádek dostane stav `OVERIT` a firma se automaticky zařadí i do
-  `--export-nezarazene` (viz níže), i když formálně kategorii má.
+### Kdy se kategorie přiřadí
+
+Pravidlo je jedno jediné:
+
+> **Každý zapsaný obor firmy musí určovat kategorii a všechny musí vést na
+> tutéž.** Stačí jeden obor, který kategorii neurčuje nebo ukazuje jinam,
+> a záznam jde k ověření.
+
+Obecný obor tedy záznam nediskvalifikuje jen sám za sebe — bere se jako známka,
+že zápis firmy je „ozdobný" (kódy nabrané při založení pro jistotu), a pak nejde
+věřit ani těm konkrétním. Firma s NACE `6210` (programování) **a** `6820`
+(pronájem nemovitostí) kategorii nedostane, i když první kód vypadá jasně.
+
+Co který kód znamená, je v `taxonomie.NACE_KATEGORIE` — mapa `kód → kategorie`,
+nebo `None`, když kód o předmětu dodávky neříká nic použitelného (formální
+registrace jako pronájem nemovitostí nebo „ostatní podpůrné činnosti", národní
+pseudokódy jako britské `99999 Dormant company`). Tabulka je **úplná** —
+obsahuje všech 1 158 kódů, takže nepřítomnost kódu je chyba k nahlášení
+(`taxonomie.chybejici_kody()`), ne tiché „platí něco obecného".
+
+```
+python3 -c "import taxonomie; print(taxonomie.pokryti())"
+{'urcuje': 1058, 'neurcuje': 100, 'chybi': 0}
+```
+
+Firma dělající 3D tisk zapsaná jako `4791` (zprostředkování maloobchodu)
+kategorii z toho kódu nedostane — říká prodejní kanál, ne obor.
+
+### Firma nemá jeden hlavní NACE
+
+Rejstříky vedou u firmy víc zapsaných oborů a hlavní mezi nimi neoznačují —
+Asseco Central Europe jich má v ARES 23, ČEZ 36. Dřív z nich nástroj jeden
+vybíral podle pořadí v seznamu, později dával přednost převažující činnosti
+z RES. **Obojí se měřením ukázalo jako nespolehlivé** (viz „Přesnost zařazení"
+níže), protože zapsaný kód často neodpovídá tomu, co firma dělá. Převažující
+činnost z RES je proto jen další kód v množině, ne autorita.
+
+### Přesnost zařazení
+
+Změřeno na vzorku z ARES — 1 000 subjektů z pěti okresních měst (600 s.r.o.
+a 400 OSVČ); skutečnou činnost části firem jsem ověřil přes web:
+
+| | |
+|---|---|
+| kategorii dostane automaticky | **8,8 %** (OSVČ 17 %, s.r.o. 3 %) |
+| zbytek jde k ověření | 91 % |
+
+Pokrytí je nízké schválně. Volnější pravidlo (ignorovat obecné obory a spoléhat
+na shodu těch konkrétních) zařadí 30 % dodavatelů, ale ověřením se ukázalo, že
+zhruba **každý druhý takový záznam je špatně**. Přísné pravidlo odchytilo
+**všech 9 chybných zařazení**, která jsem ručně dohledal — hudební klub zapsaný
+jako `11010 Destilace lihovin`, truhlářství jako `41000 Výstavba budov`, penzion
+jako `56110 Restaurace`, výrobce rozvaděčů jako `331 Opravy kovových výrobků`.
+
+**Ani tohle pravidlo ale není stoprocentní** a nemůže být. Chyby nevznikají
+špatným mapováním v tabulce, ale tím, že rejstříkový kód neodpovídá realitě —
+a to z kódu nepozná nikdo. Ověřený protipříklad: OSVČ s jediným zapsaným kódem
+`27900 Výroba ostatních elektrických zařízení` ve skutečnosti dělá
+elektroinstalace, tedy STA-04, ne TEC-04. Žádné pravidlo nad rejstříkovými daty
+tenhle strop neposune; skutečnou činnost doplní až krok
+[`--export-llm`](#zařazení-dodavatelů-přes-llm-chat---export-llm).
+
+Pětimístné národní kódy (britská UK SIC 2007 `62012`, německá WZ `62.01.0`)
+se vyhledají přes svou NACE třídu `6210`.
+
+ARES u českých firem vede navíc pole **převažující činnost** (RES), které
+označuje jeden z oborů jako hlavní. Nástroj ho stahuje a zapisuje do sloupce
+**NACE**, ale při zařazování ho bere jen jako další kód v množině — měření
+ukázalo, že i tenhle údaj bývá formální nebo zastaralý.
+
+Když je zapsaný kód obecný nebo formální (`6820` pronájem nemovitostí, `7010`
+sídlo podniku), nástroj ho nepřehazuje za jiný ani nehádá z názvu firmy —
+doplní upozornění do **Poznámky** a odkáže na sloupec **NACE (všechny)**.
+Je-li to jediný zapsaný kód, řádek dostane stav `OVERIT`. Do exportu pro LLM
+chat jde stejně jako všechny ostatní firmy (viz níže).
 
 #### Firma se nenajde v zemi bez napojeného rejstříku
 
@@ -249,104 +320,118 @@ registrační číslo po zániku původní firmy), a řádek nemá vyplněné i 
 zůstane `NENALEZENO` s kandidáty v Poznámce — bez jména totiž není podle čeho
 rozhodnout, která firma je ta správná.
 
-## Ruční zařazení nekategorizovaných firem přes LLM chat (--export-nezarazene)
+## Zařazení dodavatelů přes LLM chat (--export-llm)
 
-Firmy, které nemají spolehlivý obor, skončí buď v `XXX-00 Nezařazeno` (žádný
-NACE ani obor z Wikidat), nebo dostanou kategorii ze samotného obecného/
-podpůrného NACE kódu, ale se stavem `OVERIT` (viz "Firma má v ARES víc oborů
-podnikání" výše — nástroj kategorii záměrně nehádá z ničeho nepodloženého,
-viz [Taxonomie kategorií](#taxonomie-kategorií)). Pokud máte přístup
+Kategorie z NACE se určí jen tam, kde mapa má záznam pro **konkrétní činnost**
+(3–4 číslice) — viz "Kdy se kategorie určí z NACE" výše. U zbytku zůstane
+`XXX-00` a skutečnou činnost doplní tenhle krok. Pokud máte přístup
 k firemnímu LLM chatu (MS Copilot, ChatGPT…) jen jako k webovému rozhraní,
-bez API klíče, dá se k doplnění použít stejný dvoukrokový princip jako
-u `--jen-id`:
+bez API klíče, funguje stejný dvoukrokový princip jako u `--jen-id`:
 
 ```bash
-# 1. krok - normální běh + export nekategorizovaných/nejistých firem pro chat
-python3 dodavatele.py vstup.csv -o vystup.xlsx --export-nezarazene nezarazene.txt
+# 1. krok - normální běh + export dodavatelů pro chat
+python3 dodavatele.py vstup.csv -o vystup.xlsx --export-llm firmy.txt
 
-# --> obsah nezarazene.txt vložit do Copilotu/ChatGPT, odpověď uložit
-#     jako CSV (Název;NACE kód;Zdůvodnění), např. odpoved.csv
+# --> obsah firmy.txt vložit do Copilotu/ChatGPT, odpověď uložit
+#     jako CSV (Název;NACE kód;Kód kategorie;Zdůvodnění), např. odpoved.csv
 
-# 2. krok - stejný běh znovu, tentokrát s doplněným NACE
-python3 dodavatele.py vstup.csv -o vystup.xlsx --nace-mapa odpoved.csv
+# 2. krok - stejný běh znovu, tentokrát s doplněnou odpovědí
+python3 dodavatele.py vstup.csv -o vystup.xlsx --llm-mapa odpoved.csv
 ```
 
-**Proč se LLM ptáme na NACE, ne rovnou na naši kategorii:** aby LLM správně
-vybral jednu z ~95 vlastních kategorií, musel by napřed pochopit celou naši
-taxonomii jen z jednoho výpisu v promptu - reálný prostor pro chybu.
-Standardní NACE klasifikaci LLM naopak dobře zná ze svých trénovacích dat,
-takže dohledání skutečného oboru je pro něj spolehlivější úkol. Kategorii
-z jeho odpovědi pak dopočítá **stejný ověřený mechanismus**
-(`taxonomie.zarad()`), jaký se používá pro skutečný NACE z rejstříku - LLM
-tak nikdy sám nevymýšlí kód naší kategorie, jen NACE.
+**Exportují se všichni dodavatelé, ne jen ti bez kategorie.** Zapsaný NACE
+popisuje, jak je firma zaregistrovaná, ne co dodává — firma dělající 3D tisk
+může mít zapsaný „maloobchod přes internet". Kód je pravdivý, jako zařazení
+dodavatele nepoužitelný, a žádná heuristika to nepozná. Proto se ptáme
+u každé firmy, i u té, která už kategorii z NACE má. (Dřívější dvojice
+`--export-nezarazene` / `--export-overeni` je sloučená do tohoto jednoho
+exportu, stejně jako `--nace-mapa` / `--overeni-mapa` do `--llm-mapa`.)
 
-`--export-nezarazene` vypíše seznam takových firem (se zemí, adresou a - u
-firem jen s podpůrným NACE - i tím stávajícím kódem pro kontext) do
-textového souboru připraveného na vložení do chatu i s instrukcí a
-požadovaným formátem odpovědi. `--nace-mapa` pak načte odpověď z chatu
-(soubor `Název;NACE[;…]`), pro každou firmu dopočítá kategorii přes
-`taxonomie.zarad()` a zapíše i samotný LLM kód do nového sloupce
-**NACE (LLM)** - takže je vždy vidět, jaký kód LLM navrhl, vedle zapsaných
-kódů z rejstříku ve sloupci **NACE (všechny)**. Sloupec **Zařazeno podle**
-dostane hodnotu `rucne (LLM pres NACE)`, takže je vždy jasné, co je ověřený
-fakt z rejstříku a co ruční/AI odhad ke kontrole. Řádky, kde LLM napsal
-"neznámo" (nebo cokoli bez rozpoznatelných číslic), zůstanou beze změny.
-Na rozdíl od `--overeni-mapa` (viz níže) se `--nace-mapa` aplikuje jen na
-firmy, které už `_potrebuje_llm_pomoc` označil za nejisté - u firem se
-spolehlivým NACE nic nemění.
+### Na co se LLM ptáme
 
-Protože teď máte v jednom souboru vedle sebe **NACE (všechny)** (rejstřík) i
-**NACE (LLM)**, jde je rovnou porovnat stejným nástrojem jako cizí
-zdroj - viz `--komparace` níže:
+Na **dva údaje najednou**, oba povinné:
+
+* **NACE kód** skutečné hlavní činnosti. Tuhle klasifikaci LLM dobře zná ze
+  svých trénovacích dat. Kategorii z něj dopočítá stejný ověřený mechanismus
+  (`taxonomie.zarad()`), jaký se používá pro NACE z rejstříku — stejný kód tak
+  vede vždy na stejnou kategorii bez ohledu na to, odkud přišel. Zapsaný NACE
+  navíc zůstane ve výstupu vedle rejstříkového, takže je odpověď
+  kontrolovatelná a přežije i pozdější úpravu taxonomie.
+* **Kód naší kategorie** z číselníku, který je součástí exportu. Tenhle údaj
+  nese hlavní váhu: protože z NACE se kategorie určí jen u konkrétních tříd,
+  u většiny firem rozhodne právě on.
+
+U každé firmy jsou v hranaté závorce **všechny** její zapsané obory (ne jen
+vybraný hlavní) jako nápověda — rejstřík často vede zastaralý nebo formální
+údaj a LLM tak dostane víc materiálu k rozhodnutí.
+
+### Jak se odpověď použije
+
+```
+NACE od LLM → taxonomie.zarad() → kategorie K
+├─ NACE chybí / vede na XXX-00 (vč. shody jen na divizi) → použije se kategorie od LLM
+├─ K vyšlo, ale LLM navrhl kategorii, na kterou NACE nedosáhne → kategorie od LLM
+├─ K vyšlo, LLM navrhl něco jiného, obojí z NACE dosažitelné → vyhrává K, rozpor se vypíše
+└─ kód kategorie mimo číselník (překlep, halucinace) → zahodí se, rozhodne K
+```
+
+Druhý řádek řeší kategorie, které přes NACE vyjádřit **nelze**, ať je kód
+jakkoli správný: NACE 6920 je „Účetnické a auditorské činnosti" — jeden kód
+pro naše PRO-02 i PRO-03, obsadit ho v mapě může jen jedna z nich, takže
+auditorská firma by v PRO-03 nikdy neskončila. Kyberbezpečnost, payroll nebo
+skartace nosičů dat vlastní NACE kód vůbec nemají.
+
+Které to jsou, se **nevypisuje ručně** — odvozuje je
+`taxonomie.nedosazitelne_kategorie()` jako ty, na které nevede žádný záznam
+v `NACE_MAPA`. Když se do mapy doplní řádek nebo přibude kategorie (i ve
+vlastní taxonomii přes `--taxonomie`), odpověď se změní sama. V číselníku
+v promptu jsou označené hvězdičkou:
+
+```
+python3 -c "import taxonomie; print(sorted(taxonomie.nedosazitelne_kategorie()))"
+['FAC-06', 'HR-03', 'HR-05', 'ICT-06', 'ODP-02', 'PRO-03']
+```
+
+### Co je vidět ve výstupu
+
+Nic se nepřepisuje tiše. Vedle sebe stojí **NACE (všechny)** (rejstřík),
+**NACE (LLM)** a **Kategorie (LLM)** — návrhy z chatu — a sloupec
+**Zařazeno podle** rozliší, odkud kategorie je:
+
+| Hodnota | Význam |
+|---|---|
+| `nace` | konkrétní NACE z rejstříku |
+| `obor` | obor činnosti z Wikidat (QID) |
+| `rucne (LLM pres NACE)` | NACE od LLM se přeložil přes `NACE_MAPA` |
+| `rucne (LLM - kategorie)` | NACE od LLM nikam nevedl, rozhodl kód kategorie |
+| `rucne (LLM - kategorie mimo NACE)` | NACE vedl jinam, ale LLM vybral kategorii, kterou NACE vyjádřit neumí |
+| `vychozi` | `XXX-00`, nikdo nerozhodl |
+
+Protože máte v jednom souboru vedle sebe **NACE (všechny)** (rejstřík)
+i **NACE (LLM)**, jde je rovnou porovnat stejným nástrojem jako cizí zdroj —
+viz `--komparace` níže:
 
 ```bash
 python3 dodavatele.py --komparace vystup.xlsx --komparace-sloupec "NACE (LLM)"
 ```
 
-Žádná nová závislost, API klíč ani automatizace prohlížeče — jen soubor
-na kopírování mezi nástrojem a chatem, který už máte k dispozici.
+### Velké seznamy
 
-## Plošné ověření kategorie přes LLM (--export-overeni), jen CLI
-
-`--export-nezarazene` výše řeší jen firmy, kde nástroj sám pozná, že si
-není jistý (žádný NACE, nebo jen obecný/podpůrný kód jako pronájem či
-nespecializovaný velkoobchod). Existuje ale i opačný, zákeřnější případ:
-firma má v rejstříku zapsaný **specifický, důvěryhodně vypadající** NACE
-kód, který je ale věcně zastaralý nebo špatný (např. firma na personalizované
-reklamní předměty se zapsanou "hlavní činností" výroba oděvů, protože tak
-kdysi začínala) - to žádná heuristika nepozná, protože kód sám o sobě
-nevypadá podezřele.
-
-`--export-overeni` řeší přesně tohle - na rozdíl od `--export-nezarazene`
-exportuje **všechny** dodavatele (ne jen nejisté), a u každého uvede **všechny**
-jeho zapsané obory (sloupec NACE (všechny)), ne jen jeden. LLM tak dostane
-víc materiálu k rozhodnutí a má instrukci brát zapsané kódy jen jako nápovědu,
-ne jako jistotu - a navrhnout jiný kód, pokud podle vlastní znalosti firmy
-žádný z nich neodpovídá skutečnosti:
+`--export-davka N` rozdělí export do číslovaných souborů po N firmách
+(`firmy_01.txt`, `firmy_02.txt`…), protože chatová okna mají praktický strop,
+kolik firem najednou spolehlivě zpracují. `--llm-mapa` pak přijme víc souborů
+najednou:
 
 ```bash
-# 1. krok - normální běh + plošný export VŠECH firem k LLM overeni
-python3 dodavatele.py vstup.csv -o vystup.xlsx --export-overeni overeni.txt
-
-# u velkych seznamu (stovky+ firem) rozdelit do davek po N firmach,
-# aby se kazda davka pohodlne vesla do jedne zpravy v chatu:
-python3 dodavatele.py vstup.csv -o vystup.xlsx --export-overeni overeni.txt --export-davka 700
-# --> vznikne overeni_01.txt, overeni_02.txt, ... - kazdy vlozit do chatu zvlast
-
-# 2. krok - odpovedi (jeden soubor na davku) aplikovat zpet
-python3 dodavatele.py vstup.csv -o vystup.xlsx --overeni-mapa odpoved_01.csv odpoved_02.csv
+python3 dodavatele.py vstup.csv -o vystup.xlsx --export-llm firmy.txt --export-davka 50
+python3 dodavatele.py vstup.csv -o vystup.xlsx --llm-mapa odpoved_01.csv odpoved_02.csv
 ```
 
-**Zásadní rozdíl oproti `--nace-mapa`:** `--overeni-mapa` přepíše kategorii
-u **každé** firmy, pro kterou má odpověď - i tam, kde měl nástroj `OK` se
-specifickým kódem. To je záměr (jinak by se skryté chyby jako výše nikdy
-neodhalily), ale znamená to, že špatná/nejistá LLM odpověď může přepsat
-i dřív správnou kategorii - proto je tenhle nástroj **jen v CLI**, ne
-v desktopové appce, a hodí se hlavně tam, kde má smysl investovat čas do
-plošné ruční/AI kontroly (např. seznam kritických dodavatelů), ne jako
-výchozí krok pro každý běh. Mechanismus odvození kategorie z LLM navrženého
-NACE je stejný jako u `--nace-mapa` (`taxonomie.zarad()`) - LLM tak i tady
-nikdy nevymýšlí kód naší kategorie přímo, jen standardní NACE.
+Řádky, kde LLM napsal „neznámo" do obou sloupců, zůstanou beze změny.
+Odpovědi ze starších běhů bez sloupce s kategorií se načtou taky a chovají se
+jako dřív. Žádná nová závislost, API klíč ani automatizace prohlížeče — jen
+soubor na kopírování mezi nástrojem a chatem, který už máte k dispozici.
+
 
 ## Komparace NACE s externím zdrojem (--komparace)
 
@@ -882,11 +967,9 @@ Kompletní seznam je i v listu **Číselník kategorií** ve vygenerovaném XLSX
 -o, --vystup SOUBOR     .xlsx nebo .csv (výchozí dodavatele_vystup.xlsx)
 --kompakt               jen základní sloupce
 --jen-id                jen dohledat IČO/registrační číslo, viz "Dohledání identifikátoru"
---export-nezarazene SOUBOR   export nekategorizovaných/nejistých firem pro LLM chat, viz "Ruční zařazení"
---nace-mapa SOUBOR      aplikovat rucne/LLM dohledany NACE (odpověď z LLM chatu) na výstup
---export-overeni SOUBOR   [jen CLI] plošný export VŠECH firem pro LLM ověření, viz "Plošné ověření kategorie"
---export-davka N        rozdělit --export-overeni/--export-nezarazene do víc souborů po N firmách
---overeni-mapa SOUBOR [SOUBOR...]   aplikovat odpovědi na --export-overeni (i vícero souborů najednou)
+--export-llm SOUBOR     export všech dodavatelů pro LLM chat, viz "Zařazení dodavatelů přes LLM chat"
+--llm-mapa SOUBOR [SOUBOR...]   aplikovat odpověď z LLM chatu (Název;NACE;Kategorie) na výstup
+--export-davka N        rozdělit --export-llm do víc souborů po N firmách
 --workers N             souběžné dotazy (výchozí 4)
 --prodleva S            minimální odstup dotazů na jeden server (výchozí 0.25 s)
 --pocet N               kolik kandidátů z rejstříku načíst (výchozí 30)
