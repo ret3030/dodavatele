@@ -1,384 +1,336 @@
 {
  "KATEGORIE": {
-  "ENE-01": [
-   "Energie a utility",
-   "Dodavka elektriny a plynu"
+  "ELE-01": [
+   "Elektronika",
+   "Čisté prostory a ESD ochrana"
   ],
-  "ENE-02": [
-   "Energie a utility",
-   "Teplo a energeticke sluzby"
+  "ELE-02": [
+   "Elektronika",
+   "Desky plošných spojů (PCB) – výroba a osazování"
   ],
-  "ENE-03": [
-   "Energie a utility",
-   "Paliva a pohonne hmoty"
+  "ELE-03": [
+   "Elektronika",
+   "Elektronické součástky – distribuce"
   ],
-  "ENE-04": [
-   "Energie a utility",
-   "Vodne, stocne a vodohospodarske sluzby"
+  "ELE-04": [
+   "Elektronika",
+   "Elektronické součástky – výroba"
   ],
-  "FAC-01": [
-   "Sprava objektu a provoz",
-   "Uklidove sluzby"
+  "ELE-05": [
+   "Elektronika",
+   "Elektronika a měřicí technika – výroba"
   ],
-  "FAC-02": [
-   "Sprava objektu a provoz",
-   "Facility management"
+  "ELE-06": [
+   "Elektronika",
+   "Kabely, vodiče a kabelová konfekce"
   ],
-  "FAC-03": [
-   "Sprava objektu a provoz",
-   "Udrzba budov a technickych zarizeni"
+  "ELE-07": [
+   "Elektronika",
+   "Konektory a elektromechanické komponenty"
   ],
-  "FAC-04": [
-   "Sprava objektu a provoz",
-   "Stravovani a catering"
+  "ELE-08": [
+   "Elektronika",
+   "Optika, fotonika a laserová technika"
   ],
-  "FAC-05": [
-   "Sprava objektu a provoz",
-   "Pronajem prostor a nemovitosti"
-  ],
-  "FAC-06": [
-   "Sprava objektu a provoz",
-   "Kancelarske potreby a drobne vybaveni"
-  ],
-  "FAC-07": [
-   "Sprava objektu a provoz",
-   "Nabytek a interiery"
-  ],
-  "FAC-08": [
-   "Sprava objektu a provoz",
-   "Ubytovaci a cestovni sluzby"
-  ],
-  "FIN-01": [
-   "Financni sluzby",
-   "Bankovni sluzby"
-  ],
-  "FIN-02": [
-   "Financni sluzby",
-   "Platebni a zuctovaci sluzby"
-  ],
-  "FIN-03": [
-   "Financni sluzby",
-   "Pojisteni a zajisteni"
-  ],
-  "FIN-04": [
-   "Financni sluzby",
-   "Leasing, uvery a financovani"
-  ],
-  "FIN-05": [
-   "Financni sluzby",
-   "Ostatni financni a investicni sluzby"
-  ],
-  "FIN-06": [
-   "Financni sluzby",
-   "Inkaso pohledavek a kreditni sluzby"
-  ],
-  "HR-01": [
-   "Lidske zdroje",
-   "Nabor a personalni agentury"
-  ],
-  "HR-02": [
-   "Lidske zdroje",
-   "Agenturni zamestnavani a docasne prideleni"
-  ],
-  "HR-03": [
-   "Lidske zdroje",
-   "Mzdove a personalni sluzby (payroll)"
-  ],
-  "HR-04": [
-   "Lidske zdroje",
-   "Skoleni a vzdelavani"
-  ],
-  "HR-05": [
-   "Lidske zdroje",
-   "Benefity a pece o zamestnance"
+  "ELE-09": [
+   "Elektronika",
+   "Vysokofrekvenční technika a konektory"
   ],
   "ICT-01": [
-   "ICT a technologie",
-   "Vyvoj software a aplikaci na zakazku"
+   "IT a telekomunikace",
+   "Identifikace, čárové kódy a RFID"
   ],
   "ICT-02": [
-   "ICT a technologie",
-   "Software, licence a SaaS"
+   "IT a telekomunikace",
+   "IT – hardware a výpočetní technika"
   ],
   "ICT-03": [
-   "ICT a technologie",
-   "Cloud, hosting a datova centra"
+   "IT a telekomunikace",
+   "IT – software, licence a služby"
   ],
   "ICT-04": [
-   "ICT a technologie",
-   "Sprava IT a managed services"
+   "IT a telekomunikace",
+   "Telekomunikace a síťová infrastruktura"
   ],
-  "ICT-05": [
-   "ICT a technologie",
-   "IT poradenstvi a systemova integrace"
+  "MET-01": [
+   "Měření a metrologie",
+   "Kalibrace, metrologie a technické zkoušky"
   ],
-  "ICT-06": [
-   "ICT a technologie",
-   "Kyberneticka bezpecnost"
+  "MET-02": [
+   "Měření a metrologie",
+   "Laboratorní a zdravotnická technika"
   ],
-  "ICT-07": [
-   "ICT a technologie",
-   "Hardware a koncova zarizeni"
+  "MET-03": [
+   "Měření a metrologie",
+   "Měřicí a testovací technika – prodej a servis"
   ],
-  "ICT-08": [
-   "ICT a technologie",
-   "Sitova a komunikacni infrastruktura"
-  ],
-  "ICT-09": [
-   "ICT a technologie",
-   "Telekomunikacni sluzby a konektivita"
-  ],
-  "ICT-10": [
-   "ICT a technologie",
-   "Zpracovani dat, BPO a sdilene sluzby"
-  ],
-  "ICT-11": [
-   "ICT a technologie",
-   "Servis a likvidace vypocetni techniky"
-  ],
-  "ICT-12": [
-   "ICT a technologie",
-   "Internetove portaly a online sluzby"
-  ],
-  "LOG-01": [
-   "Logistika a doprava",
-   "Silnicni a zeleznicni doprava"
-  ],
-  "LOG-02": [
-   "Logistika a doprava",
-   "Letecka a namorni preprava"
-  ],
-  "LOG-03": [
-   "Logistika a doprava",
-   "Zasilatelstvi a spedice"
-  ],
-  "LOG-04": [
-   "Logistika a doprava",
-   "Skladovani a logisticke sluzby"
-  ],
-  "LOG-05": [
-   "Logistika a doprava",
-   "Kurynske a postovni sluzby"
-  ],
-  "MAT-01": [
-   "Material a suroviny",
-   "Kovy a hutni material"
-  ],
-  "MAT-02": [
-   "Material a suroviny",
-   "Chemicke latky a pripravky"
-  ],
-  "MAT-03": [
-   "Material a suroviny",
-   "Plasty, pryz a kompozity"
-  ],
-  "MAT-04": [
-   "Material a suroviny",
-   "Papir, obaly a obalove materialy"
-  ],
-  "MAT-05": [
-   "Material a suroviny",
-   "Stavebni hmoty a nekovove materialy"
-  ],
-  "MAT-06": [
-   "Material a suroviny",
-   "Textil, odevy a OOPP"
-  ],
-  "MAT-07": [
-   "Material a suroviny",
-   "Elektronicke a elektrotechnicke komponenty"
-  ],
-  "MAT-08": [
-   "Material a suroviny",
-   "Potraviny a napoje"
-  ],
-  "MAT-09": [
-   "Material a suroviny",
-   "Zemedelske a lesni suroviny"
-  ],
-  "MAT-10": [
-   "Material a suroviny",
-   "Nerostne suroviny a tezba"
-  ],
-  "MAT-11": [
-   "Material a suroviny",
-   "Drevo a vyrobky ze dreva"
-  ],
-  "MKT-01": [
-   "Marketing a media",
-   "Reklamni a mediani agentury"
-  ],
-  "MKT-02": [
-   "Marketing a media",
-   "Pruzkum trhu a analytika"
-  ],
-  "MKT-03": [
-   "Marketing a media",
-   "Tisk, polygrafie a reklamni produkce"
-  ],
-  "MKT-04": [
-   "Marketing a media",
-   "Eventy, konference a veletrhy"
-  ],
-  "MKT-05": [
-   "Marketing a media",
-   "Audiovizualni produkce a vysilani"
-  ],
-  "OBC-01": [
-   "Obchod",
-   "Velkoobchod a distribuce"
-  ],
-  "OBC-02": [
-   "Obchod",
-   "Maloobchod a drobny nakup"
-  ],
-  "OBC-03": [
-   "Obchod",
-   "Prodej a servis motorovych vozidel"
-  ],
-  "ODP-01": [
-   "Odpady a zivotni prostredi",
-   "Odpadove hospodarstvi"
-  ],
-  "ODP-02": [
-   "Odpady a zivotni prostredi",
-   "Skartace a likvidace nosicu dat"
-  ],
-  "ODP-03": [
-   "Odpady a zivotni prostredi",
-   "Sanace a environmentalni sluzby"
+  "MET-04": [
+   "Měření a metrologie",
+   "Zkušební přípravky a kontaktovací technika"
   ],
   "OST-01": [
-   "Ostatni",
-   "Kultura, sport a volny cas"
+   "Firemní a ostatní",
+   "Catering a závodní stravování"
   ],
   "OST-02": [
-   "Ostatni",
-   "Ostatni osobni a podpurne sluzby"
+   "Firemní a ostatní",
+   "Členské příspěvky, komory a asociace"
+  ],
+  "OST-03": [
+   "Firemní a ostatní",
+   "Konference a firemní akce"
+  ],
+  "OST-04": [
+   "Firemní a ostatní",
+   "Kultura a společenské akce"
+  ],
+  "OST-05": [
+   "Firemní a ostatní",
+   "Ostatní / k ověření"
+  ],
+  "OST-06": [
+   "Firemní a ostatní",
+   "Ostatní obchod a zprostředkování"
+  ],
+  "OST-07": [
+   "Firemní a ostatní",
+   "Potraviny, nápoje a občerstvení"
+  ],
+  "OST-08": [
+   "Firemní a ostatní",
+   "Sport, rekreace a volnočasové akce"
+  ],
+  "OST-09": [
+   "Firemní a ostatní",
+   "Ubytování, stravování a pohoštění"
+  ],
+  "OST-10": [
+   "Firemní a ostatní",
+   "Veřejná správa a samospráva"
+  ],
+  "OST-11": [
+   "Firemní a ostatní",
+   "Zdravotní péče a zaměstnanecké benefity"
   ],
   "PRO-01": [
-   "Profesni sluzby",
-   "Pravni sluzby"
+   "Profesní služby",
+   "Certifikace, normy a technická školení"
   ],
   "PRO-02": [
-   "Profesni sluzby",
-   "Ucetni a danove sluzby"
+   "Profesní služby",
+   "Finanční služby, leasing a pojištění"
   ],
   "PRO-03": [
-   "Profesni sluzby",
-   "Audit a assurance"
+   "Profesní služby",
+   "Personální a agenturní služby"
   ],
   "PRO-04": [
-   "Profesni sluzby",
-   "Manazerske a procesni poradenstvi"
+   "Profesní služby",
+   "Poradenství, audit a daně"
   ],
   "PRO-05": [
-   "Profesni sluzby",
-   "Inzenyring, projekce a architektura"
+   "Profesní služby",
+   "Právní služby a advokacie"
   ],
   "PRO-06": [
-   "Profesni sluzby",
-   "Certifikace, zkusebnictvi a inspekce"
+   "Profesní služby",
+   "Projekce a inženýrské služby"
   ],
   "PRO-07": [
-   "Profesni sluzby",
-   "Vyzkum a vyvoj"
+   "Profesní služby",
+   "Technické poradenství a expertizy"
   ],
-  "PRO-08": [
-   "Profesni sluzby",
-   "Preklady, jazykove a redakcni sluzby"
+  "SLU-01": [
+   "Služby",
+   "Doprava, spedice a logistika"
   ],
-  "PRO-09": [
-   "Profesni sluzby",
-   "Ostatni profesni a technicke sluzby"
+  "SLU-02": [
+   "Služby",
+   "Nemovitosti, pronájem a facility management"
   ],
-  "SEC-01": [
-   "Bezpecnost",
-   "Fyzicka ostraha a bezpecnostni sluzby"
+  "SLU-03": [
+   "Služby",
+   "Poštovní, kurýrní a přepravní služby"
   ],
-  "SEC-02": [
-   "Bezpecnost",
-   "Bezpecnostni technologie (EZS, CCTV, pristupove systemy)"
+  "SLU-04": [
+   "Služby",
+   "Správa vozového parku a mobilita"
   ],
-  "STA-01": [
-   "Stavebnictvi",
-   "Pozemni stavby a investicni vystavba"
+  "SLU-05": [
+   "Služby",
+   "Vozidla – prodej, servis a náhradní díly"
   ],
-  "STA-02": [
-   "Stavebnictvi",
-   "Inzenyrske stavitelstvi"
+  "STR-01": [
+   "Stroje a technika",
+   "Čerpadla, armatury a regulační technika"
   ],
-  "STA-03": [
-   "Stavebnictvi",
-   "Specializovane stavebni prace"
+  "STR-02": [
+   "Stroje a technika",
+   "Kompresory a stlačený vzduch – technika"
   ],
-  "STA-04": [
-   "Stavebnictvi",
-   "Elektroinstalace a slaboproud"
+  "STR-03": [
+   "Stroje a technika",
+   "Manipulační a skladová technika"
   ],
-  "TEC-01": [
-   "Technologie a stroje",
-   "Vyrobni stroje a zarizeni"
+  "STR-04": [
+   "Stroje a technika",
+   "Obráběcí stroje a technologie – prodej a servis"
   ],
-  "TEC-02": [
-   "Technologie a stroje",
-   "Merici, ridici a regulacni technika (OT)"
+  "STR-05": [
+   "Stroje a technika",
+   "Průmyslová automatizace a robotika"
   ],
-  "TEC-03": [
-   "Technologie a stroje",
-   "Servis, opravy a instalace stroju"
+  "STR-06": [
+   "Stroje a technika",
+   "Průmyslové stroje a technický servis"
   ],
-  "TEC-04": [
-   "Technologie a stroje",
-   "Elektricka zarizeni a pohony"
+  "STR-07": [
+   "Stroje a technika",
+   "Řezné nástroje a nástrojařství"
   ],
-  "TEC-05": [
-   "Technologie a stroje",
-   "Dopravni prostredky a jejich dily"
+  "STR-08": [
+   "Stroje a technika",
+   "Výrobní technologie a stroje – SMT/elektronika"
   ],
-  "TEC-06": [
-   "Technologie a stroje",
-   "Pronajem techniky a vozidel"
+  "STR-09": [
+   "Stroje a technika",
+   "Vzduchotechnika, klimatizace a servis"
   ],
-  "TEC-07": [
-   "Technologie a stroje",
-   "Kovove konstrukce a dily"
+  "STR-10": [
+   "Stroje a technika",
+   "Zdvihací, vázací a plošinová technika"
   ],
-  "VER-01": [
-   "Verejny a neziskovy sektor",
-   "Verejna sprava a statni instituce"
+  "UDR-01": [
+   "Provoz a údržba",
+   "Elektroinstalační materiál a práce"
   ],
-  "VER-02": [
-   "Verejny a neziskovy sektor",
-   "Asociace, spolky a neziskove organizace"
+  "UDR-02": [
+   "Provoz a údržba",
+   "Energie, voda a odpadové hospodářství"
   ],
-  "VER-03": [
-   "Verejny a neziskovy sektor",
-   "Vzdelavaci instituce"
+  "UDR-03": [
+   "Provoz a údržba",
+   "Kancelářské potřeby a vybavení"
+  ],
+  "UDR-04": [
+   "Provoz a údržba",
+   "Nářadí a dílenské potřeby"
+  ],
+  "UDR-05": [
+   "Provoz a údržba",
+   "Osobní ochranné pomůcky a BOZP"
+  ],
+  "UDR-06": [
+   "Provoz a údržba",
+   "Osvětlení a světelná technika"
+  ],
+  "UDR-07": [
+   "Provoz a údržba",
+   "Požární ochrana a revize technických zařízení"
+  ],
+  "UDR-08": [
+   "Provoz a údržba",
+   "Pracovní oděvy, textilní servis a úklid"
+  ],
+  "UDR-09": [
+   "Provoz a údržba",
+   "Provozní vybavení, nábytek a dílenská technika"
+  ],
+  "UDR-10": [
+   "Provoz a údržba",
+   "Spojovací materiál a upevňovací technika"
+  ],
+  "UDR-11": [
+   "Provoz a údržba",
+   "Stavební práce a údržba budov"
+  ],
+  "UDR-12": [
+   "Provoz a údržba",
+   "Technické potřeby a materiál – velkoobchod"
+  ],
+  "UDR-13": [
+   "Provoz a údržba",
+   "Vytápění, vodoinstalace a topenářská technika"
+  ],
+  "UDR-14": [
+   "Provoz a údržba",
+   "Zabezpečovací, přístupové a slaboproudé systémy"
+  ],
+  "UDR-15": [
+   "Provoz a údržba",
+   "Značení, etikety a bezpečnostní tabulky"
+  ],
+  "VYR-01": [
+   "Výroba a materiály",
+   "3D tisk a aditivní výroba"
+  ],
+  "VYR-02": [
+   "Výroba a materiály",
+   "Hutní materiál a kovy"
+  ],
+  "VYR-03": [
+   "Výroba a materiály",
+   "Kovoobrábění a strojírenská výroba"
+  ],
+  "VYR-04": [
+   "Výroba a materiály",
+   "Kovové konstrukce, svařování a zámečnictví"
+  ],
+  "VYR-05": [
+   "Výroba a materiály",
+   "Obaly a balicí materiál"
+  ],
+  "VYR-06": [
+   "Výroba a materiály",
+   "Povrchové úpravy a galvanika"
+  ],
+  "VYR-07": [
+   "Výroba a materiály",
+   "Přesné kovové díly a lisování"
+  ],
+  "VYR-08": [
+   "Výroba a materiály",
+   "Průmyslová chemie, maziva a lepidla"
+  ],
+  "VYR-09": [
+   "Výroba a materiály",
+   "Pryžové a plastové komponenty – výroba"
+  ],
+  "VYR-10": [
+   "Výroba a materiály",
+   "Technické materiály a polotovary"
+  ],
+  "VZD-01": [
+   "Vzdělávání a média",
+   "Jazykové vzdělávání a překlady"
+  ],
+  "VZD-02": [
+   "Vzdělávání a média",
+   "Média, inzerce a předplatné"
+  ],
+  "VZD-03": [
+   "Vzdělávání a média",
+   "Odborná literatura, publikace a školení"
+  ],
+  "VZD-04": [
+   "Vzdělávání a média",
+   "Reklama, marketing a PR"
+  ],
+  "VZD-05": [
+   "Vzdělávání a média",
+   "Tisk, polygrafie a reklamní materiály"
+  ],
+  "VZD-06": [
+   "Vzdělávání a média",
+   "Vzdělávání a odborná školení"
+  ],
+  "VZD-07": [
+   "Vzdělávání a média",
+   "Vzdělávání, výzkum a vývoj"
   ],
   "XXX-00": [
-   "Nezarazeno",
-   "Nezarazeno - nutne rucni doplneni"
-  ],
-  "ZDR-01": [
-   "Zdravotnictvi",
-   "Zdravotni pece a pracovnelekarske sluzby"
-  ],
-  "ZDR-02": [
-   "Zdravotnictvi",
-   "Laboratore a diagnostika"
-  ],
-  "ZDR-03": [
-   "Zdravotnictvi",
-   "Farmacie a zdravotnicky material"
-  ],
-  "ZDR-04": [
-   "Zdravotnictvi",
-   "Socialni sluzby"
-  ],
-  "ZDR-05": [
-   "Zdravotnictvi",
-   "Veterinarni sluzby"
+   "Nezařazeno",
+   "Nezařazeno - nutné ruční doplnění"
   ]
  },
  "NACE_NAZVY": {
