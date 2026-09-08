@@ -18,16 +18,17 @@ běží i na Windows bez WSL, Podmanu a Dockeru.
 
 | zdroj | co z něj bereme |
 |---|---|
-| **ARES** (`ares.gov.cz`) | kanonický název, IČO, DIČ, sídlo (město), CZ-NACE |
+| **ARES** (`ares.gov.cz`) | ČR: kanonický název, IČO, DIČ, sídlo (město), CZ-NACE |
+| **RPO SR** (`api.statistics.sk`) | SK: totéž + hlavní činnost (SK-NACE + slovenský text) |
 | **Wikidata** (`wikidata.org`) | firmu spáruje podle IČO (`P4156`); z entity: oficiální web (`P856`), obor (`P452`), produkt (`P1056`), typ (`P31`), popis |
 | **Wikipedie** (cs, pak en) | úvodní odstavec článku – čistý popis činnosti |
 | **web firmy** | `<title>`, meta popis, `<h1>`, viditelný text titulky + až 2 vnitřní stránky (`/o-nas`, `/produkty`…) |
 
 ## Jak to funguje
 
-1. **ARES** podle názvu (nebo přímo podle IČO ze vstupu) → kanonická data
-   a seznam CZ-NACE. Spáruje se jen při shodě normalizovaného názvu – radši
-   nic než špatná firma.
+1. **Rejstřík** podle názvu (nebo přímo podle IČO ze vstupu) → kanonická data
+   a NACE. Pro `Země = SK` **RPO SR**, jinak **ARES**. Spáruje se jen při přesné
+   shodě normalizovaného názvu (nebo IČO) – radši nic než špatná firma.
 2. **Wikidata**: nejdřív `haswbstatement:P4156=<IČO>` (přesné), jinak
    `wbsearchentities` podle názvu. Z entity se vytáhne web, obor, produkt,
    typ a popis; QID oborů se přeloží na české štítky.
@@ -48,43 +49,74 @@ běží i na Windows bez WSL, Podmanu a Dockeru.
    - **OVERIT** – skóre ≥ 6 → návrh s nižší jistotou, doporučená kontrola.
    - **LLM** – jinak → `XXX-00`, nechává se na původní LLM krok.
 
-Každá stažená odpověď (ARES, Wikidata, Wikipedie, web) se ukládá do `.cache/`
-(gzip JSON, klíč = hash dotazu). Opakovaný běh nic nestahuje a je plně
+Každá stažená odpověď (ARES, RPO SR, Wikidata, Wikipedie, web) se ukládá do
+`.cache/` (gzip JSON, klíč = hash dotazu). Opakovaný běh nic nestahuje a je plně
 deterministický. Rejstříková data se mění řádově pomaleji než SERP snippety,
-takže i první běh je dobře reprodukovatelný.
+takže i první běh je dobře reprodukovatelný. Dotazy jsou sériové s respektem
+k `Retry-After` (Wikimedia API jinak vrací HTTP 429).
 
 ## Použití
 
-```bash
-# XLSX potřebuje openpyxl → spouštět přes .venv/bin/python
-.venv/bin/python -m kategorizace.kategorizuj vstup.csv -o vystup_kat.csv
-.venv/bin/python -m kategorizace.kategorizuj vstup.xlsx -o vystup_kat.xlsx --rozbor rozbor.jsonl
+### 1. běh – deterministické zařazení + prompt pro LLM na zbytek
 
-# jen z keše, nic nestahovat
-.venv/bin/python -m kategorizace.kategorizuj vstup.csv -o out.csv --offline
+```bash
+# CSV výstup funguje bez závislostí; XLSX potřebuje openpyxl (→ .venv/bin/python)
+python3 -m kategorizace.kategorizuj vstup.csv -o vystup_kat.csv --export-llm pro_llm.txt
 ```
 
-Vstup: CSV / XLSX / TXT. Povinný je jen sloupec s názvem firmy. Nepovinné, ale
+- `vystup_kat.csv` – rozřazené firmy (viz sloupec **Rozhodnutí** níže),
+- `pro_llm.txt` – hotový prompt pro Copilot/ChatGPT jen na firmy s rozhodnutím
+  `LLM`: obsahuje celý číselník a ke každé firmě kontext, který už máme
+  (IČO, zapsané obory, doména, `tip` = top-3 kandidáti deterministického kroku).
+
+### 2. běh – domergovat odpověď z chatu
+
+Odpověď z chatu (`Původní název;Kód kategorie;Čím se firma zabývá`) uložte jako
+CSV a spusťte znovu s `--llm-mapa`:
+
+```bash
+python3 -m kategorizace.kategorizuj vstup.csv -o vystup_kat.csv --llm-mapa odpoved.csv
+```
+
+Doplněné řádky dostanou `Rozhodnutí = LLM-doplneno` a vyplněný `Popis (LLM)`.
+(Rejstříky se z keše nedotazují znovu – druhý běh je okamžitý.)
+
+### Vstup
+
+CSV / XLSX / TXT. Povinný je jen sloupec s názvem firmy. Nepovinné, ale
 **hodně zpřesní**:
 
 | sloupec | k čemu |
 |---|---|
-| `Web` / `URL` | přímo doména firmy – odpadá nejisté hádání |
-| `IČO` | přesné spárování s ARES i Wikidaty |
+| `Web` / `URL` | přímo doména firmy – odpadá nejisté hádání (**největší páka**) |
+| `IČO` | přesné spárování s ARES / RPO SR i Wikidaty |
 | `Město` | ověření uhádnuté domény, zúžení ARES |
-| `Země` | zatím se plně řeší jen `CZ`/prázdno (ARES); ostatní jen Wikidata + web |
-| `NACE` | slabý textový signál (když není z ARES) |
+| `Země` | `CZ`/prázdno → ARES, `SK` → RPO SR, ostatní jen Wikidata + web |
+| `NACE` | slabý textový signál (když není z rejstříku) |
 
-Přepínače: `--offline` (jen keš), `--bez-webu` (nestahovat weby firem),
-`--bez-heuristiky` (nehádat doménu z názvu), `--limit N`, `--prodleva S`,
-`--kes ADRESÁŘ`, `--rozbor SOUBOR.jsonl`.
+### Přepínače
 
-Výstup (CSV `;` nebo XLSX): `Název | IČO | Doména | Zdroj domény | Kód kategorie
-| Kategorie | Skupina | ICT relevance | Rozhodnutí | Skóre | Odstup | Zdrojů |
-Alternativy | Skupina (skóre) | Důkaz`. Sloupec **Zdroj domény**
-(`vstup` / `wikidata` / `heuristika` / prázdno) říká, jak moc doméně věřit;
-**Důkaz** ukazuje, které fráze z jakého zdroje zabraly.
+`--export-llm SOUBOR.txt` (prompt na nezařazené), `--llm-mapa CSV…` (domergovat
+odpověď), `--llm-i-overit` (do promptu i větev OVERIT), `--export-davka N`
+(rozdělit prompt po N firmách), `--offline` (jen keš), `--bez-webu`,
+`--bez-heuristiky`, `--limit N`, `--prodleva S`, `--kes ADRESÁŘ`,
+`--rozbor SOUBOR.jsonl`.
 
+### Výstup
+
+`Název | IČO | Doména | Zdroj domény | Kód kategorie | Kategorie | Skupina |
+ICT relevance | Rozhodnutí | Skóre | Odstup | Zdrojů | Alternativy |
+Skupina (skóre) | Důkaz | Popis (LLM)`
+
+| Rozhodnutí | co s tím |
+|---|---|
+| `AUTO` | kategorie převzatá rovnou (~97 % přesnost listu, 100 % shoda ICT příznaku) |
+| `OVERIT` | jen našeptávač (~73 % list) – kontrola člověkem |
+| `LLM` | nezařazeno – je v `pro_llm.txt` |
+| `LLM-doplneno` | doplněno z `--llm-mapa` |
+
+Sloupec **Zdroj domény** (`vstup` / `wikidata` / `heuristika` / prázdno) říká,
+jak moc doméně věřit; **Důkaz** ukazuje, které fráze z jakého zdroje zabraly.
 `--rozbor soubor.jsonl` uloží ke každé firmě kompletní rozklad pro ladění.
 
 ## Měření přesnosti
@@ -101,33 +133,42 @@ přesnost), přesnost po skupinách a nejčastější záměny.
 
 ## Naměřená přesnost
 
-> **Pozor:** čísla níže jsou z verze, která signály brala z webového
-> vyhledávání (SERP přes SERPER, později SearXNG). Přechod na veřejné rejstříky
-> mění zdroj i pokrytí – firmu bez vyplněného webu a bez záznamu ve Wikidatech
-> teď častěji nedohledáme a spadne rovnou na LLM. **Přeměřte si to na svém gold
-> seznamu** (`vyhodnoceni.py`). Pravidla i prahy jsou na konkrétní zdroj
-> nezávislé; co drží, je přesnost AUTO větve (~95 % list) – ta stojí hlavně na
-> textu z webu firmy, který zůstal.
+Test na `testset_vzorek.csv` – 246 reálných firem napříč 11 skupinami, gold
+určen ručním researchem. Vstup **bez** vyplněného sloupce `Web`.
 
-| metrika (SERP verze, orientačně) | hodnota |
+| metrika | hodnota |
 |---|---|
-| top-1 přesnost listu, všechny firmy | ~63 % |
-| top-1 přesnost skupiny, všechny firmy | ~74 % |
-| pokrytí větve AUTO | ~45 % |
-| přesnost listu ve větvi AUTO | ~94 % |
-| shoda ICT příznaku ve větvi AUTO (vstup pro ISO 27001) | ~97 % |
+| top-1 přesnost listu, všechny firmy | 34 % |
+| top-1 přesnost skupiny, všechny firmy | 37 % |
+| **pokrytí větve AUTO** | **10 %** |
+| **přesnost listu ve větvi AUTO** | **97 %** |
+| **shoda ICT příznaku ve větvi AUTO** (vstup pro ISO 27001) | **100 %** |
+| větev OVERIT – list správně | 73 % |
+| padá na LLM | 71 % |
 
-**100 % nedosažitelné.** Zbývající chyby jsou víceoborové firmy (ČSOB Leasing =
-finanční i operativní leasing) a sporné zařazení samo. Deterministicky se dá
-spolehlivě ubrat část objemu LLM, ne celý – a s veřejnými rejstříky je ta část
-menší než se SERP, výměnou za nulovou infrastrukturu.
+Čtení: co modul zařadí jako `AUTO`, je spolehlivé (prahy jsou schválně přísné),
+ale takových firem je zatím jen desetina. Zbytek jde přes `pro_llm.txt` do LLM.
+Pro srovnání: dřívější verze přes webové vyhledávání (SERP) měla ~45 % AUTO –
+platila za to běžící službou (SearXNG v kontejneru).
+
+**Co pokrytí zvedne** (v tomto pořadí dopadu):
+
+1. **vyplnit sloupec `Web`** ve vstupu → odhad AUTO ~35 % (zpět na úroveň SERP),
+2. **ARES-VR předmět podnikání** (zatím nenapojeno) – text registrované činnosti
+   česky a konkrétně, i pro firmy bez webu → odhad AUTO ~20–25 %.
+
+**100 % nedosažitelné** ani s tím – víceoborové firmy (ČSOB Leasing = finanční
+i operativní leasing) a sporné zařazení samo. Deterministicky se dá ubrat část
+objemu LLM, ne celý.
 
 ## Kam dál
 
-- **web ze vstupu**: největší páka na přesnost i pokrytí – doplnit sloupec
-  `Web` co největšímu počtu dodavatelů,
-- **SK**: doplnit RPO SR (obdoba ARES) pro slovenské firmy,
-- **hybrid**: deterministicky se vezme top-3 a LLM z nich jen vybere,
+- **web ze vstupu** – největší páka; doplnit sloupec `Web` co nejvíce dodavatelům,
+- **ARES-VR předmět podnikání** – největší jednotlivý zisk pro firmy bez webu,
+- NACE kódy z rejstříku jsou teď slabý signál (číselník je anglicky) – po
+  napojení ARES-VR je z klasifikátoru vyřadit nebo srazit váhu,
+- **SK NACE** – RPO SR vrací i seznam `activities`, bereme jen `mainActivity`,
+- **hybrid** – deterministicky se vezme top-3 a LLM z nich jen vybere,
 - rozšířit `pravidla.py` na sourozenecké dvojice (výroba × distribuce,
   e-shop × velkoobchod) kontextovými pravidly.
 
@@ -137,7 +178,7 @@ menší než se SERP, výměnou za nulovou infrastrukturu.
 |---|---|
 | `kategorizuj.py` | CLI: seznam firem → kategorie |
 | `vyhodnoceni.py` | CLI: porovnání s gold seznamem |
-| `zdroje.py` | klienti ARES / Wikidata / Wikipedie + dohledání domény + disková keš |
+| `zdroje.py` | klienti ARES / RPO SR / Wikidata / Wikipedie + dohledání domény + disková keš |
 | `web.py` | stažení a čištění textu z webu firmy |
 | `pravidla.py` | **list klíčových slov** pro 82 kategorií (+ XXX-00) |
 | `klasifikator.py` | sběr signálů, skórování, rozhodnutí, prahy |

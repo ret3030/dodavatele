@@ -58,7 +58,7 @@ na LLM. Není součástí desktopové aplikace – jen příkazová řádka.
 
 Signály se sbírají **jen z veřejných zdrojů bez API klíče a bez běžící služby**:
 
-- **ARES** – kanonický název, IČO/DIČ, sídlo, CZ-NACE,
+- **ARES** (ČR) / **RPO SR** (Slovensko) – kanonický název, IČO/DIČ, sídlo, NACE,
 - **Wikidata** – firmu spáruje podle IČO (`P4156`), z ní vezme oficiální web
   (`P856`), obor, produkt a typ,
 - **Wikipedie** (cs, pak en) – úvodní odstavec článku,
@@ -66,32 +66,50 @@ Signály se sbírají **jen z veřejných zdrojů bez API klíče a bez běžíc
   jinak ji opatrně zkusí uhodnout z názvu (přijme jen ověřenou).
 
 Je to **čistý Python (jen `urllib`)** – běží i na Windows bez WSL, Podmanu
-a Dockeru. První běh stahuje, každý další běh nad stejným seznamem jede z keše
-a je bajt po bajtu shodný.
+a Dockeru. Nic se neinstaluje, nic neběží na pozadí. První běh stahuje, každý
+další běh nad stejným seznamem jede z keše a je bajt po bajtu shodný.
 
-### Použití
+### Aktivace – jeden běh
 
 ```bash
-.venv/bin/python -m kategorizace.kategorizuj vstup.csv -o vystup_kat.csv
-.venv/bin/python -m kategorizace.kategorizuj vstup.csv -o out.csv --offline   # jen z keše
+# deterministický výstup + rovnou hotový prompt pro LLM na zbytek
+python3 -m kategorizace.kategorizuj vstup.csv -o vystup_kat.csv --export-llm pro_llm.txt
 ```
 
-Vstup je stejný seznam firem jako pro `dodavatele.py`. **Přesnost výrazně
-zvedne sloupec `Web` (nebo `URL`)** – odpadá nejisté hádání domény. Pomůže
-i `IČO` (přesné spárování s Wikidaty) a `Město`.
+Vstup je stejný seznam firem jako pro `dodavatele.py` (CSV/XLSX/TXT, povinný je
+jen sloupec s názvem). **Přesnost výrazně zvedne sloupec `Web` (nebo `URL`)** –
+odpadá nejisté hádání domény; pomůže i `IČO` a `Město`.
 
-Ve výstupu (`Název | IČO | Doména | Zdroj domény | Kód kategorie | … |
-Rozhodnutí`) rozhoduje sloupec **Rozhodnutí**:
+Výstup `vystup_kat.csv` (`Název | IČO | Doména | Zdroj domény | Kód kategorie |
+… | Rozhodnutí | Popis (LLM)`) – rozhoduje sloupec **Rozhodnutí**:
 
 | rozhodnutí | co s tím |
 |---|---|
-| `AUTO` | kategorie převzata rovnou (na AUTO větvi ~95 % přesnost listu) |
-| `OVERIT` | návrh s nižší jistotou, doporučená kontrola |
-| `LLM` | nezařazeno, jde na LLM krok níže |
+| `AUTO` | kategorie převzatá rovnou (na AUTO větvi ~97 % přesnost listu, 100 % shoda ICT příznaku) |
+| `OVERIT` | návrh s nižší jistotou – jen našeptávač, doporučená kontrola člověkem |
+| `LLM` | nezařazeno – je v `pro_llm.txt` |
 
-Podíl mezi větvemi závisí na tom, kolik firem má vyplněný web a je ve
-Wikidatech – přeměřte si ho na svém gold seznamu (`kategorizace/vyhodnoceni.py`).
-Podrobnosti a ladění pravidel: `kategorizace/README.md`.
+### Zbytek přes LLM chat
+
+`pro_llm.txt` už obsahuje celý číselník a ke každé nezařazené firmě kontext
+(IČO, zapsané obory, doménu, top-3 tip). Vložte ho do Copilotu/ChatGPT,
+odpověď (`Název;Kód kategorie;Popis`) uložte jako CSV a domergujte:
+
+```bash
+python3 -m kategorizace.kategorizuj vstup.csv -o vystup_kat.csv --llm-mapa odpoved.csv
+```
+
+Doplněné řádky dostanou `Rozhodnutí = LLM-doplneno` a vyplněný `Popis (LLM)`.
+
+### Poznámky
+
+- `--offline` – nestahovat nic, jen z keše. `--llm-i-overit` – do promptu dát
+  i větev OVERIT. `--export-davka N` – rozdělit prompt po N firmách.
+- Naměřeno na `kategorizace/testset_vzorek.csv` (246 firem): **~10 % AUTO
+  (97 % přesnost), ~19 % OVERIT, ~71 % LLM**. Pokrytí AUTO roste hlavně
+  s vyplněným sloupcem `Web`. Přeměřte si to na svém gold seznamu
+  (`kategorizace/vyhodnoceni.py`).
+- Podrobnosti a ladění pravidel: `kategorizace/README.md`.
 
 ## Zařazení přes LLM chat
 

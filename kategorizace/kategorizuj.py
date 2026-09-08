@@ -286,16 +286,20 @@ def main(argv=None):
 
     # -- domergovat odpoved z chatu (--llm-mapa) --------------------------
     doplneno = 0
+    nezname_kody = set()
     if a.llm_mapa:
         mapa = _nacti_llm_mapu(a.llm_mapa)
         for radek, m in zip(radky, meta):
-            if m["rozh"] not in na_llm and radek[4] != VYCHOZI_KOD:
-                continue
+            # domergovat vsechno, na co chat dal odpoved (bez ohledu na vetev) -
+            # ta CSV mapa je zamerne pripravena clovekem
             hit = mapa.get(m["klic"])
             if not hit:
                 continue
             kod, popis = hit
-            skup_nazev = KATEGORIE.get(kod, ["", ""])
+            skup_nazev = KATEGORIE.get(kod)
+            if skup_nazev is None:
+                nezname_kody.add(kod)
+                skup_nazev = ["", ""]
             radek[4] = kod
             radek[5] = skup_nazev[1]
             radek[6] = skup_nazev[0]
@@ -304,6 +308,9 @@ def main(argv=None):
             radek[15] = popis
             m["rozh"] = "LLM-doplneno"
             doplneno += 1
+        if nezname_kody:
+            print("  ! --llm-mapa: %d kodu neni v ciselniku (ponechano tak): %s"
+                  % (len(nezname_kody), ", ".join(sorted(nezname_kody))), file=sys.stderr)
 
     if os.path.splitext(a.vystup)[1].lower() in (".xlsx", ".xlsm"):
         _zapis_xlsx(a.vystup, radky, hlavicka)
