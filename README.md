@@ -93,7 +93,16 @@ serverů je rizikovější než drahý dodavatel kancelářských potřeb.
 požadavky ve smlouvě, DPA, právo auditu, monitoring). Přepočítá se s každou
 změnou vstupů.
 
-Logiku vzorců hlídá `python3 test_vzorce.py`.
+### Testy
+
+```bash
+python3 test_vzorce.py    # logika vzorců v Excelu (bez Excelu je nespustíme)
+python3 test_zdroje.py    # normalizace názvů, odhad domény, ověření stránky
+```
+
+Oba běží bez sítě. Hlídají tiché chyby, které by se v auditu poznaly pozdě —
+například že „ESET" a „RESET" nesmí splynout, nebo že web uhodnutý z názvu
+se nepřijme, pokud vede na parkovanou doménu.
 
 ## Soubory
 
@@ -105,6 +114,7 @@ Logiku vzorců hlídá `python3 test_vzorce.py`.
 | `taxonomie.py` | čtení číselníku |
 | `taxonomie_data.json` | číselník kategorií a ICT relevance |
 | `test_vzorce.py` | kontrola logiky vzorců v Excelu |
+| `test_zdroje.py` | kontrola normalizace názvů a ověřování webu |
 | `TAXONOMIE.md` | proč je číselník členěný takhle |
 
 Keš je v profilu uživatele (`~/.cache/dodavatele/`), mezistav v

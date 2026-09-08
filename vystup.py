@@ -101,7 +101,7 @@ def _blok_firmy(cislo, f):
     if misto:
         hlava += " (%s)" % misto
     radky = [hlava, "   identita: %s" % f.identita]
-    for stitek, text in f.podklady():
+    for stitek, text in f.podklady(strucne=True):
         radky.append("   %s: %s" % (stitek, text))
     return "\n".join(radky)
 
@@ -295,10 +295,12 @@ def zapis_excel(firmy, odpovedi, cesta):
 
     # -- list Souhrn ------------------------------------------------------
     ws_s = wb.create_sheet("Souhrn")
-    kr = "Dodavatelé!$%s$2:$%s$%d" % (_pismeno(S_KRIT), _pismeno(S_KRIT), posledni)
-    ic = "Dodavatelé!$%s$2:$%s$%d" % (_pismeno(S_ICT), _pismeno(S_ICT), posledni)
-    kod = "Dodavatelé!$%s$2:$%s$%d" % (_pismeno(S_KOD), _pismeno(S_KOD), posledni)
-    ident = "Dodavatelé!$C$2:$C$%d" % posledni
+    def _rozsah(sloupec):
+        pis = _pismeno(sloupec)
+        return "'Dodavatelé'!$%s$2:$%s$%d" % (pis, pis, posledni)
+
+    kr, ic, kod = _rozsah(S_KRIT), _rozsah(S_ICT), _rozsah(S_KOD)
+    ident = "'Dodavatelé'!$C$2:$C$%d" % posledni
 
     ws_s.append(["Přehled", ""])
     ws_s.append(["Dodavatelů celkem", len(firmy)])

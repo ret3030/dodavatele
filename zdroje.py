@@ -66,6 +66,11 @@ BEZ_DIAKRITIKY_TABULKA = str.maketrans({
 })
 
 PRAVNI_FORMY = {
+    # Zbytky po sluceni tecek: "spol. s r.o." -> "spol s ro" (ne "spol s r o",
+    # protoze "r.o." se slepi na "ro"). Kdyz tu tyhle varianty chybi, zvedaji
+    # podobnost mezi jinak odlisnymi firmami - "ESET s ro" vs "RESET s ro"
+    # dava 0.95 a ARES by je zamenil.
+    "spol", "a spol", "s ro", "spol s ro", "s r o s", "ro",
     "as", "a s", "akciova spolecnost", "sro", "s r o", "spol s r o",
     "spolecnost s rucenim omezenym", "ks", "vos", "zs", "ops", "sp", "se", "statni podnik",
     "zapsany spolek", "zu", "odstepny zavod",
@@ -145,6 +150,20 @@ def skore_shody(a, b):
 def _text(s, limit=None):
     t = _WS.sub(" ", html.unescape(_TAG.sub(" ", str(s or "")))).strip()
     return t[:limit] if limit else t
+
+
+def _zkrat(text, limit):
+    """Zkrati na hranici vety nebo slova, at text nekonci uprostred slova."""
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text
+    orez = text[:limit]
+    for hranice in (". ", "! ", "? ", " · "):
+        i = orez.rfind(hranice)
+        if i > limit * 0.5:
+            return orez[:i + 1].strip()
+    i = orez.rfind(" ")
+    return (orez[:i] if i > limit * 0.5 else orez).rstrip(" ,;·") + "…"
 
 
 def _ico(hodnota):
@@ -352,19 +371,28 @@ class Firma:
         casti = [self.ulice, " ".join(x for x in (self.psc, self.mesto) if x), self.zeme]
         return ", ".join(c for c in casti if c) or self.vstup_adresa
 
-    def podklady(self):
-        """Vsechno, co o firme vime, jako seznam (stitek, text) - do promptu pro LLM."""
+    def podklady(self, strucne=False):
+        """
+        Co o firme vime, jako seznam (stitek, text).
+
+        `strucne=True` je pro prompt do chatu: podklady se zkrati, at se do
+        jedne davky vejde 250 firem a da se to vlozit do okna chatu. Na urceni
+        oboru staci prvni veta - zbytek je pro cloveka, ktery to overuje.
+        """
+        limit_polozky = 240 if strucne else 700
+        pocet_oboru = 3 if strucne else 8
         out = []
         if self.obory:
-            out.append(("zapsané obory", "; ".join(self.obory[:8])))
+            out.append(("zapsané obory",
+                        _zkrat("; ".join(self.obory[:pocet_oboru]), limit_polozky)))
         if self.nace:
-            out.append(("NACE", ", ".join(self.nace[:8])))
+            out.append(("NACE", ", ".join(self.nace[:6])))
         if self.popis_wikidata:
-            out.append(("Wikidata", self.popis_wikidata))
+            out.append(("Wikidata", _zkrat(self.popis_wikidata, limit_polozky)))
         if self.popis_wikipedie:
-            out.append(("Wikipedie", self.popis_wikipedie))
+            out.append(("Wikipedie", _zkrat(self.popis_wikipedie, limit_polozky)))
         if self.web_text:
-            out.append(("web", self.web_text))
+            out.append(("web", _zkrat(self.web_text, limit_polozky)))
         return out
 
 
@@ -752,7 +780,11 @@ def web_text(klient, f):
     zaradil dodavatele svorkovnic mezi media.
     """
     dohadovana = not f.web
-    dom = f.web or _dohad_domeny(f)
+    sila = 0
+    if dohadovana:
+        dom, sila = _dohad_domeny(f)
+    else:
+        dom = f.web
     if not dom:
         return
     if not dom.startswith("http"):
@@ -787,7 +819,7 @@ def web_text(klient, f):
         casti.append(telo)
     text = _text(" · ".join(c for c in casti if c), 900)
 
-    if dohadovana and not _stranka_sedi(f, text, htmls):
+    if dohadovana and not _stranka_sedi(f, text, htmls, sila):
         poznamka = ("web %s neověřen (nezmiňuje firmu), nepoužit"
                     % urllib.parse.urlsplit(cil).netloc)
         f.poznamky.append(poznamka)
@@ -836,33 +868,60 @@ def _stahni_stranku(url):
     return "", ""
 
 
-def _stranka_sedi(f, text, htmls):
-    """Patri stranka opravdu teto firme? ICO na strance, nebo aspon dva
-    vyznamove tokeny nazvu (jeden je slabý - 'phoenix' sedi i na televizi)."""
+def _stranka_sedi(f, text, htmls, sila):
+    """
+    Patri stranka opravdu teto firme?
+
+    `sila` = kolik tokenu nazvu slo do uhodnute domeny. Domena slozena z celeho
+    nazvu (teslablatna.cz) je sama o sobe silny dukaz - staci, kdyz stranka
+    firmu zmini. Domena z jednoho slova (phoenix.de) je slaba: takovou adresu
+    ma i nekdo uplne jiny, takze se chce potvrzeni z dalsiho slova nazvu.
+    """
     if f.ico and f.ico in htmls:
         return True
-    tokeny = [t for t in normalizuj_nazev(f.vstup_nazev).split() if len(t) >= 3]
+    tokeny = _tokeny_nazvu(f.vstup_nazev)
     if not tokeny:
         return False
-    nizky = bez_diakritiky(text).lower()
+    # Hleda se i v syrovem HTML, ne jen ve viditelnem textu: "AutoESA" ma web
+    # nadepsany "Auto ESA" s mezerou, ale v adresach a meta znackach je jednim
+    # slovem. Parkovana domena (teslablatna.cz -> parking.vedos.cz) nazev
+    # firmy neobsahuje nikde, takze projde odmitnutim tak jako tak.
+    nizky = bez_diakritiky(text + " " + htmls).lower()
     zasazene = sum(1 for t in set(tokeny) if t in nizky)
-    return zasazene >= 2 or (len(tokeny) == 1 and zasazene == 1)
+    if sila >= 2 or len(tokeny) == 1:
+        return zasazene >= 1
+    return zasazene >= 2
+
+
+# Slova, ktera nenesou identitu firmy - do domeny ani do overovani nepatri.
+_VYPLNOVA_SLOVA = {"and", "spol", "the", "und", "group", "holding", "holdings",
+                   "company", "international", "czech", "cz", "slovakia", "sk",
+                   "deutschland", "europe", "eu", "praha", "brno", "gmbh", "bohemia"}
+
+
+def _tokeny_nazvu(nazev):
+    """Vyznamova slova nazvu - bez pravnich forem a vyplnovych slov."""
+    return [t for t in normalizuj_nazev(nazev).split()
+            if len(t) >= 3 and t not in _VYPLNOVA_SLOVA]
 
 
 def _dohad_domeny(f):
     """
-    Domena z nazvu - jen jeden pokus. Vysledek se overuje v `_stranka_sedi`,
-    takze spatny odhad podklady neznehodnoti, jen se zahodi.
+    Domena z nazvu. Vraci (domena, sila), kde sila je pocet slov nazvu, ktera
+    do domeny sla - podle toho se pak posuzuje, jak moc vysledku verit.
+    Spatny odhad podklady neznehodnoti, `_stranka_sedi` ho zahodi.
     """
-    tokeny = [t for t in normalizuj_nazev(f.vstup_nazev).split() if len(t) >= 3]
+    tokeny = _tokeny_nazvu(f.vstup_nazev)
     if not tokeny:
-        return ""
-    zaklad = "".join(tokeny) if len(tokeny) <= 2 else tokeny[0]
+        return "", 0
+    # cely nazev je specificky (teslablatna.cz); jedno slovo je risk (phoenix.de)
+    zaklad = "".join(tokeny[:3]) if len(tokeny) <= 3 else "".join(tokeny[:2])
+    sila = min(len(tokeny), 3 if len(tokeny) <= 3 else 2)
     if len(zaklad) < 4:
-        return ""
+        return "", 0
     tld = {"CZ": "cz", "SK": "sk", "DE": "de", "AT": "at", "PL": "pl", "NL": "nl",
            "FR": "fr", "IT": "it", "ES": "es", "HU": "hu", "SE": "se", "CH": "ch"}
-    return zaklad + "." + tld.get((f.zeme or f.vstup_zeme).upper(), "com")
+    return zaklad + "." + tld.get((f.zeme or f.vstup_zeme).upper(), "com"), sila
 
 
 # ---------------------------------------------------------------------------
