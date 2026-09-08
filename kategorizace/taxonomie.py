@@ -50,6 +50,12 @@ def prevod_ze_stare(kod):
 
 
 def nazev_nace(kod):
+    """Nazev NACE polozky. ARES/RPO casto vraci 5mistne kody (46900), ktere
+    ciselnik nema - zkusi se proto i kratsi prefixy (4630 -> 463 -> 46)."""
     if not kod:
         return ""
-    return NACE_NAZVY.get(kod) or NACE_NAZVY.get(re.sub(r"\D", "", kod), "")
+    cislo = re.sub(r"\D", "", str(kod))
+    for k in (kod, cislo, cislo[:4], cislo[:3], cislo[:2]):
+        if k and NACE_NAZVY.get(k):
+            return NACE_NAZVY[k]
+    return ""
