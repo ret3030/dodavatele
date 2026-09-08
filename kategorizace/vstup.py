@@ -2,7 +2,7 @@
 Nezavisle cteni vstupniho seznamu firem (CSV / XLSX / TXT). Zamerne nesdili
 kod s dodavatele.py - modul ma bezet samostatne.
 
-Vraci seznam dict: {"nazev","mesto","zeme","nace","ico"} (chybejici = "").
+Vraci seznam dict: {"nazev","mesto","zeme","nace","ico","web"} (chybejici = "").
 """
 
 import csv
@@ -19,6 +19,8 @@ _SLOUPCE = {
     "zeme": {"zeme", "země", "country", "stat", "stát", "kod zeme", "kód země"},
     "nace": {"nace", "nace kod", "nace kód", "obor", "cinnost", "činnost"},
     "ico": {"ico", "ičo", "ic", "identifikacni cislo", "identifikační číslo"},
+    "web": {"web", "www", "url", "webstranka", "webová stránka", "webova stranka",
+            "stranky", "stránky", "website", "domena", "doména", "domain"},
 }
 
 
@@ -65,6 +67,7 @@ def _radky_z_tabulky(radky):
             "zeme": bunka("zeme"),
             "nace": bunka("nace"),
             "ico": bunka("ico"),
+            "web": bunka("web"),
         })
     return out
 

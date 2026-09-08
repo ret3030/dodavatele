@@ -52,61 +52,46 @@ Odůvodnění revize: `kategorizace/TAXONOMIE_V2.md`.
 ## Deterministické zařazení bez LLM
 
 Adresář `kategorizace/` je samostatný modul, který **kód kategorie určí
-deterministicky** (stejný vstup → stejný výstup) z webového vyhledávání a webu
+deterministicky** (stejný vstup → stejný výstup) z veřejných rejstříků a webu
 firmy, a tak u části dodavatelů obejde LLM krok. Nejednoznačné firmy nechá
 na LLM. Není součástí desktopové aplikace – jen příkazová řádka.
 
-Hledání jde přes **vlastní instanci [SearXNG](https://docs.searxng.org/)** –
-názvy dodavatelů neopouštějí vlastní infrastrukturu, nic se neposílá do
-externí vyhledávací služby.
+Signály se sbírají **jen z veřejných zdrojů bez API klíče a bez běžící služby**:
 
-### Aktivace
+- **ARES** – kanonický název, IČO/DIČ, sídlo, CZ-NACE,
+- **Wikidata** – firmu spáruje podle IČO (`P4156`), z ní vezme oficiální web
+  (`P856`), obor, produkt a typ,
+- **Wikipedie** (cs, pak en) – úvodní odstavec článku,
+- **web firmy** – doménu bere ze sloupce `Web` ve vstupu, jinak z Wikidat,
+  jinak ji opatrně zkusí uhodnout z názvu (přijme jen ověřenou).
 
-1. **Rozjeďte SearXNG.** Přes [Podman](https://podman.io/) (zdarma i pro
-   firmy, na rozdíl od Docker Desktopu). Na Windows/macOS nejdřív jednou
-   `podman machine init && podman machine start`, pak:
+Je to **čistý Python (jen `urllib`)** – běží i na Windows bez WSL, Podmanu
+a Dockeru. První běh stahuje, každý další běh nad stejným seznamem jede z keše
+a je bajt po bajtu shodný.
 
-   ```bash
-   podman run -d --name searxng -p 8888:8080 \
-     -v "./searxng:/etc/searxng" docker.io/searxng/searxng
-   ```
+### Použití
 
-2. **Povolte JSON výstup** – v `searxng/settings.yml` (vytvoří se při prvním
-   startu) přidejte a kontejner restartujte (`podman restart searxng`):
+```bash
+.venv/bin/python -m kategorizace.kategorizuj vstup.csv -o vystup_kat.csv
+.venv/bin/python -m kategorizace.kategorizuj vstup.csv -o out.csv --offline   # jen z keše
+```
 
-   ```yaml
-   search:
-     formats: [html, json]
-   ```
+Vstup je stejný seznam firem jako pro `dodavatele.py`. **Přesnost výrazně
+zvedne sloupec `Web` (nebo `URL`)** – odpadá nejisté hádání domény. Pomůže
+i `IČO` (přesné spárování s Wikidaty) a `Město`.
 
-3. **Řekněte modulu adresu** – proměnnou prostředí, souborem, nebo přepínačem
-   `--searxng URL`:
+Ve výstupu (`Název | IČO | Doména | Zdroj domény | Kód kategorie | … |
+Rozhodnutí`) rozhoduje sloupec **Rozhodnutí**:
 
-   ```bash
-   export SEARXNG_URL=http://localhost:8888
-   # nebo:  echo http://localhost:8888 > kategorizace/searxng_url.txt
-   ```
+| rozhodnutí | co s tím |
+|---|---|
+| `AUTO` | kategorie převzata rovnou (na AUTO větvi ~95 % přesnost listu) |
+| `OVERIT` | návrh s nižší jistotou, doporučená kontrola |
+| `LLM` | nezařazeno, jde na LLM krok níže |
 
-   Instance za HTTP Basic auth: dejte přihlášení do URL –
-   `http://uzivatel:heslo@vyhledavac.interni:8080`.
-
-4. **Spusťte kategorizaci** nad stejným seznamem firem:
-
-   ```bash
-   .venv/bin/python -m kategorizace.kategorizuj vstup.csv -o vystup_kat.csv
-   .venv/bin/python -m kategorizace.kategorizuj vstup.csv -o out.csv --offline   # jen z keše
-   ```
-
-Ve výstupu (`Název | Kód kategorie | Kategorie | Skupina | … | Rozhodnutí`)
-rozhoduje sloupec **Rozhodnutí**:
-
-| rozhodnutí | podíl | co s tím |
-|---|---|---|
-| `AUTO` | ~37 % | kategorie převzata rovnou (~96 % přesnost listu) |
-| `OVERIT` | ~33 % | návrh s nižší jistotou, doporučená kontrola |
-| `LLM` | ~30 % | nezařazeno, jde na LLM krok níže |
-
-Podrobnosti, měření přesnosti a ladění pravidel: `kategorizace/README.md`.
+Podíl mezi větvemi závisí na tom, kolik firem má vyplněný web a je ve
+Wikidatech – přeměřte si ho na svém gold seznamu (`kategorizace/vyhodnoceni.py`).
+Podrobnosti a ladění pravidel: `kategorizace/README.md`.
 
 ## Zařazení přes LLM chat
 
