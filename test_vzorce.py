@@ -56,8 +56,58 @@ def _zkontroluj_syntaxi(vzorec, jmeno):
     return chyby
 
 
-def main():
+def _test_nacitani_odpovedi():
+    """Čtení odpovědí z chatu: formát, tolerance k šumu, kontrola párování."""
+    import os
+    import tempfile
+
+    class _F:
+        def __init__(self, n):
+            self.vstup_nazev = self.nazev = n
+
+    firmy = [_F("Alza.cz a.s."), _F("GABEN, spol. s r. o."), _F("ESET, spol. s r.o.")]
     chyby = []
+
+    def _precti(obsah, s_kontrolou=True):
+        with tempfile.TemporaryDirectory() as d:
+            with open(os.path.join(d, "o.csv"), "w", encoding="utf-8") as f:
+                f.write(obsah)
+            return vystup.nacti_odpovedi(d, firmy if s_kontrolou else None)
+
+    # správně spárovaná odpověď
+    odp, nes = _precti("1;Alza.cz a.s.;OBH-01;e-shop;vysoká\n"
+                       "2;GABEN, spol. s r. o.;ICT-08;RFID;vysoká\n")
+    if len(odp) != 2 or nes:
+        chyby.append("správná odpověď: %d řádků, %d nesouladů" % (len(odp), len(nes)))
+    if odp.get(1, {}).get("kod") != "OBH-01" or odp.get(1, {}).get("popis") != "e-shop":
+        chyby.append("špatně rozparsovaný řádek: %r" % odp.get(1))
+
+    # posunuté číslování se musí zachytit, ne tiše přiřadit
+    odp, nes = _precti("1;GABEN, spol. s r. o.;ICT-08;RFID;vysoká\n")
+    if odp or len(nes) != 1:
+        chyby.append("posunuté ID se nezachytilo (%d řádků, %d nesouladů)"
+                     % (len(odp), len(nes)))
+
+    # starší formát bez názvu musí pořád fungovat
+    odp, nes = _precti("1;OBH-01;e-shop;vysoká\n")
+    if odp.get(1, {}).get("kod") != "OBH-01":
+        chyby.append("formát bez názvu firmy se nepřečetl: %r" % odp)
+
+    # hlavička a povídání okolo se přeskočí
+    odp, nes = _precti("Tady je výsledek:\nID;Název;Kód;Co dodává;Jistota\n"
+                       "3;ESET, spol. s r.o.;ICT-05;antivirus;vysoká\n")
+    if odp.get(3, {}).get("kod") != "ICT-05":
+        chyby.append("šum okolo odpovědi se nepřeskočil: %r" % odp)
+
+    # drobná odchylka v názvu se tolerovat má (chat občas zkrátí)
+    odp, nes = _precti("1;Alza.cz;OBH-01;e-shop;vysoká\n")
+    if not odp:
+        chyby.append("zkrácený název se neuznal jako shoda")
+    return chyby
+
+
+def main():
+    chyby = _test_nacitani_odpovedi()
 
     # 1) logika kritičnosti
     for vstup, cekano in PRIPADY:
@@ -117,7 +167,8 @@ def main():
             print("  ✗ %s" % c)
         return 1
     print("OK: %d případů kritičnosti, syntaxe vzorců, indexy sloupců, "
-          "číselník (%d kategorií)" % (len(PRIPADY), len(KATEGORIE)))
+          "číselník (%d kategorií), čtení odpovědí z chatu"
+          % (len(PRIPADY), len(KATEGORIE)))
     return 0
 
 

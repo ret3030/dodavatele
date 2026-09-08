@@ -22,6 +22,12 @@ python3 dodavatele.py odpovedi/          # 2. běh – doplní je do Excelu
 
 Žádné přepínače. První argument je soubor (dohledání) nebo složka (doplnění).
 
+Prompt v dávce si o formát odpovědi řekne sám — chat vrátí CSV s řádky
+`ID;Název firmy;Kód kategorie;Co dodává;Jistota`. Soubor uložte do `odpovedi/`
+pod libovolným jménem. Podle ID **i názvu** se odpověď páruje zpět: kdyby chat
+posunul číslování, řádky se zahodí a nástroj to nahlásí, místo aby dodavateli
+tiše přiřadil cizí kategorii.
+
 **Vstup** (CSV / XLSX / TXT): povinný je jen název. Rozpoznají se sloupce
 `Název`, `Adresa`, `IČO`, `DIČ`, `Země`, `Částka` — česky, anglicky i německy.
 Duplicity podle názvu a IČO se slučují.

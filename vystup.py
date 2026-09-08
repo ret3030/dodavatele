@@ -85,13 +85,14 @@ rejstřících a na webu. Pozor na řádek "identita" - hodnota "neověřeno" zn
 """
 
 FORMAT = """\
-Odpověz POUZE v CSV, jeden řádek na firmu, oddělovač ';', v tomto pořadí
-a beze změny ID. Bez hlavičky, bez uvozovek, bez textu okolo:
+Odpověz POUZE v CSV, jeden řádek na firmu, oddělovač ';', v tomto pořadí.
+Bez hlavičky, bez uvozovek, bez textu okolo:
 
-ID;Kód kategorie;Co dodává;Jistota
+ID;Název firmy;Kód kategorie;Co dodává;Jistota
 
-Zpracuj všech %d firem. Když nestihneš všechny, radši méně řádků, ale úplných -
-nikdy nezkracuj tak, že vynecháš ID uprostřed.
+ID i název opiš přesně tak, jak jsou v seznamu - podle nich se odpověď páruje
+zpět a nesoulad se pozná. Zpracuj všech %d firem. Když nestihneš všechny,
+radši méně řádků, ale úplných - nikdy nevynechávej ID uprostřed.
 """
 
 
@@ -140,36 +141,71 @@ def zapis_davky(firmy, adresar):
 # Nacteni odpovedi z chatu
 # ---------------------------------------------------------------------------
 
-def nacti_odpovedi(adresar):
+def nacti_odpovedi(adresar, firmy=None):
     """
-    Precte vsechny CSV/TXT v adresari a vrati {id: {"kod","popis","jistota"}}.
+    Precte vsechny CSV/TXT v adresari a vrati (odpovedi, nesoulady), kde
+    odpovedi = {id: {"kod","popis","jistota"}}.
+
     Radky bez rozpoznatelneho ID nebo kodu se preskoci - chat casto pripise
-    uvodni vetu nebo hlavicku.
+    uvodni vetu nebo hlavicku. Kdyz je zadany `firmy`, kontroluje se navic
+    nazev: kdyby chat posunul cislovani, dostala by firma cizi kategorii
+    a v auditu by se to poznalo hodne pozde. Takove radky se zahodi a vrati
+    v `nesoulady`.
     """
-    out = {}
+    out, nesoulady = {}, []
     if not os.path.isdir(adresar):
-        return out
+        return out, nesoulady
     for jmeno in sorted(os.listdir(adresar)):
         if not jmeno.lower().endswith((".csv", ".txt")):
             continue
-        cesta = os.path.join(adresar, jmeno)
-        with open(cesta, encoding="utf-8-sig", newline="") as fh:
+        with open(os.path.join(adresar, jmeno), encoding="utf-8-sig", newline="") as fh:
             vzorek = fh.read(4096)
             fh.seek(0)
             odd = ";" if vzorek.count(";") >= vzorek.count(",") else ","
             for radek in csv.reader(fh, delimiter=odd):
                 if len(radek) < 2:
                     continue
-                ident = re.match(r"^\s*(\d+)\s*$", radek[0] or "")
-                kod = _KOD_RE.search((radek[1] or "").upper())
-                if not ident or not kod:
+                ident = re.match(r"^\s*(\d+)\s*$", (radek[0] or "").strip())
+                if not ident:
                     continue
-                out[int(ident.group(1))] = {
-                    "kod": kod.group(0),
-                    "popis": (radek[2].strip() if len(radek) > 2 else ""),
-                    "jistota": (radek[3].strip().lower() if len(radek) > 3 else ""),
+                # kod kategorie muze byt ve 2. nebo 3. sloupci podle toho,
+                # jestli chat vratil i nazev firmy
+                kod, i_kod = None, None
+                for i in (1, 2):
+                    if i < len(radek):
+                        m = _KOD_RE.search((radek[i] or "").upper())
+                        if m:
+                            kod, i_kod = m.group(0), i
+                            break
+                if not kod:
+                    continue
+
+                cislo = int(ident.group(1))
+                nazev_z_odpovedi = radek[1].strip() if i_kod == 2 else ""
+                if firmy and nazev_z_odpovedi and not _nazev_sedi(
+                        firmy, cislo, nazev_z_odpovedi):
+                    ocekavany = (firmy[cislo - 1].nazev or firmy[cislo - 1].vstup_nazev
+                                 if 1 <= cislo <= len(firmy) else "?")
+                    nesoulady.append((cislo, nazev_z_odpovedi, ocekavany))
+                    continue
+
+                out[cislo] = {
+                    "kod": kod,
+                    "popis": (radek[i_kod + 1].strip() if len(radek) > i_kod + 1 else ""),
+                    "jistota": (radek[i_kod + 2].strip().lower()
+                                if len(radek) > i_kod + 2 else ""),
                 }
-    return out
+    return out, nesoulady
+
+
+def _nazev_sedi(firmy, cislo, nazev):
+    """Odpovida nazev z odpovedi firme na tomhle poradovem cisle?"""
+    if not 1 <= cislo <= len(firmy):
+        return False
+    f = firmy[cislo - 1]
+    from zdroje import skore_shody
+    return max(skore_shody(nazev, f.vstup_nazev),
+               skore_shody(nazev, f.nazev or f.vstup_nazev)) >= 0.75
 
 
 # ---------------------------------------------------------------------------

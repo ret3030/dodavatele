@@ -207,11 +207,11 @@ def beh_doplneni(adresar):
         raise SystemExit(
             "Chybí %s – nejdřív spusťte dohledání:  python3 %s seznam.xlsx"
             % (STAV, os.path.basename(__file__)))
-    odpovedi = vystup.nacti_odpovedi(adresar)
-    if not odpovedi:
+    odpovedi, nesoulady = vystup.nacti_odpovedi(adresar, firmy)
+    if not odpovedi and not nesoulady:
         raise SystemExit(
             "V %s nejsou žádné použitelné odpovědi. Čekám CSV s řádky "
-            "'ID;Kód kategorie;Co dodává;Jistota'." % adresar)
+            "'ID;Název firmy;Kód kategorie;Co dodává;Jistota'." % adresar)
 
     vystup.zapis_excel(firmy, odpovedi, VYSTUP)
 
@@ -221,6 +221,14 @@ def beh_doplneni(adresar):
           file=sys.stderr)
     if nizka:
         print("  z toho %d s nízkou jistotou – projděte ručně" % nizka, file=sys.stderr)
+    if nesoulady:
+        print("\n  POZOR: %d odpovědí nesedělo na firmu podle ID a byly zahozeny."
+              % len(nesoulady), file=sys.stderr)
+        print("  Nejspíš se v chatu posunulo číslování – zkuste tu dávku znovu.",
+              file=sys.stderr)
+        for cislo, dostal, cekano in nesoulady[:5]:
+            print("    ID %d: odpověď %r, čekáno %r" % (cislo, dostal[:32], cekano[:32]),
+                  file=sys.stderr)
     if chybi:
         ukazka = ", ".join(str(i) for i in chybi[:15])
         print("  chybí odpověď u %d firem (ID: %s%s)"
