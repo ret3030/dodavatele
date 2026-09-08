@@ -114,13 +114,17 @@ class Zdroje:
             print("  ! kes nejde zapsat: %s" % e, file=sys.stderr)
 
     # -- HTTP -------------------------------------------------------------
-    def _skrt(self):
-        """Serializace dotazu - aspon `prodleva` sekund mezi kterymikoli dvema
-        (ne az po uspechu). Wikidata/Wikipedia API jinak rychle vrati HTTP 429."""
-        if self.prodleva:
-            spano = time.time() - self._posledni_dotaz
-            if spano < self.prodleva:
-                time.sleep(self.prodleva - spano)
+    # Rozestup drzime jen na Wikimedia (Wikidata/Wikipedia) - ta jinak rychle
+    # vrati HTTP 429. ARES, RPO SR i weby firem snesou dotazy hned za sebou.
+    _POMALE_HOSTY = ("wikidata.org", "wikipedia.org", "wikimedia.org")
+
+    def _skrt(self, url):
+        host = urllib.parse.urlsplit(url).hostname or ""
+        if not self.prodleva or not any(host.endswith(h) for h in self._POMALE_HOSTY):
+            return
+        spano = time.time() - self._posledni_dotaz
+        if spano < self.prodleva:
+            time.sleep(self.prodleva - spano)
         self._posledni_dotaz = time.time()
 
     def _http(self, url, data=None, hlavicky=None):
@@ -132,7 +136,7 @@ class Zdroje:
             h["Content-Type"] = "application/json"
         posledni = None
         for pokus in range(1, self.pokusy + 1):
-            self._skrt()
+            self._skrt(url)
             try:
                 with urllib.request.urlopen(
                     urllib.request.Request(url, data=telo, headers=h),
@@ -408,7 +412,7 @@ class Zdroje:
     def _stahni_hlavicku(self, url):
         try:
             req = urllib.request.Request(url, headers={"User-Agent": UA})
-            with urllib.request.urlopen(req, timeout=10) as r:
+            with urllib.request.urlopen(req, timeout=6) as r:
                 return r.geturl(), r.read(120000).decode("utf-8", "replace")
         except Exception:
             return None, ""
@@ -438,12 +442,12 @@ class Zdroje:
                                      "".join(tokeny[:2]) if len(tokeny) >= 2 else prvni]):
             if len(zaklad) < 3:
                 continue
-            for tld in (".cz", ".sk", ".com", ".eu"):
-                kandidati.append(zaklad + tld)
+            for t in (".cz", ".com", ".sk"):
+                kandidati.append(zaklad + t)
 
         mesto_n = bez_diakritiky((mesto or "").lower())
         nalezena = ""
-        for dom in kandidati[:10]:
+        for dom in kandidati[:6]:
             fin, body = self._stahni_hlavicku("https://" + dom)
             if not body:
                 continue
