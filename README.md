@@ -5,18 +5,19 @@ z veřejných rejstříků – ARES (ČR), RPO SR (Slovensko), INSEE (Francie),
 SEC EDGAR (USA), GLEIF a Wikidata (svět). Vše bez API klíče a bez registrace.
 
 Zařazení do vlastní kategorie dodavatele a stručný popis, co firma skutečně
-dělá, se určuje ve druhém kroku přes LLM chat (Copilot/ChatGPT) – zapsaný
-obor v rejstříku totiž říká, jak je firma zaregistrovaná, ne co dodává.
-Viz [Zařazení přes LLM chat](#zařazení-přes-llm-chat) níže.
+dělá, se doplňuje ve druhém kroku – zapsaný obor v rejstříku říká, jak je
+firma zaregistrovaná, ne co dodává. Dvě cesty:
 
-K dispozici jako příkazová řádka i jako desktopová aplikace bez nutnosti
-instalovat Python – viz [Desktopová aplikace](#desktopová-aplikace).
+- **[Deterministické zařazení bez LLM](#deterministické-zařazení-bez-llm)** –
+  část dodavatelů zařadí automaticky z webu firmy.
+- **[Zařazení přes LLM chat](#zařazení-přes-llm-chat)** – zbytek přes
+  Copilot/ChatGPT.
 
 ## Instalace a použití
 
 ```bash
 python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt   # openpyxl, jen pro zápis XLSX
+.venv/bin/pip install -r requirements.txt   # openpyxl, jen pro čtení/zápis XLSX
 
 python3 dodavatele.py vstup.csv -o vystup.xlsx
 ```
@@ -42,17 +43,38 @@ danému řádku věřit:
 Opakovaný běh nad stejným seznamem je díky keši (uložené v profilu
 uživatele) téměř okamžitý – nic se nestahuje znovu. `--obnovit` zkusí ještě
 jednou dohledat firmy, které v daném běhu skončily jako nenalezené.
-Přepínač `--help` vypíše všechny volby i s popisem.
+`--help` vypíše všechny volby.
 
 Číselník kategorií (`taxonomie_data.json`) má **74 kategorií v 11 skupinách**
 a u každé příznak ICT relevance (vstup pro navazující posouzení dle ISO 27001).
-Odůvodnění a historie revize: `kategorizace/TAXONOMIE_V2.md`.
+Odůvodnění revize: `kategorizace/TAXONOMIE_V2.md`.
 
-## Deterministické zařazení bez LLM (experiment)
+## Deterministické zařazení bez LLM
 
-Adresář `kategorizace/` je samostatný modul, který se pokouší **kód kategorie
-určit deterministicky** z Google vyhledávání (SERPER API) a webu firmy, a tak
-u části dodavatelů obejít LLM krok níže. Viz `kategorizace/README.md`.
+Adresář `kategorizace/` je samostatný modul, který **kód kategorie určí
+deterministicky** (stejný vstup → stejný výstup) z Google vyhledávání a webu
+firmy, a tak u části dodavatelů obejde LLM krok. Nejednoznačné firmy nechá
+na LLM.
+
+Potřebuje klíč k [serper.dev](https://serper.dev) (Google Search API):
+
+```bash
+export SERPER_API_KEY=...          # nebo klíč do souboru kategorizace/serper_key.txt
+
+.venv/bin/python -m kategorizace.kategorizuj vstup.csv -o vystup_kat.csv
+.venv/bin/python -m kategorizace.kategorizuj vstup.csv -o out.csv --offline   # jen z keše
+```
+
+Ve výstupu (`Název | Kód kategorie | Kategorie | Skupina | … | Rozhodnutí`)
+rozhoduje sloupec **Rozhodnutí**:
+
+| rozhodnutí | podíl | co s tím |
+|---|---|---|
+| `AUTO` | ~37 % | kategorie převzata rovnou (~96 % přesnost listu) |
+| `OVERIT` | ~33 % | návrh s nižší jistotou, doporučená kontrola |
+| `LLM` | ~30 % | nezařazeno, jde na LLM krok níže |
+
+Podrobnosti, měření přesnosti a ladění pravidel: `kategorizace/README.md`.
 
 ## Zařazení přes LLM chat
 
@@ -80,14 +102,12 @@ python3 dodavatele.py --z-vystupu vystup.xlsx --llm-mapa odpoved.csv -o vystup2.
 ## Desktopová aplikace
 
 `gui.py` je okenní rozhraní nad stejnou logikou, zabalené přes PyInstaller
-do jednoho spustitelného souboru – spouští se dvojklikem, bez nutnosti
-cokoli instalovat.
+do jednoho spustitelného souboru – spouští se dvojklikem, bez instalace Pythonu.
 
 **Stažení hotové aplikace:**
-https://github.com/ret3030/dodavatele/releases/tag/gui-latest –
-vždy poslední verze, bez přihlášení do GitHub účtu. Na macOS je po
-rozbalení potřeba aplikaci poprvé spustit přes pravé tlačítko → Otevřít
-(Gatekeeper jinak nepodepsanou aplikaci nespustí dvojklikem).
+https://github.com/ret3030/dodavatele/releases/tag/gui-latest – vždy poslední
+verze. Na macOS je po rozbalení potřeba aplikaci poprvé spustit přes pravé
+tlačítko → Otevřít (Gatekeeper jinak nepodepsanou aplikaci nespustí dvojklikem).
 
 **Sestavení lokálně:**
 
@@ -102,32 +122,3 @@ pyinstaller --windowed --name Dodavatele --add-data "taxonomie_data.json:." gui.
 PyInstaller neumí sestavit aplikaci pro jinou platformu, než na které běží –
 proto GitHub Actions (`.github/workflows/build-gui.yml`) sestavuje zvlášť na
 Windows a macOS při každé změně `dodavatele.py`/`gui.py` na `main`.
-
-## Porovnání s cizí kategorizací
-
-Chcete-li ověřit, jak moc se náš `Kód kategorie`/`Kategorie dodavatele`
-shoduje s kategorizací od někoho jiného (kolega, jiný nástroj) nad stejným
-seznamem firem ve stejném pořadí, stačí přidat sloupec a jeden vzorec –
-žádný skript navíc:
-
-1. Vložte cizí kategorii jako **nový sloupec na konec** výstupu, řádek pod
-   řádkem stejně jako u nás (např. sloupec `N`, pokud `Kategorie dodavatele`
-   je ve sloupci `L`).
-2. Do dalšího sloupce (`O`) přidejte vzorec porovnání – ignoruje velikost
-   písmen a mezery navíc:
-   ```
-   =IF(TRIM(LOWER(L2))=TRIM(LOWER(N2));"ANO";"NE")
-   ```
-   a zkopírujte ho dolů přes všechny řádky s daty.
-3. Souhrnné procento shody spočítá v libovolné volné buňce:
-   ```
-   =COUNTIF(O2:O1000;"ANO")/COUNTA(O2:O1000)
-   ```
-   (rozsah upravte podle skutečného počtu řádků) a naformátujte buňku jako
-   **procenta**.
-
-Vzorec vyžaduje **stejná slova ve stejném pořadí** – funguje spolehlivě,
-když obě strany používají stejný katalog kategorií (stejné názvy). Pokud
-srovnáváte proti jinému číselníku/volnému textu, přesná shoda nebude
-vypovídající a je potřeba porovnání provést ručně nebo volněji (např. jen
-podle skupiny).
