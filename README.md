@@ -54,18 +54,46 @@ Odůvodnění revize: `kategorizace/TAXONOMIE_V2.md`.
 Adresář `kategorizace/` je samostatný modul, který **kód kategorie určí
 deterministicky** (stejný vstup → stejný výstup) z webového vyhledávání a webu
 firmy, a tak u části dodavatelů obejde LLM krok. Nejednoznačné firmy nechá
-na LLM.
+na LLM. Není součástí desktopové aplikace – jen příkazová řádka.
 
 Hledání jde přes **vlastní instanci [SearXNG](https://docs.searxng.org/)** –
-názvy dodavatelů neopouštějí vlastní infrastrukturu. Instance musí mít
-v `settings.yml` povolený JSON výstup (`search: formats: [html, json]`).
+názvy dodavatelů neopouštějí vlastní infrastrukturu, nic se neposílá do
+externí vyhledávací služby.
 
-```bash
-export SEARXNG_URL=http://localhost:8888   # nebo adresa do kategorizace/searxng_url.txt
+### Aktivace
 
-.venv/bin/python -m kategorizace.kategorizuj vstup.csv -o vystup_kat.csv
-.venv/bin/python -m kategorizace.kategorizuj vstup.csv -o out.csv --offline   # jen z keše
-```
+1. **Rozjeďte SearXNG.** Stačí lokální kontejner:
+
+   ```bash
+   docker run -d --name searxng -p 8888:8080 \
+     -v "$PWD/searxng:/etc/searxng" searxng/searxng
+   ```
+
+2. **Povolte JSON výstup** – v `searxng/settings.yml` (vytvoří se při prvním
+   startu) přidejte a kontejner restartujte (`docker restart searxng`):
+
+   ```yaml
+   search:
+     formats: [html, json]
+   ```
+
+3. **Řekněte modulu adresu** – proměnnou prostředí, souborem, nebo přepínačem
+   `--searxng URL`:
+
+   ```bash
+   export SEARXNG_URL=http://localhost:8888
+   # nebo:  echo http://localhost:8888 > kategorizace/searxng_url.txt
+   ```
+
+   Instance za HTTP Basic auth: dejte přihlášení do URL –
+   `http://uzivatel:heslo@vyhledavac.interni:8080`.
+
+4. **Spusťte kategorizaci** nad stejným seznamem firem:
+
+   ```bash
+   .venv/bin/python -m kategorizace.kategorizuj vstup.csv -o vystup_kat.csv
+   .venv/bin/python -m kategorizace.kategorizuj vstup.csv -o out.csv --offline   # jen z keše
+   ```
 
 Ve výstupu (`Název | Kód kategorie | Kategorie | Skupina | … | Rozhodnutí`)
 rozhoduje sloupec **Rozhodnutí**:
