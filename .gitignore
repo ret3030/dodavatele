@@ -9,3 +9,10 @@ gb_companies_house.db*
 build/
 dist/
 *.spec
+
+# nezavisly modul kategorizace/ - lokalni klic, kes a vystupy
+kategorizace/serper_key.txt
+kategorizace/.cache/
+kategorizace/*_rozbor.jsonl
+kategorizace/vystup_*.csv
+kategorizace/vystup_*.xlsx

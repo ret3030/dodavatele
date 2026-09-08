@@ -44,6 +44,16 @@ uživatele) téměř okamžitý – nic se nestahuje znovu. `--obnovit` zkusí j
 jednou dohledat firmy, které v daném běhu skončily jako nenalezené.
 Přepínač `--help` vypíše všechny volby i s popisem.
 
+Číselník kategorií (`taxonomie_data.json`) má **74 kategorií v 11 skupinách**
+a u každé příznak ICT relevance (vstup pro navazující posouzení dle ISO 27001).
+Odůvodnění a historie revize: `kategorizace/TAXONOMIE_V2.md`.
+
+## Deterministické zařazení bez LLM (experiment)
+
+Adresář `kategorizace/` je samostatný modul, který se pokouší **kód kategorie
+určit deterministicky** z Google vyhledávání (SERPER API) a webu firmy, a tak
+u části dodavatelů obejít LLM krok níže. Viz `kategorizace/README.md`.
+
 ## Zařazení přes LLM chat
 
 **Kód kategorie**, **Kategorie dodavatele** a **Popis činnosti** zůstávají

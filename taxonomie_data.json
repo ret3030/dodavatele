@@ -1,337 +1,583 @@
 {
+ "_popis": "Taxonomie kategorií dodavatelů (v2, sjednocená). 74 kategorií v 11 skupinách. Používá ji dodavatele.py i modul kategorizace/. Historie a odůvodnění revize: kategorizace/TAXONOMIE_V2.md. MAPA_ZE_STARE = převod z původního číselníku.",
+ "VYCHOZI_KOD": "XXX-00",
+ "SKUPINY": [
+  "IT, telekomunikace a kyberbezpečnost",
+  "Elektronika a elektrotechnika",
+  "Měření, metrologie a laboratoře",
+  "Stroje, automatizace a výrobní technologie",
+  "Výroba dílů a zpracování materiálů",
+  "Materiál, nářadí a provozní zásobování",
+  "Stavby, energie a facility",
+  "Doprava, logistika a vozidla",
+  "Profesní a poradenské služby",
+  "Marketing, tisk, vzdělávání a firemní služby",
+  "Nezařazeno"
+ ],
  "KATEGORIE": {
-  "ELE-01": [
-   "Elektronika",
-   "Čisté prostory a ESD ochrana"
-  ],
-  "ELE-02": [
-   "Elektronika",
-   "Desky plošných spojů (PCB) – výroba a osazování"
-  ],
-  "ELE-03": [
-   "Elektronika",
-   "Elektronické součástky – distribuce"
-  ],
-  "ELE-04": [
-   "Elektronika",
-   "Elektronické součástky – výroba"
-  ],
-  "ELE-05": [
-   "Elektronika",
-   "Elektronika a měřicí technika – výroba"
-  ],
-  "ELE-06": [
-   "Elektronika",
-   "Kabely, vodiče a kabelová konfekce"
-  ],
-  "ELE-07": [
-   "Elektronika",
-   "Konektory a elektromechanické komponenty"
-  ],
-  "ELE-08": [
-   "Elektronika",
-   "Optika, fotonika a laserová technika"
-  ],
-  "ELE-09": [
-   "Elektronika",
-   "Vysokofrekvenční technika a konektory"
-  ],
   "ICT-01": [
-   "IT a telekomunikace",
-   "Identifikace, čárové kódy a RFID"
+   "IT, telekomunikace a kyberbezpečnost",
+   "IT hardware a výpočetní technika"
   ],
   "ICT-02": [
-   "IT a telekomunikace",
-   "IT – hardware a výpočetní technika"
+   "IT, telekomunikace a kyberbezpečnost",
+   "Software, licence a vývoj aplikací"
   ],
   "ICT-03": [
-   "IT a telekomunikace",
-   "IT – software, licence a služby"
+   "IT, telekomunikace a kyberbezpečnost",
+   "IT služby, podpora a systémová integrace"
   ],
   "ICT-04": [
-   "IT a telekomunikace",
-   "Telekomunikace a síťová infrastruktura"
+   "IT, telekomunikace a kyberbezpečnost",
+   "Cloud, hosting a datová centra"
+  ],
+  "ICT-05": [
+   "IT, telekomunikace a kyberbezpečnost",
+   "Kybernetická bezpečnost"
+  ],
+  "ICT-06": [
+   "IT, telekomunikace a kyberbezpečnost",
+   "Telekomunikace a konektivita"
+  ],
+  "ICT-07": [
+   "IT, telekomunikace a kyberbezpečnost",
+   "Síťová infrastruktura a strukturovaná kabeláž"
+  ],
+  "ICT-08": [
+   "IT, telekomunikace a kyberbezpečnost",
+   "Identifikace, čárové kódy, RFID a sběr dat"
+  ],
+  "ELE-01": [
+   "Elektronika a elektrotechnika",
+   "Elektronické součástky – výroba a distribuce"
+  ],
+  "ELE-02": [
+   "Elektronika a elektrotechnika",
+   "Osazování a výroba DPS (EMS)"
+  ],
+  "ELE-03": [
+   "Elektronika a elektrotechnika",
+   "Vývoj a zakázková výroba elektroniky"
+  ],
+  "ELE-04": [
+   "Elektronika a elektrotechnika",
+   "Konektory, kabely a kabelová konfekce"
+  ],
+  "ELE-05": [
+   "Elektronika a elektrotechnika",
+   "Vestavné a řídicí systémy, IoT zařízení"
+  ],
+  "ELE-06": [
+   "Elektronika a elektrotechnika",
+   "Optika, fotonika a laserová technika"
+  ],
+  "ELE-07": [
+   "Elektronika a elektrotechnika",
+   "Čisté prostory a ESD ochrana"
+  ],
+  "ELE-08": [
+   "Elektronika a elektrotechnika",
+   "Elektroinstalační materiál a silnoproud"
+  ],
+  "ELE-09": [
+   "Elektronika a elektrotechnika",
+   "Rozvaděče, transformátory a napájecí technika"
   ],
   "MET-01": [
-   "Měření a metrologie",
-   "Kalibrace, metrologie a technické zkoušky"
-  ],
-  "MET-02": [
-   "Měření a metrologie",
-   "Laboratorní a zdravotnická technika"
-  ],
-  "MET-03": [
-   "Měření a metrologie",
+   "Měření, metrologie a laboratoře",
    "Měřicí a testovací technika – prodej a servis"
   ],
-  "MET-04": [
-   "Měření a metrologie",
-   "Zkušební přípravky a kontaktovací technika"
+  "MET-02": [
+   "Měření, metrologie a laboratoře",
+   "Kalibrace, metrologie a technické zkoušky"
   ],
-  "OST-01": [
-   "Firemní a ostatní",
-   "Catering a závodní stravování"
-  ],
-  "OST-02": [
-   "Firemní a ostatní",
-   "Členské příspěvky, komory a asociace"
-  ],
-  "OST-03": [
-   "Firemní a ostatní",
-   "Konference a firemní akce"
-  ],
-  "OST-04": [
-   "Firemní a ostatní",
-   "Kultura a společenské akce"
-  ],
-  "OST-05": [
-   "Firemní a ostatní",
-   "Ostatní / k ověření"
-  ],
-  "OST-06": [
-   "Firemní a ostatní",
-   "Ostatní obchod a zprostředkování"
-  ],
-  "OST-07": [
-   "Firemní a ostatní",
-   "Potraviny, nápoje a občerstvení"
-  ],
-  "OST-08": [
-   "Firemní a ostatní",
-   "Sport, rekreace a volnočasové akce"
-  ],
-  "OST-09": [
-   "Firemní a ostatní",
-   "Ubytování, stravování a pohoštění"
-  ],
-  "OST-10": [
-   "Firemní a ostatní",
-   "Veřejná správa a samospráva"
-  ],
-  "OST-11": [
-   "Firemní a ostatní",
-   "Zdravotní péče a zaměstnanecké benefity"
-  ],
-  "PRO-01": [
-   "Profesní služby",
-   "Certifikace, normy a technická školení"
-  ],
-  "PRO-02": [
-   "Profesní služby",
-   "Finanční služby, leasing a pojištění"
-  ],
-  "PRO-03": [
-   "Profesní služby",
-   "Personální a agenturní služby"
-  ],
-  "PRO-04": [
-   "Profesní služby",
-   "Poradenství, audit a daně"
-  ],
-  "PRO-05": [
-   "Profesní služby",
-   "Právní služby a advokacie"
-  ],
-  "PRO-06": [
-   "Profesní služby",
-   "Projekce a inženýrské služby"
-  ],
-  "PRO-07": [
-   "Profesní služby",
-   "Technické poradenství a expertizy"
-  ],
-  "SLU-01": [
-   "Služby",
-   "Doprava, spedice a logistika"
-  ],
-  "SLU-02": [
-   "Služby",
-   "Nemovitosti, pronájem a facility management"
-  ],
-  "SLU-03": [
-   "Služby",
-   "Poštovní, kurýrní a přepravní služby"
-  ],
-  "SLU-04": [
-   "Služby",
-   "Správa vozového parku a mobilita"
-  ],
-  "SLU-05": [
-   "Služby",
-   "Vozidla – prodej, servis a náhradní díly"
+  "MET-03": [
+   "Měření, metrologie a laboratoře",
+   "Laboratorní a analytická technika"
   ],
   "STR-01": [
-   "Stroje a technika",
-   "Čerpadla, armatury a regulační technika"
+   "Stroje, automatizace a výrobní technologie",
+   "Průmyslová automatizace, robotika a řídicí systémy"
   ],
   "STR-02": [
-   "Stroje a technika",
-   "Kompresory a stlačený vzduch – technika"
+   "Stroje, automatizace a výrobní technologie",
+   "Obráběcí stroje a výrobní technologie – prodej a servis"
   ],
   "STR-03": [
-   "Stroje a technika",
-   "Manipulační a skladová technika"
+   "Stroje, automatizace a výrobní technologie",
+   "Průmyslové stroje – servis, opravy a montáže"
   ],
   "STR-04": [
-   "Stroje a technika",
-   "Obráběcí stroje a technologie – prodej a servis"
-  ],
-  "STR-05": [
-   "Stroje a technika",
-   "Průmyslová automatizace a robotika"
-  ],
-  "STR-06": [
-   "Stroje a technika",
-   "Průmyslové stroje a technický servis"
-  ],
-  "STR-07": [
-   "Stroje a technika",
+   "Stroje, automatizace a výrobní technologie",
    "Řezné nástroje a nástrojařství"
   ],
+  "STR-05": [
+   "Stroje, automatizace a výrobní technologie",
+   "Čerpadla, armatury a regulační technika"
+  ],
+  "STR-06": [
+   "Stroje, automatizace a výrobní technologie",
+   "Kompresory a technika stlačeného vzduchu"
+  ],
+  "STR-07": [
+   "Stroje, automatizace a výrobní technologie",
+   "Manipulační, skladová a zdvihací technika"
+  ],
   "STR-08": [
-   "Stroje a technika",
-   "Výrobní technologie a stroje – SMT/elektronika"
+   "Stroje, automatizace a výrobní technologie",
+   "Vzduchotechnika, chlazení a klimatizace"
   ],
-  "STR-09": [
-   "Stroje a technika",
-   "Vzduchotechnika, klimatizace a servis"
+  "MAT-01": [
+   "Výroba dílů a zpracování materiálů",
+   "Kovoobrábění a přesné kovové díly"
   ],
-  "STR-10": [
-   "Stroje a technika",
-   "Zdvihací, vázací a plošinová technika"
-  ],
-  "UDR-01": [
-   "Provoz a údržba",
-   "Elektroinstalační materiál a práce"
-  ],
-  "UDR-02": [
-   "Provoz a údržba",
-   "Energie, voda a odpadové hospodářství"
-  ],
-  "UDR-03": [
-   "Provoz a údržba",
-   "Kancelářské potřeby a vybavení"
-  ],
-  "UDR-04": [
-   "Provoz a údržba",
-   "Nářadí a dílenské potřeby"
-  ],
-  "UDR-05": [
-   "Provoz a údržba",
-   "Osobní ochranné pomůcky a BOZP"
-  ],
-  "UDR-06": [
-   "Provoz a údržba",
-   "Osvětlení a světelná technika"
-  ],
-  "UDR-07": [
-   "Provoz a údržba",
-   "Požární ochrana a revize technických zařízení"
-  ],
-  "UDR-08": [
-   "Provoz a údržba",
-   "Pracovní oděvy, textilní servis a úklid"
-  ],
-  "UDR-09": [
-   "Provoz a údržba",
-   "Provozní vybavení, nábytek a dílenská technika"
-  ],
-  "UDR-10": [
-   "Provoz a údržba",
-   "Spojovací materiál a upevňovací technika"
-  ],
-  "UDR-11": [
-   "Provoz a údržba",
-   "Stavební práce a údržba budov"
-  ],
-  "UDR-12": [
-   "Provoz a údržba",
-   "Technické potřeby a materiál – velkoobchod"
-  ],
-  "UDR-13": [
-   "Provoz a údržba",
-   "Vytápění, vodoinstalace a topenářská technika"
-  ],
-  "UDR-14": [
-   "Provoz a údržba",
-   "Zabezpečovací, přístupové a slaboproudé systémy"
-  ],
-  "UDR-15": [
-   "Provoz a údržba",
-   "Značení, etikety a bezpečnostní tabulky"
-  ],
-  "VYR-01": [
-   "Výroba a materiály",
-   "3D tisk a aditivní výroba"
-  ],
-  "VYR-02": [
-   "Výroba a materiály",
-   "Hutní materiál a kovy"
-  ],
-  "VYR-03": [
-   "Výroba a materiály",
-   "Kovoobrábění a strojírenská výroba"
-  ],
-  "VYR-04": [
-   "Výroba a materiály",
+  "MAT-02": [
+   "Výroba dílů a zpracování materiálů",
    "Kovové konstrukce, svařování a zámečnictví"
   ],
-  "VYR-05": [
-   "Výroba a materiály",
-   "Obaly a balicí materiál"
-  ],
-  "VYR-06": [
-   "Výroba a materiály",
+  "MAT-03": [
+   "Výroba dílů a zpracování materiálů",
    "Povrchové úpravy a galvanika"
   ],
-  "VYR-07": [
-   "Výroba a materiály",
-   "Přesné kovové díly a lisování"
+  "MAT-04": [
+   "Výroba dílů a zpracování materiálů",
+   "Plastové a pryžové díly – výroba"
   ],
-  "VYR-08": [
-   "Výroba a materiály",
+  "MAT-05": [
+   "Výroba dílů a zpracování materiálů",
+   "3D tisk a aditivní výroba"
+  ],
+  "MAT-06": [
+   "Výroba dílů a zpracování materiálů",
+   "Hutní materiál a kovy"
+  ],
+  "MAT-07": [
+   "Výroba dílů a zpracování materiálů",
+   "Technické plasty, pryž a polotovary"
+  ],
+  "MAT-08": [
+   "Výroba dílů a zpracování materiálů",
    "Průmyslová chemie, maziva a lepidla"
   ],
-  "VYR-09": [
-   "Výroba a materiály",
-   "Pryžové a plastové komponenty – výroba"
+  "MAT-09": [
+   "Výroba dílů a zpracování materiálů",
+   "Obaly a balicí materiál"
   ],
-  "VYR-10": [
-   "Výroba a materiály",
-   "Technické materiály a polotovary"
+  "PROV-01": [
+   "Materiál, nářadí a provozní zásobování",
+   "Nářadí, spojovací a upevňovací materiál"
   ],
-  "VZD-01": [
-   "Vzdělávání a média",
-   "Jazykové vzdělávání a překlady"
+  "PROV-02": [
+   "Materiál, nářadí a provozní zásobování",
+   "Technický velkoobchod a MRO materiál"
   ],
-  "VZD-02": [
-   "Vzdělávání a média",
-   "Média, inzerce a předplatné"
+  "PROV-03": [
+   "Materiál, nářadí a provozní zásobování",
+   "Kancelářské a provozní vybavení a nábytek"
   ],
-  "VZD-03": [
-   "Vzdělávání a média",
-   "Odborná literatura, publikace a školení"
+  "PROV-04": [
+   "Materiál, nářadí a provozní zásobování",
+   "OOPP, BOZP a bezpečnostní značení"
   ],
-  "VZD-04": [
-   "Vzdělávání a média",
+  "PROV-05": [
+   "Materiál, nářadí a provozní zásobování",
+   "Pracovní oděvy, textilní servis a úklid"
+  ],
+  "PROV-06": [
+   "Materiál, nářadí a provozní zásobování",
+   "Osvětlení a světelná technika"
+  ],
+  "PROV-07": [
+   "Materiál, nářadí a provozní zásobování",
+   "Potraviny a nápoje – velkoobchod"
+  ],
+  "FAC-01": [
+   "Stavby, energie a facility",
+   "Stavební práce a údržba budov"
+  ],
+  "FAC-02": [
+   "Stavby, energie a facility",
+   "Vytápění, vodoinstalace a topenářská technika"
+  ],
+  "FAC-03": [
+   "Stavby, energie a facility",
+   "Facility management a správa budov"
+  ],
+  "FAC-04": [
+   "Stavby, energie a facility",
+   "Nemovitosti, pronájem a reality"
+  ],
+  "FAC-05": [
+   "Stavby, energie a facility",
+   "Energie a média (elektřina, plyn, teplo, voda)"
+  ],
+  "FAC-06": [
+   "Stavby, energie a facility",
+   "Odpadové hospodářství a recyklace"
+  ],
+  "FAC-07": [
+   "Stavby, energie a facility",
+   "Požární ochrana a revize vyhrazených zařízení"
+  ],
+  "FAC-08": [
+   "Stavby, energie a facility",
+   "Zabezpečovací, přístupové a slaboproudé systémy"
+  ],
+  "FAC-09": [
+   "Stavby, energie a facility",
+   "Fyzická ostraha a bezpečnostní služby"
+  ],
+  "LOG-01": [
+   "Doprava, logistika a vozidla",
+   "Doprava, spedice a logistika"
+  ],
+  "LOG-02": [
+   "Doprava, logistika a vozidla",
+   "Kurýrní, expresní a poštovní služby"
+  ],
+  "LOG-03": [
+   "Doprava, logistika a vozidla",
+   "Vozidla – prodej, servis a díly"
+  ],
+  "LOG-04": [
+   "Doprava, logistika a vozidla",
+   "Správa vozového parku a mobilita"
+  ],
+  "PRO-01": [
+   "Profesní a poradenské služby",
+   "Poradenství, audit a daně"
+  ],
+  "PRO-02": [
+   "Profesní a poradenské služby",
+   "Právní služby"
+  ],
+  "PRO-03": [
+   "Profesní a poradenské služby",
+   "Certifikace, inspekce a technické zkušebnictví"
+  ],
+  "PRO-04": [
+   "Profesní a poradenské služby",
+   "Projekce, inženýrské služby a technické expertizy"
+  ],
+  "PRO-05": [
+   "Profesní a poradenské služby",
+   "Personální a agenturní služby"
+  ],
+  "PRO-06": [
+   "Profesní a poradenské služby",
+   "Finanční služby, leasing a pojištění"
+  ],
+  "PRO-07": [
+   "Profesní a poradenské služby",
+   "Výzkum a vývoj (smluvní)"
+  ],
+  "FIR-01": [
+   "Marketing, tisk, vzdělávání a firemní služby",
    "Reklama, marketing a PR"
   ],
-  "VZD-05": [
-   "Vzdělávání a média",
-   "Tisk, polygrafie a reklamní materiály"
+  "FIR-02": [
+   "Marketing, tisk, vzdělávání a firemní služby",
+   "Tisk, polygrafie a reklamní předměty"
   ],
-  "VZD-06": [
-   "Vzdělávání a média",
-   "Vzdělávání a odborná školení"
+  "FIR-03": [
+   "Marketing, tisk, vzdělávání a firemní služby",
+   "Média, vydavatelství a předplatné"
   ],
-  "VZD-07": [
-   "Vzdělávání a média",
-   "Vzdělávání, výzkum a vývoj"
+  "FIR-04": [
+   "Marketing, tisk, vzdělávání a firemní služby",
+   "Vzdělávání, školení a odborná literatura"
+  ],
+  "FIR-05": [
+   "Marketing, tisk, vzdělávání a firemní služby",
+   "Překlady a jazykové služby"
+  ],
+  "FIR-06": [
+   "Marketing, tisk, vzdělávání a firemní služby",
+   "Catering a firemní stravování"
+  ],
+  "FIR-07": [
+   "Marketing, tisk, vzdělávání a firemní služby",
+   "Ubytování, konference a firemní akce"
+  ],
+  "FIR-08": [
+   "Marketing, tisk, vzdělávání a firemní služby",
+   "Zaměstnanecké benefity a volnočasové služby"
+  ],
+  "FIR-09": [
+   "Marketing, tisk, vzdělávání a firemní služby",
+   "Veřejný sektor, instituce a nezisková sféra"
   ],
   "XXX-00": [
    "Nezařazeno",
-   "Nezařazeno - nutné ruční doplnění"
+   "Nezařazeno – nutné ruční doplnění"
   ]
+ },
+ "ICT_RELEVANCE": {
+  "_popis": "Vstup pro navazující krok (ISO 27001). ano = dodavatel typicky zpracovává/uchovává naše informace nebo se připojuje do našich systémů; hranicni = může mít přístup k datům nebo do prostor podle konkrétní smlouvy; ne = dodává zboží/služby bez přístupu k informačním aktivům.",
+  "ano": [
+   "ICT-01",
+   "ICT-02",
+   "ICT-03",
+   "ICT-04",
+   "ICT-05",
+   "ICT-06",
+   "ICT-07",
+   "ICT-08",
+   "ELE-05"
+  ],
+  "hranicni": [
+   "STR-01",
+   "FAC-08",
+   "FAC-09",
+   "PRO-01",
+   "PRO-02",
+   "PRO-05",
+   "PRO-06",
+   "FIR-08",
+   "XXX-00"
+  ],
+  "ne": [
+   "ELE-01",
+   "ELE-02",
+   "ELE-03",
+   "ELE-04",
+   "ELE-06",
+   "ELE-07",
+   "ELE-08",
+   "ELE-09",
+   "MET-01",
+   "MET-02",
+   "MET-03",
+   "STR-02",
+   "STR-03",
+   "STR-04",
+   "STR-05",
+   "STR-06",
+   "STR-07",
+   "STR-08",
+   "MAT-01",
+   "MAT-02",
+   "MAT-03",
+   "MAT-04",
+   "MAT-05",
+   "MAT-06",
+   "MAT-07",
+   "MAT-08",
+   "MAT-09",
+   "PROV-01",
+   "PROV-02",
+   "PROV-03",
+   "PROV-04",
+   "PROV-05",
+   "PROV-06",
+   "PROV-07",
+   "FAC-01",
+   "FAC-02",
+   "FAC-03",
+   "FAC-04",
+   "FAC-05",
+   "FAC-06",
+   "FAC-07",
+   "LOG-01",
+   "LOG-02",
+   "LOG-03",
+   "LOG-04",
+   "PRO-03",
+   "PRO-04",
+   "PRO-07",
+   "FIR-01",
+   "FIR-02",
+   "FIR-03",
+   "FIR-04",
+   "FIR-05",
+   "FIR-06",
+   "FIR-07",
+   "FIR-09"
+  ]
+ },
+ "MAPA_ZE_STARE": {
+  "_popis": "Původní kód kolegovy taxonomie -> nový kód. Pro migraci již zařazených výstupů.",
+  "ELE-01": "ELE-07",
+  "ELE-02": "ELE-02",
+  "ELE-03": "ELE-01",
+  "ELE-04": "ELE-01",
+  "ELE-05": "ELE-03",
+  "ELE-06": "ELE-04",
+  "ELE-07": "ELE-04",
+  "ELE-08": "ELE-06",
+  "ELE-09": "ELE-04",
+  "ICT-01": "ICT-08",
+  "ICT-02": "ICT-01",
+  "ICT-03": "ICT-02",
+  "ICT-04": "ICT-06",
+  "MET-01": "MET-02",
+  "MET-02": "MET-03",
+  "MET-03": "MET-01",
+  "MET-04": "MET-01",
+  "OST-01": "FIR-06",
+  "OST-02": "FIR-09",
+  "OST-03": "FIR-07",
+  "OST-04": "FIR-09",
+  "OST-05": "XXX-00",
+  "OST-06": "PROV-02",
+  "OST-07": "PROV-07",
+  "OST-08": "FIR-08",
+  "OST-09": "FIR-07",
+  "OST-10": "FIR-09",
+  "OST-11": "FIR-08",
+  "PRO-01": "PRO-03",
+  "PRO-02": "PRO-06",
+  "PRO-03": "PRO-05",
+  "PRO-04": "PRO-01",
+  "PRO-05": "PRO-02",
+  "PRO-06": "PRO-04",
+  "PRO-07": "PRO-04",
+  "SLU-01": "LOG-01",
+  "SLU-02": "FAC-03",
+  "SLU-03": "LOG-02",
+  "SLU-04": "LOG-04",
+  "SLU-05": "LOG-03",
+  "STR-01": "STR-05",
+  "STR-02": "STR-06",
+  "STR-03": "STR-07",
+  "STR-04": "STR-02",
+  "STR-05": "STR-01",
+  "STR-06": "STR-03",
+  "STR-07": "STR-04",
+  "STR-08": "STR-02",
+  "STR-09": "STR-08",
+  "STR-10": "STR-07",
+  "UDR-01": "ELE-08",
+  "UDR-02": "FAC-05",
+  "UDR-03": "PROV-03",
+  "UDR-04": "PROV-01",
+  "UDR-05": "PROV-04",
+  "UDR-06": "PROV-06",
+  "UDR-07": "FAC-07",
+  "UDR-08": "PROV-05",
+  "UDR-09": "PROV-03",
+  "UDR-10": "PROV-01",
+  "UDR-11": "FAC-01",
+  "UDR-12": "PROV-02",
+  "UDR-13": "FAC-02",
+  "UDR-14": "FAC-08",
+  "UDR-15": "PROV-04",
+  "VYR-01": "MAT-05",
+  "VYR-02": "MAT-06",
+  "VYR-03": "MAT-01",
+  "VYR-04": "MAT-02",
+  "VYR-05": "MAT-09",
+  "VYR-06": "MAT-03",
+  "VYR-07": "MAT-01",
+  "VYR-08": "MAT-08",
+  "VYR-09": "MAT-04",
+  "VYR-10": "MAT-07",
+  "VZD-01": "FIR-05",
+  "VZD-02": "FIR-03",
+  "VZD-03": "FIR-04",
+  "VZD-04": "FIR-01",
+  "VZD-05": "FIR-02",
+  "VZD-06": "FIR-04",
+  "VZD-07": "PRO-07",
+  "XXX-00": "XXX-00"
+ },
+ "SIC_NA_NACE": {
+  "01": "01",
+  "02": "01",
+  "07": "01",
+  "08": "02",
+  "09": "03",
+  "10": "07",
+  "12": "05",
+  "13": "06",
+  "14": "08",
+  "15": "41",
+  "16": "42",
+  "17": "43",
+  "20": "10",
+  "21": "12",
+  "22": "13",
+  "23": "14",
+  "24": "16",
+  "25": "31",
+  "26": "17",
+  "27": "18",
+  "28": "20",
+  "283": "21",
+  "29": "19",
+  "30": "22",
+  "31": "15",
+  "32": "23",
+  "33": "24",
+  "34": "25",
+  "35": "28",
+  "357": "2620",
+  "36": "27",
+  "366": "2630",
+  "367": "26",
+  "37": "29",
+  "372": "30",
+  "38": "26",
+  "382": "2651",
+  "384": "3250",
+  "39": "32",
+  "40": "49",
+  "41": "49",
+  "42": "49",
+  "44": "50",
+  "45": "51",
+  "46": "49",
+  "47": "5229",
+  "48": "61",
+  "484": "60",
+  "489": "61",
+  "49": "35",
+  "50": "46",
+  "51": "46",
+  "52": "47",
+  "53": "47",
+  "54": "47",
+  "55": "45",
+  "56": "47",
+  "57": "47",
+  "58": "56",
+  "59": "47",
+  "60": "6419",
+  "61": "6492",
+  "62": "66",
+  "63": "65",
+  "64": "6622",
+  "65": "68",
+  "67": "64",
+  "70": "55",
+  "72": "96",
+  "73": "6202",
+  "7370": "6201",
+  "7371": "6201",
+  "7372": "5829",
+  "7374": "6311",
+  "7375": "6312",
+  "7379": "6209",
+  "78": "59",
+  "79": "93",
+  "80": "86",
+  "81": "6910",
+  "82": "85",
+  "83": "88",
+  "86": "94",
+  "87": "71",
+  "8711": "7112",
+  "8721": "6920",
+  "8731": "72",
+  "89": "74",
+  "91": "84",
+  "92": "84",
+  "93": "84",
+  "94": "84",
+  "95": "84",
+  "96": "84",
+  "97": "84",
+  "99": "8299"
  },
  "NACE_NAZVY": {
   "01": "Crop and animal production, hunting and related service activities",
@@ -1488,104 +1734,5 @@
   "99": "Activities of extraterritorial organisations and bodies",
   "990": "Activities of extraterritorial organisations and bodies",
   "9900": "Activities of extraterritorial organisations and bodies"
- },
- "SIC_NA_NACE": {
-  "01": "01",
-  "02": "01",
-  "07": "01",
-  "08": "02",
-  "09": "03",
-  "10": "07",
-  "12": "05",
-  "13": "06",
-  "14": "08",
-  "15": "41",
-  "16": "42",
-  "17": "43",
-  "20": "10",
-  "21": "12",
-  "22": "13",
-  "23": "14",
-  "24": "16",
-  "25": "31",
-  "26": "17",
-  "27": "18",
-  "28": "20",
-  "283": "21",
-  "29": "19",
-  "30": "22",
-  "31": "15",
-  "32": "23",
-  "33": "24",
-  "34": "25",
-  "35": "28",
-  "357": "2620",
-  "36": "27",
-  "366": "2630",
-  "367": "26",
-  "37": "29",
-  "372": "30",
-  "38": "26",
-  "382": "2651",
-  "384": "3250",
-  "39": "32",
-  "40": "49",
-  "41": "49",
-  "42": "49",
-  "44": "50",
-  "45": "51",
-  "46": "49",
-  "47": "5229",
-  "48": "61",
-  "484": "60",
-  "489": "61",
-  "49": "35",
-  "50": "46",
-  "51": "46",
-  "52": "47",
-  "53": "47",
-  "54": "47",
-  "55": "45",
-  "56": "47",
-  "57": "47",
-  "58": "56",
-  "59": "47",
-  "60": "6419",
-  "61": "6492",
-  "62": "66",
-  "63": "65",
-  "64": "6622",
-  "65": "68",
-  "67": "64",
-  "70": "55",
-  "72": "96",
-  "73": "6202",
-  "7370": "6201",
-  "7371": "6201",
-  "7372": "5829",
-  "7374": "6311",
-  "7375": "6312",
-  "7379": "6209",
-  "78": "59",
-  "79": "93",
-  "80": "86",
-  "81": "6910",
-  "82": "85",
-  "83": "88",
-  "86": "94",
-  "87": "71",
-  "8711": "7112",
-  "8721": "6920",
-  "8731": "72",
-  "89": "74",
-  "91": "84",
-  "92": "84",
-  "93": "84",
-  "94": "84",
-  "95": "84",
-  "96": "84",
-  "97": "84",
-  "99": "8299"
- },
- "VYCHOZI_KOD": "XXX-00"
+ }
 }
