@@ -1,16 +1,6 @@
-﻿Název;IČO;DIČ;Země
-Škoda Auto a.s.;;;CZ
-ČEZ, a. s.;;;CZ
-Alza.cz a.s.;;;CZ
-Kooperativa pojišťovna, a.s.;;;CZ
-ABB s.r.o.;;;CZ
-Seznam.cz, a.s.;;;CZ
-Securitas ČR s.r.o.;;;CZ
-;27082440;;
-Slovnaft, a.s.;;;SK
-Siemens Aktiengesellschaft;;;DE
-Robert Bosch GmbH;;;DE
-SAP SE;;;DE
-Apple Inc.;;;US
-Microsoft Corporation;;;US
-Firma Ktera Neexistuje 12345 s.r.o.;;;CZ
+Název;Adresa;IČO;DIČ;Země;Částka
+Alza.cz a.s.;Jankovcova 1522/53, 170 00 Praha 7;27082440;CZ27082440;CZ;1250000
+GABEN, spol. s r. o.;Hájkova 558/1, 702 00 Ostrava;19012021;;CZ;89000
+WAGO Kontakttechnik GmbH & Co. KG;Hansastr. 27, 32423 Minden;;DE811150595;DE;2100000
+ESET, spol. s r.o.;Einsteinova 24, 851 01 Bratislava;31333532;;SK;95000
+Cloudflare, Inc.;101 Townsend St, San Francisco CA;;;US;78000

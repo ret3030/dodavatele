@@ -1,159 +1,111 @@
-# Dodavatelé – obohacení seznamu z veřejných rejstříků
+# Dodavatelé – podklad pro audit dle ISO/IEC 27001
 
-Nástroj, který k seznamu firem doplní adresu, IČO/DIČ a obor činnosti (NACE)
-z veřejných rejstříků – ARES (ČR), RPO SR (Slovensko), INSEE (Francie),
-SEC EDGAR (USA), GLEIF a Wikidata (svět). Vše bez API klíče a bez registrace.
+Vezme seznam kreditorů z účetnictví a připraví z něj evidenci dodavatelů pro
+audit dodavatelských vztahů: kdo dodavatel doopravdy je, čím se zabývá, jestli
+má vazbu na ICT a jak je pro firmu kritický.
 
-Zařazení do vlastní kategorie dodavatele a stručný popis, co firma skutečně
-dělá, se doplňuje ve druhém kroku – zapsaný obor v rejstříku říká, jak je
-firma zaregistrovaná, ne co dodává. Dvě cesty:
+Nástroj dělá jen tu část, která jde udělat spolehlivě a strojově — **dohledá
+identitu ve veřejných rejstřících a posbírá podklady**. Zařazení do kategorie
+dělá LLM v chatu, protože „co firma reálně dodává" se z rejstříku vyčíst nedá.
+Vztah k vaší firmě a smluvní závazky doplníte v Excelu vy.
 
-- **[Deterministické zařazení bez LLM](#deterministické-zařazení-bez-llm)** –
-  část dodavatelů zařadí automaticky z webu firmy.
-- **[Zařazení přes LLM chat](#zařazení-přes-llm-chat)** – zbytek přes
-  Copilot/ChatGPT.
-
-## Instalace a použití
+## Použití
 
 ```bash
-python3 -m venv .venv
-.venv/bin/pip install -r requirements.txt   # openpyxl, jen pro čtení/zápis XLSX
+pip install openpyxl
 
-python3 dodavatele.py vstup.csv -o vystup.xlsx
+python3 dodavatele.py kreditori.xlsx     # 1. běh – dohledá a napíše dávky
+#   → vložte davky/davka_01.txt … do ChatGPT/Copilotu
+#   → odpovědi uložte jako CSV do složky odpovedi/
+python3 dodavatele.py odpovedi/          # 2. běh – doplní je do Excelu
 ```
 
-Vstupem je `.csv`, `.xlsx` nebo `.txt` se seznamem firem – stačí sloupec
-s názvem, IČO/DIČ/adresa jsou nepovinné, ale zpřesní a zrychlí hledání.
-Hlavičku sloupců rozpozná automaticky, česky i anglicky. Ukázka:
-`vzor_dodavatele.csv`.
+Žádné přepínače. První argument je soubor (dohledání) nebo složka (doplnění).
 
-Výstup: `Jméno | Ulice | PSČ | Město | Země | IČO | DIČ | NACE | Stav
-| Zdroj dat | Kód kategorie | Kategorie dodavatele | Popis činnosti` (+ pár
-sloupců navíc, jen když mají čím být naplněné). **Stav** říká, jak moc
-danému řádku věřit:
+**Vstup** (CSV / XLSX / TXT): povinný je jen název. Rozpoznají se sloupce
+`Název`, `Adresa`, `IČO`, `DIČ`, `Země`, `Částka` — česky, anglicky i německy.
+Duplicity podle názvu a IČO se slučují.
 
-| stav | význam |
+| co dodáte | co to udělá |
 |---|---|
-| `OK` | jednoznačná shoda, data lze převzít |
-| `VYBRANO` | víc podobných firem – vybrána nejlepší, doporučená kontrola |
-| `OVERIT` | shoda s výhradou (např. jiná adresa/země) – doporučená kontrola |
-| `NENALEZENO` | nic dost podobného nenalezeno |
-| `CHYBA` | prázdný řádek nebo výpadek zdrojů |
+| `IČO` | ověřená identita z ARES / RPO SR, včetně NACE a předmětu podnikání |
+| `DIČ` | ověřená identita přes VIES — jediná bezplatná cesta u DE, NL, AT… |
+| `Adresa` | rozliší firmy stejného jména, ověří nalezený web |
+| `Částka` | předvyplní objem v Excelu, nemusíte ho psát ručně |
 
-Opakovaný běh nad stejným seznamem je díky keši (uložené v profilu
-uživatele) téměř okamžitý – nic se nestahuje znovu. `--obnovit` zkusí ještě
-jednou dohledat firmy, které v daném běhu skončily jako nenalezené.
-`--help` vypíše všechny volby.
+## Odkud se bere identita
 
-Číselník kategorií (`taxonomie_data.json`) má **74 kategorií v 11 skupinách**
-a u každé příznak ICT relevance (vstup pro navazující posouzení dle ISO 27001).
-Odůvodnění revize: `kategorizace/TAXONOMIE_V2.md`.
+| zdroj | co dá | pro koho |
+|---|---|---|
+| **ARES** | úřední název, adresa, CZ-NACE, předmět podnikání | ČR |
+| **RPO SR** | úřední název, adresa, SK-NACE | Slovensko |
+| **VIES** | úřední název a adresa podle DIČ | všechny státy EU |
+| **Wikidata + Wikipedie** | oficiální web, obor, popis | kdokoli, kdo tam je |
+| **web firmy** | `<title>`, meta popis, `<h1>`, kus textu | kdokoli s webem |
 
-## Deterministické zařazení bez LLM
+Vše bez API klíče, bez registrace, čistý Python (`urllib`) — běží i na Windows
+bez WSL a Dockeru. Vše se kešuje, takže druhý běh nejde na síť.
 
-Adresář `kategorizace/` je samostatný modul, který **kód kategorie určí
-deterministicky** (stejný vstup → stejný výstup) z veřejných rejstříků a webu
-firmy, a tak u části dodavatelů obejde LLM krok. Nejednoznačné firmy nechá
-na LLM. Není součástí desktopové aplikace – jen příkazová řádka.
+Sloupec **Jistota identity** říká, čemu věřit: `rejstřík` (podle IČO nebo přesné
+shody jména) > `VIES (DIČ)` > `podle názvu` > `neověřeno`. Země bez veřejného
+rejstříku zdarma (US, CH, JP, HK, SG, GB…) skončí jako `neověřeno` — o zařazení
+tam rozhoduje web a znalosti LLM.
 
-Signály se sbírají **jen z veřejných zdrojů bez API klíče a bez běžící služby**:
+Záměrně **nepoužíváme GLEIF ani jiné fuzzy hledání jmenem přes hranice**: u
+německých firem vracelo zahraniční dcery a holdingy místo provozní firmy
+(Festo → Kanada, Rittal → Belgie). Špatně ověřená identita je pro audit horší
+než žádná, protože se pozná až pozdě.
 
-- **ARES** (ČR) / **RPO SR** (Slovensko) – kanonický název, IČO/DIČ, sídlo, NACE,
-- **Wikidata** – firmu spáruje podle IČO (`P4156`), z ní vezme oficiální web
-  (`P856`), obor, produkt a typ,
-- **Wikipedie** (cs, pak en) – úvodní odstavec článku,
-- **web firmy** – doménu bere ze sloupce `Web` ve vstupu, jinak z Wikidat,
-  jinak ji opatrně zkusí uhodnout z názvu (přijme jen ověřenou).
+## Výstup: `dodavatele.xlsx`
 
-Je to **čistý Python (jen `urllib`)** – běží i na Windows bez WSL, Podmanu
-a Dockeru. Nic se neinstaluje, nic neběží na pozadí. První běh stahuje, každý
-další běh nad stejným seznamem jede z keše a je bajt po bajtu shodný.
-
-### Aktivace – jeden běh
-
-```bash
-# deterministický výstup + rovnou hotový prompt pro LLM na zbytek
-python3 -m kategorizace.kategorizuj vstup.csv -o vystup_kat.csv --export-llm pro_llm.txt
-```
-
-Vstup je stejný seznam firem jako pro `dodavatele.py` (CSV/XLSX/TXT, povinný je
-jen sloupec s názvem). **Přesnost výrazně zvedne sloupec `Web` (nebo `URL`)** –
-odpadá nejisté hádání domény; pomůže i `IČO` a `Město`.
-
-Výstup `vystup_kat.csv` (`Název | IČO | Doména | Zdroj domény | Kód kategorie |
-… | Rozhodnutí | Popis (LLM)`) – rozhoduje sloupec **Rozhodnutí**:
-
-| rozhodnutí | co s tím |
+| list | obsah |
 |---|---|
-| `AUTO` | kategorie převzatá rovnou (na AUTO větvi ~97 % přesnost listu, 100 % shoda ICT příznaku) |
-| `OVERIT` | návrh s nižší jistotou – jen našeptávač, doporučená kontrola člověkem |
-| `LLM` | nezařazeno – je v `pro_llm.txt` |
+| **Dodavatelé** | hlavní tabulka — jeden řádek na dodavatele |
+| **Číselník** | 74 kategorií v 11 skupinách + ICT příznak (zdroj pro vzorce) |
+| **Souhrn** | kolik je ICT, kolik kritických, jak dopadla identita |
+| **Podklady** | co se o firmě našlo — dohledatelné, proč LLM rozhodl takhle |
 
-### Zbytek přes LLM chat
+Excel je **živý dokument, ne jen export**. Kategorie, skupina a ICT relevance
+nejsou zapsané hodnoty, ale `VLOOKUP` do Číselníku — když opravíte kód
+kategorie, přepočítá se název, skupina, ICT příznak, kritičnost i režim dle
+ISO 27001.
 
-`pro_llm.txt` už obsahuje celý číselník a ke každé nezařazené firmě kontext
-(IČO, zapsané obory, doménu, top-3 tip). Vložte ho do Copilotu/ChatGPT,
-odpověď (`Název;Kód kategorie;Popis`) uložte jako CSV a domergujte:
+### Co doplníte ručně (žlutě, s rozbalovacím seznamem)
 
-```bash
-python3 -m kategorizace.kategorizuj vstup.csv -o vystup_kat.csv --llm-mapa odpoved.csv
-```
+| sloupec | hodnoty |
+|---|---|
+| Přístup k datům/systémům | žádný / fyzický / omezený / privilegovaný |
+| Nahraditelnost | snadná / obtížná / prakticky žádná |
+| Objem (ABC) | A / B / C |
+| Typ vztahu | rámcová smlouva / objednávky / DPA / NDA / bez smlouvy |
 
-Doplněné řádky dostanou `Rozhodnutí = LLM-doplneno` a vyplněný `Popis (LLM)`.
+### Co z toho spočítají vzorce
 
-### Poznámky
+**Kritičnost** — `KRITICKÝ`, když má dodavatel privilegovaný přístup, nebo je
+ICT dodavatel s přístupem k datům, nebo je prakticky nenahraditelný.
+`VÝZNAMNÝ` při ICT vazbě, omezeném přístupu, obtížné nahraditelnosti nebo
+objemu A. Jinak `BĚŽNÝ`.
 
-- `--offline` – nestahovat nic, jen z keše. `--llm-i-overit` – do promptu dát
-  i větev OVERIT. `--export-davka N` – rozdělit prompt po N firmách.
-- Naměřeno na `kategorizace/testset_vzorek.csv` (246 firem): **~10 % AUTO
-  (97 % přesnost), ~19 % OVERIT, ~71 % LLM**. Pokrytí AUTO roste hlavně
-  s vyplněným sloupcem `Web`. Přeměřte si to na svém gold seznamu
-  (`kategorizace/vyhodnoceni.py`).
-- Podrobnosti a ladění pravidel: `kategorizace/README.md`.
+Rozhoduje tedy **přístup, ne cena** — levný dodavatel se vzdálenou správou
+serverů je rizikovější než drahý dodavatel kancelářských potřeb.
 
-## Zařazení přes LLM chat
+**Režim dle ISO 27001** — co je u dodavatele potřeba (prověření, bezpečnostní
+požadavky ve smlouvě, DPA, právo auditu, monitoring). Přepočítá se s každou
+změnou vstupů.
 
-**Kód kategorie**, **Kategorie dodavatele** a **Popis činnosti** zůstávají
-prázdné, dokud je nedoplní tenhle krok. U firem, kde se v žádném rejstříku
-nenašel žádný NACE kód, se navíc doplní i **NACE** – jako odhad LLM, ne
-rejstříkový údaj (rozlišuje to sloupec **NACE - zdroj**). Tam, kde NACE
-z rejstříku už je, se nikdy nepřepisuje.
+Logiku vzorců hlídá `python3 test_vzorce.py`.
 
-```bash
-python3 dodavatele.py vstup.csv -o vystup.xlsx --export-llm firmy.txt
-# --> obsah firmy.txt vložit do Copilotu/ChatGPT, odpověď uložit jako CSV
-python3 dodavatele.py vstup.csv -o vystup.xlsx --llm-mapa odpoved.csv
-```
+## Soubory
 
-Když už vyplněný výstup máte (a vstupní seznam po ruce nemáte, nebo je na
-jiném stroji bez keše), `--z-vystupu` nahradí `vstup` a export/import proběhne
-přímo nad ním, bez jediného dotazu do rejstříku:
+| soubor | co dělá |
+|---|---|
+| `dodavatele.py` | CLI, čtení vstupu, orchestrace obou běhů |
+| `zdroje.py` | ARES, RPO SR, VIES, Wikidata, web + keš |
+| `vystup.py` | dávky pro LLM, čtení odpovědí, Excel se vzorci |
+| `taxonomie.py` | čtení číselníku |
+| `taxonomie_data.json` | číselník kategorií a ICT relevance |
+| `test_vzorce.py` | kontrola logiky vzorců v Excelu |
+| `TAXONOMIE.md` | proč je číselník členěný takhle |
 
-```bash
-python3 dodavatele.py --z-vystupu vystup.xlsx --export-llm firmy.txt
-python3 dodavatele.py --z-vystupu vystup.xlsx --llm-mapa odpoved.csv -o vystup2.xlsx
-```
-
-## Desktopová aplikace
-
-`gui.py` je okenní rozhraní nad stejnou logikou, zabalené přes PyInstaller
-do jednoho spustitelného souboru – spouští se dvojklikem, bez instalace Pythonu.
-
-**Stažení hotové aplikace:**
-https://github.com/ret3030/dodavatele/releases/tag/gui-latest – vždy poslední
-verze. Na macOS je po rozbalení potřeba aplikaci poprvé spustit přes pravé
-tlačítko → Otevřít (Gatekeeper jinak nepodepsanou aplikaci nespustí dvojklikem).
-
-**Sestavení lokálně:**
-
-```bash
-pip install pyinstaller openpyxl
-# Windows - .exe
-pyinstaller --onefile --windowed --name Dodavatele --add-data "taxonomie_data.json;." gui.py
-# macOS - .app
-pyinstaller --windowed --name Dodavatele --add-data "taxonomie_data.json:." gui.py
-```
-
-PyInstaller neumí sestavit aplikaci pro jinou platformu, než na které běží –
-proto GitHub Actions (`.github/workflows/build-gui.yml`) sestavuje zvlášť na
-Windows a macOS při každé změně `dodavatele.py`/`gui.py` na `main`.
+Keš je v profilu uživatele (`~/.cache/dodavatele/`), mezistav v
+`.dodavatele-stav.json` vedle výstupu.
