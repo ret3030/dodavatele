@@ -62,7 +62,21 @@ externí vyhledávací služby.
 
 ### Aktivace
 
-1. **Rozjeďte SearXNG.** Stačí lokální kontejner:
+> Pokud SearXNG už běží ve firmě, přeskočte na krok 3 a zadejte jeho adresu.
+
+1. **Rozjeďte SearXNG.** Potřebujete běžící kontejnerový engine – `docker run`
+   sám o sobě nestačí, bez enginu skončí chybou „failed to connect to the
+   Docker API". Na macOS ho nainstalujete a nastartujete přes
+   [Colima](https://github.com/abiosoft/colima) (jen terminál) nebo
+   [OrbStack](https://orbstack.dev/):
+
+   ```bash
+   brew install colima docker
+   colima start
+   docker info          # musí vypsat verzi serveru, ne chybu
+   ```
+
+   Pak spusťte samotný SearXNG (celé je to jeden řádek, `\` jen zalamuje):
 
    ```bash
    docker run -d --name searxng -p 8888:8080 \
