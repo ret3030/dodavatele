@@ -62,15 +62,17 @@ externí vyhledávací služby.
 
 ### Aktivace
 
-1. **Rozjeďte SearXNG.** Stačí lokální kontejner:
+1. **Rozjeďte SearXNG.** Přes [Podman](https://podman.io/) (zdarma i pro
+   firmy, na rozdíl od Docker Desktopu). Na Windows/macOS nejdřív jednou
+   `podman machine init && podman machine start`, pak:
 
    ```bash
-   docker run -d --name searxng -p 8888:8080 \
-     -v "$PWD/searxng:/etc/searxng" searxng/searxng
+   podman run -d --name searxng -p 8888:8080 \
+     -v "./searxng:/etc/searxng" docker.io/searxng/searxng
    ```
 
 2. **Povolte JSON výstup** – v `searxng/settings.yml` (vytvoří se při prvním
-   startu) přidejte a kontejner restartujte (`docker restart searxng`):
+   startu) přidejte a kontejner restartujte (`podman restart searxng`):
 
    ```yaml
    search:

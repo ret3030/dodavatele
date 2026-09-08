@@ -38,7 +38,7 @@ deterministický.
 
 ## Nastavení SearXNG
 
-Stačí libovolná dostupná instance – lokální v Dockeru i sdílená interní.
+Stačí libovolná dostupná instance – lokální v Podmanu i sdílená interní.
 V `settings.yml` musí být povolený JSON výstup:
 
 ```yaml
