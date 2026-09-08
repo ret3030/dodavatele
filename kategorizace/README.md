@@ -11,14 +11,17 @@ Taxonomie (74 kategorií / 11 skupin, u každé příznak ICT relevance) je
 **sjednocená v `../taxonomie_data.json`** – čte ji modul i `dodavatele.py`.
 Odůvodnění revize: `TAXONOMIE_V2.md`.
 
+Hledání jde přes **vlastní instanci [SearXNG](https://docs.searxng.org/)**
+(metavyhledávač) – názvy dodavatelů se neposílají do žádné externí vyhledávací
+služby, zůstávají na vlastní infrastruktuře.
+
 ## Jak to funguje
 
-1. Pro každou firmu se pošlou **2 dotazy do Google přes SERPER API**
+1. Pro každou firmu se pošlou **2 dotazy na SearXNG**
    (`"název" město` + `název (výrobce OR dodavatel OR distributor OR služby …)`).
-2. Ze SERP odpovědi (organické výsledky, knowledge graph, answer box, sitelinky)
-   se posbírá text s **vahami zdrojů** – vlastní web firmy 3,5; knowledge graph
-   3,0; první tři výsledky 2,0; katalogy a rejstříky (firmy.cz, justice.cz,
-   LinkedIn, Wikipedia…) jen 0,8.
+2. Z odpovědi (organické výsledky, infobox, přímé odpovědi) se posbírá text
+   s **vahami zdrojů** – vlastní web firmy 3,5; infobox 3,0; první tři výsledky
+   2,0; katalogy a rejstříky (firmy.cz, justice.cz, LinkedIn, Wikipedia…) jen 0,8.
 3. `pravidla.py` je **list namapovaných klíčových slov** – pro každý kód
    kategorie sada frází s vahou (a záporné fráze na odlišení sourozeneckých
    kategorií: výroba vs. distribuce, technické poradenství vs. audit…).
@@ -29,15 +32,29 @@ Odůvodnění revize: `TAXONOMIE_V2.md`.
    - **OVERIT** – skóre ≥ 5 → návrh s nižší jistotou, doporučená kontrola.
    - **LLM** – jinak → `XXX-00`, nechává se na původní LLM krok.
 
-Surová odpověď SERPER se ukládá do `.cache/` (gzip JSON, klíč = hash dotazu).
-Opakovaný běh nic nestahuje a je plně deterministický (Google jinak výsledky
-přehazuje).
+Odpověď SearXNG (převedená do jednotné struktury) se ukládá do `.cache/`
+(gzip JSON, klíč = hash dotazu). Opakovaný běh nic nestahuje a je plně
+deterministický.
+
+## Nastavení SearXNG
+
+Stačí libovolná dostupná instance – lokální v Dockeru i sdílená interní.
+V `settings.yml` musí být povolený JSON výstup:
+
+```yaml
+search:
+  formats: [html, json]
+```
+
+Adresu modul bere z (v tomto pořadí) přepínače `--searxng URL`, proměnné
+`SEARXNG_URL`, nebo souboru `kategorizace/searxng_url.txt` (je v `.gitignore`).
+Instance za HTTP Basic auth: dej přihlášení do URL –
+`http://uzivatel:heslo@vyhledavac.interni:8080`.
 
 ## Použití
 
 ```bash
-# klíč: buď proměnná prostředí, nebo soubor kategorizace/serper_key.txt
-export SERPER_API_KEY=...
+export SEARXNG_URL=http://localhost:8888     # nebo do kategorizace/searxng_url.txt
 
 # XLSX potřebuje openpyxl → spouštět přes .venv/bin/python
 .venv/bin/python -m kategorizace.kategorizuj vstup.csv -o vystup_kat.csv
@@ -48,7 +65,7 @@ export SERPER_API_KEY=...
 ```
 
 Vstup: CSV / XLSX / TXT. Povinný je sloupec s názvem firmy; `Město`, `Země`
-(kód, řídí `gl`/`hl` vyhledávání) a `NACE` jsou nepovinné, ale zpřesní výsledek.
+(kód, řídí jazyk vyhledávání) a `NACE` jsou nepovinné, ale zpřesní výsledek.
 
 Výstup (CSV `;` nebo XLSX): `Název | Kód kategorie | Kategorie | Skupina |
 Rozhodnutí | Skóre | Odstup | Zdrojů | Alternativy | Skupina (skóre) | Důkaz`.
@@ -77,8 +94,14 @@ Párování je podle názvu (bez právních forem). Vypíše:
 
 Test na `testset_vzorek.csv` – 246 reálných firem napříč 11 skupinami / ~68
 z 83 kategorií, gold určen ručním researchem (odhad ~5 % gold je sporných).
-Konfigurace: 2 dotazy SERPER + stažení meta popisu z webu firmy, prahy
-nastavené na „AUTO jen když jistota".
+Konfigurace: 2 dotazy + stažení meta popisu z webu firmy, prahy nastavené
+na „AUTO jen když jistota".
+
+> Čísla níže jsou naměřená na starším běhu přes Google (SERPER). Vlastní
+> SearXNG skládá výsledky z víc vyhledávačů (Google, Bing, …) – snippety
+> a pořadí se liší, takže se drobně posunou i tyhle metriky. Pravidla i
+> prahy jsou ale na konkrétní zdroj nezávislé; přeměř si to na svém gold
+> seznamu (`vyhodnoceni.py`).
 
 | metrika | 1. běh | taxonomie v2 | v2 + širší web |
 |---|---|---|---|
@@ -128,11 +151,12 @@ podle konfuzní matice; (6) přísnější prahy AUTO.
 |---|---|
 | `kategorizuj.py` | CLI: seznam firem → kategorie |
 | `vyhodnoceni.py` | CLI: porovnání s gold seznamem |
-| `serper.py` | klient SERPER + disková keš |
+| `searxng.py` | klient SearXNG + disková keš |
+| `web.py` | stažení a čištění textu z webu firmy |
 | `pravidla.py` | **list klíčových slov** pro 82 kategorií (+ XXX-00) |
-| `klasifikator.py` | sběr signálů ze SERP, skórování, rozhodnutí, prahy |
+| `klasifikator.py` | sběr signálů z výsledků, skórování, rozhodnutí, prahy |
 | `normalizace.py` | normalizace textu a názvů firem |
 | `taxonomie.py` | čtení `../taxonomie_data.json` |
 | `vstup.py` | čtení CSV / XLSX / TXT |
 
-`serper_key.txt`, `.cache/` a `vystup_*` jsou v `.gitignore`.
+`searxng_url.txt`, `.cache/` a `vystup_*` jsou v `.gitignore`.

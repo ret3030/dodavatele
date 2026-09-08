@@ -52,14 +52,16 @@ Odůvodnění revize: `kategorizace/TAXONOMIE_V2.md`.
 ## Deterministické zařazení bez LLM
 
 Adresář `kategorizace/` je samostatný modul, který **kód kategorie určí
-deterministicky** (stejný vstup → stejný výstup) z Google vyhledávání a webu
+deterministicky** (stejný vstup → stejný výstup) z webového vyhledávání a webu
 firmy, a tak u části dodavatelů obejde LLM krok. Nejednoznačné firmy nechá
 na LLM.
 
-Potřebuje klíč k [serper.dev](https://serper.dev) (Google Search API):
+Hledání jde přes **vlastní instanci [SearXNG](https://docs.searxng.org/)** –
+názvy dodavatelů neopouštějí vlastní infrastrukturu. Instance musí mít
+v `settings.yml` povolený JSON výstup (`search: formats: [html, json]`).
 
 ```bash
-export SERPER_API_KEY=...          # nebo klíč do souboru kategorizace/serper_key.txt
+export SEARXNG_URL=http://localhost:8888   # nebo adresa do kategorizace/searxng_url.txt
 
 .venv/bin/python -m kategorizace.kategorizuj vstup.csv -o vystup_kat.csv
 .venv/bin/python -m kategorizace.kategorizuj vstup.csv -o out.csv --offline   # jen z keše

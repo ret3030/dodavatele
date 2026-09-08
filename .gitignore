@@ -10,8 +10,8 @@ build/
 dist/
 *.spec
 
-# nezavisly modul kategorizace/ - lokalni klic, kes a vystupy
-kategorizace/serper_key.txt
+# nezavisly modul kategorizace/ - lokalni adresa SearXNG, kes a vystupy
+kategorizace/searxng_url.txt
 kategorizace/.cache/
 kategorizace/*_rozbor.jsonl
 kategorizace/vystup_*.csv

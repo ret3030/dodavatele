@@ -1,11 +1,13 @@
 """
-CLI: seznam firem -> kategorie z ciselniku (deterministicky, pres SERPER).
+CLI: seznam firem -> kategorie z ciselniku (deterministicky, pres vlastni SearXNG).
 
     python3 -m kategorizace.kategorizuj vstup.csv -o vystup_kat.csv
     python3 -m kategorizace.kategorizuj vstup.xlsx -o vystup_kat.xlsx --rozbor rozbor.jsonl
     python3 -m kategorizace.kategorizuj vstup.csv -o out.csv --offline   # jen z kese
 
-Klic SERPER: env SERPER_API_KEY, nebo soubor kategorizace/serper_key.txt.
+Adresa SearXNG: prepinac --searxng, env SEARXNG_URL, nebo soubor
+kategorizace/searxng_url.txt. Nazvy dodavatelu zustavaji na vlastni
+infrastrukture - nic se neposila do externi vyhledavaci sluzby.
 """
 
 import argparse
@@ -15,7 +17,7 @@ import re
 import sys
 
 from .klasifikator import klasifikuj, vlastni_domena
-from .serper import Serper, nacti_klic
+from .searxng import SearXNG, nacti_url
 from .web import Web
 from .taxonomie import ict_relevance, nazev_nace
 from .vstup import nacti as nacti_vstup
@@ -97,7 +99,7 @@ def _zapis_xlsx(cesta, radky, hlavicka):
 def main(argv=None):
     p = argparse.ArgumentParser(
         prog="kategorizace.kategorizuj",
-        description="Deterministicke zarazeni dodavatele do kategorie pres SERPER + list klicovych slov.",
+        description="Deterministicke zarazeni dodavatele do kategorie pres vlastni SearXNG + list klicovych slov.",
     )
     p.add_argument("vstup", help="CSV / XLSX / TXT se seznamem firem (sloupec s nazvem povinny)")
     p.add_argument("-o", "--vystup", default="vystup_kategorizace.csv",
@@ -110,7 +112,9 @@ def main(argv=None):
     p.add_argument("--bez-webu", dest="bez_webu", action="store_true",
                    help="nestahovat domovske stranky firem (jen SERP snippety)")
     p.add_argument("--kes", default=VYCHOZI_KES, help="adresar kese (vychozi kategorizace/.cache)")
-    p.add_argument("--prodleva", type=float, default=0.5, help="pauza mezi dotazy do SERPER (s)")
+    p.add_argument("--searxng", metavar="URL",
+                   help="adresa SearXNG (jinak env SEARXNG_URL nebo kategorizace/searxng_url.txt)")
+    p.add_argument("--prodleva", type=float, default=0.0, help="pauza mezi dotazy na SearXNG (s); u vlastni instance staci 0")
     p.add_argument("--num", type=int, default=10, help="pocet organic vysledku na dotaz")
     a = p.parse_args(argv)
 
@@ -120,11 +124,13 @@ def main(argv=None):
     if not firmy:
         raise SystemExit("Vstup neobsahuje zadnou firmu.")
 
-    klic = "" if a.offline else nacti_klic()
-    if not a.offline and not klic:
-        raise SystemExit("Chybi SERPER klic (env SERPER_API_KEY nebo kategorizace/serper_key.txt). "
-                         "Pro beh jen z kese pouzijte --offline.")
-    serper = Serper(api_key=klic or None, cache_dir=a.kes, prodleva=a.prodleva)
+    adresa = "" if a.offline else (a.searxng or nacti_url())
+    if not a.offline and not adresa:
+        raise SystemExit(
+            "Chybi adresa SearXNG - zadejte --searxng URL, env SEARXNG_URL nebo soubor "
+            "kategorizace/searxng_url.txt (napr. http://localhost:8888). "
+            "Pro beh jen z kese pouzijte --offline.")
+    hledac = SearXNG(base_url=adresa or None, cache_dir=a.kes, prodleva=a.prodleva)
     web = Web(cache_dir=os.path.join(a.kes, "web"),
               povolit=not a.offline and not a.bez_webu)
 
@@ -138,7 +144,7 @@ def main(argv=None):
     for i, firma in enumerate(firmy, 1):
         odpovedi = []
         for q, gl, hl in dotazy(firma):
-            odpovedi.append(serper.hledej(q, gl=gl, hl=hl, num=a.num))
+            odpovedi.append(hledac.hledej(q, gl=gl, hl=hl, num=a.num))
         pridane = []
         dom = vlastni_domena(odpovedi, firma["nazev"])
         if dom:
@@ -188,7 +194,7 @@ def main(argv=None):
     print("  AUTO   %4d  (%.0f %%)  - kategorie prevzata rovnou" % (pocty["AUTO"], 100 * pocty["AUTO"] / n), file=sys.stderr)
     print("  OVERIT %4d  (%.0f %%)  - navrh s nizsi jistotou, doporucena kontrola" % (pocty["OVERIT"], 100 * pocty["OVERIT"] / n), file=sys.stderr)
     print("  LLM    %4d  (%.0f %%)  - nezarazeno, na puvodni LLM krok" % (pocty["LLM"], 100 * pocty["LLM"] / n), file=sys.stderr)
-    print("  SERPER: %d z kese, %d stazeno, %d chyb" % (serper.z_kese, serper.stazeno, serper.chyby), file=sys.stderr)
+    print("  SEARXNG: %d z kese, %d stazeno, %d chyb" % (hledac.z_kese, hledac.stazeno, hledac.chyby), file=sys.stderr)
     print("  WEB:    %d z kese, %d stazeno, %d bez odpovedi" % (web.z_kese, web.stazeno, web.chyby), file=sys.stderr)
 
 
