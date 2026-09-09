@@ -70,6 +70,7 @@ než žádná, protože se pozná až pozdě.
 | **Číselník** | 74 kategorií v 11 skupinách + ICT příznak (zdroj pro vzorce) |
 | **Souhrn** | kolik je ICT, kolik kritických, jak dopadla identita |
 | **Podklady** | co se o firmě našlo — dohledatelné, proč LLM rozhodl takhle |
+| **Metodika** | co znamená který sloupec a jeho vazba na ISO/IEC 27001 |
 
 Excel je **živý dokument, ne jen export**. Kategorie, skupina a ICT relevance
 nejsou zapsané hodnoty, ale `VLOOKUP` do Číselníku — když opravíte kód

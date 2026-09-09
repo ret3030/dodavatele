@@ -38,6 +38,64 @@ S_KOD, S_KATEG, S_SKUP, S_ICT = 10, 11, 12, 13
 S_PRISTUP, S_NAHRAD, S_OBJEM, S_VZTAH = 16, 17, 18, 19
 S_KRIT, S_ISO = 20, 21
 
+# Popis kazdeho sloupce listu Dodavatele a jeho vazba na ISO/IEC 27001, pro
+# list Metodika. Poradi a delka musi sedet na SLOUPCE - kdyz nekdo prida
+# sloupec a zapomene na tohle, zapis_excel to shodi hned pri generovani.
+METODIKA = [
+    ("Název ze vstupu", "Název dodavatele přesně tak, jak přišel ze vstupního "
+     "souboru (z účetnictví).", ""),
+    ("Ověřený název", "Úřední název z rejstříku (ARES / RPO SR) nebo VIES, "
+     "pokud se liší od vstupu.", "A.5.19 – dodavatele je třeba jednoznačně "
+     "identifikovat"),
+    ("Jistota identity", "Jak spolehlivě je identita ověřená: rejstřík (podle "
+     "IČO nebo přesné shody jména) > VIES (DIČ) > podle názvu > neověřeno.",
+     "A.5.19"),
+    ("IČO", "Identifikátor dohledaný v ARES / RPO SR.", ""),
+    ("DIČ", "Identifikátor použitý k ověření přes VIES u zahraničních "
+     "dodavatelů v EU.", ""),
+    ("Země", "Sídlo dodavatele.", ""),
+    ("Město", "Sídlo dodavatele.", ""),
+    ("Web", "Ověřený web dodavatele – ne jen odhad z názvu.", ""),
+    ("NACE", "Úředně zapsaný obor podnikání. Jen vodítko pro kategorizaci, "
+     "ne finální zařazení – bývá zastaralý nebo obecný.", ""),
+    ("Kód kategorie", "Kód z Číselníku, který LLM přiřadil podle toho, čím "
+     "se dodavatel reálně zabývá.", "A.5.19 – podklad pro posouzení druhu "
+     "dodávky"),
+    ("Kategorie", "Název kategorie – VLOOKUP do listu Číselník podle kódu.", ""),
+    ("Skupina", "Nadřazená skupina kategorie – VLOOKUP do listu Číselník.", ""),
+    ("ICT relevance", "ano / hraniční / ne – jestli dodavatel typicky "
+     "zpracovává informace firmy nebo se připojuje do jejích systémů. "
+     "VLOOKUP do Číselníku.", "A.5.21 – řízení bezpečnosti v ICT "
+     "dodavatelském řetězci"),
+    ("Co dodává (LLM)", "Stručný popis od LLM, aby šlo zkontrolovat, že kód "
+     "kategorie sedí.", ""),
+    ("Jistota zařazení", "vysoká / střední / nízká – jak jistý si LLM byl "
+     "při zařazení do kategorie.", ""),
+    ("Přístup k datům/systémům", "RUČNĚ: žádný / fyzický / omezený / "
+     "privilegovaný přístup dodavatele k informacím nebo systémům firmy. "
+     "Hlavní vstup pro výpočet kritičnosti.", "A.5.19, A.5.20; A.8.2 "
+     "(privilegovaná přístupová práva)"),
+    ("Nahraditelnost", "RUČNĚ: snadná / obtížná / prakticky žádná – jak "
+     "snadno lze dodavatele nahradit jiným.", "A.5.21; A.5.29/A.5.30 "
+     "(kontinuita provozu)"),
+    ("Objem (ABC)", "RUČNĚ: hrubá ABC klasifikace obchodního objemu s "
+     "dodavatelem. Doplňkové kritérium dopadu – vysoký objem sám o sobě "
+     "kritičnost nezakládá.", "obecná praxe posouzení dopadu, není z "
+     "konkrétního řízení"),
+    ("Typ vztahu", "RUČNĚ: rámcová smlouva / objednávky / DPA / NDA / bez "
+     "smlouvy – jaký smluvní rámec s dodavatelem existuje.", "A.5.20 – "
+     "bezpečnostní požadavky musí být zakotvené ve smlouvě"),
+    ("Kritičnost", "KRITICKÝ / VÝZNAMNÝ / BĚŽNÝ – vzorec z ICT relevance, "
+     "Přístupu, Nahraditelnosti a Objemu. Rozhoduje přístup, ne cena.",
+     "shrnutí A.5.19–A.5.22"),
+    ("Režim dle ISO 27001", "Doporučená opatření podle Kritičnosti a ICT "
+     "relevance – prověření, bezpečnostní požadavky ve smlouvě, DPA, právo "
+     "auditu, monitoring.", "A.5.19–A.5.22"),
+    ("Poznámky nástroje", "Technické poznámky z dohledávání (např. web "
+     "nenalezen) – informace o procesu, ne o dodavateli samotném.", ""),
+]
+assert len(METODIKA) == len(SLOUPCE), "METODIKA musí popisovat každý sloupec SLOUPCE"
+
 
 def _pismeno(i):
     """1 -> A, 27 -> AA"""
@@ -395,5 +453,33 @@ def zapis_excel(firmy, odpovedi, cesta):
         b.font = Font(bold=True)
     for i, sirka in enumerate((6, 34, 14, 120), 1):
         ws_p.column_dimensions[get_column_letter(i)].width = sirka
+
+    # -- list Metodika (co který sloupec znamená a vazba na ISO 27001) ----
+    ws_m = wb.create_sheet("Metodika")
+    _radek(ws_m, ["List", "Co obsahuje"])
+    for nazev, obsah in (
+        ("Dodavatelé", "hlavní tabulka – jeden řádek na dodavatele"),
+        ("Číselník", "74 kategorií v 11 skupinách + ICT příznak; zdroj pro "
+         "VLOOKUP a rozbalovací seznamy"),
+        ("Souhrn", "kolik dodavatelů je ICT, kolik kritických, jak dopadla "
+         "identita"),
+        ("Podklady", "co se o firmě našlo a proč LLM zařadilo takhle – pro "
+         "zpětnou kontrolu"),
+    ):
+        _radek(ws_m, [nazev, obsah])
+    _radek(ws_m, [])
+    zahlavi_tabulky = ws_m.max_row + 1  # radek "Sloupec listu Dodavatelé..."
+    _radek(ws_m, ["Sloupec listu Dodavatelé", "Popis", "Vazba na ISO/IEC 27001"])
+    for nazev, popis, iso in METODIKA:
+        _radek(ws_m, [nazev, popis, iso])
+    for b in ws_m[1]:
+        b.font = Font(bold=True)
+    for b in ws_m[zahlavi_tabulky]:
+        b.font = Font(bold=True)
+    for i, sirka in enumerate((28, 60, 40), 1):
+        ws_m.column_dimensions[get_column_letter(i)].width = sirka
+    for radek in ws_m.iter_rows(min_row=zahlavi_tabulky + 1):
+        for bunka in radek:
+            bunka.alignment = Alignment(wrap_text=True, vertical="top")
 
     wb.save(cesta)
