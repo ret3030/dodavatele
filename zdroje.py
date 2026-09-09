@@ -350,7 +350,6 @@ class Firma:
     vstup_ico: str = ""
     vstup_dic: str = ""
     vstup_zeme: str = ""
-    vstup_objem: str = ""
     # zjisteno
     nazev: str = ""
     ico: str = ""
@@ -937,7 +936,8 @@ def _dohad_domeny(f):
 
 def dohledej(klient, radek):
     """
-    radek = {"kod","nazev","adresa","ico","dic","zeme","objem"} ze vstupu.
+    radek = {"kod","nazev","adresa","ico","dic","zeme"} ze vstupu
+    (rozpoznava se i "objem", ale do evidence nevstupuje).
     Vraci Firmu se vsim, co se podarilo zjistit. Nikdy nevyhodi vyjimku -
     neuspech se pozna podle pole `identita`.
     """
@@ -948,7 +948,6 @@ def dohledej(klient, radek):
         vstup_ico=_ico(radek.get("ico")),
         vstup_dic=(radek.get("dic") or "").strip(),
         vstup_zeme=(radek.get("zeme") or "").strip().upper()[:2],
-        vstup_objem=str(radek.get("objem") or "").strip(),
     )
     f.ico, f.dic, f.zeme = f.vstup_ico, f.vstup_dic, f.vstup_zeme
     nazev = f.vstup_nazev

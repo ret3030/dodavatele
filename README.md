@@ -38,7 +38,7 @@ i německy. Duplicity podle názvu a IČO se slučují.
 | `IČO` | ověřená identita z ARES / RPO SR, včetně NACE a předmětu podnikání |
 | `DIČ` | ověřená identita přes VIES — jediná bezplatná cesta u DE, NL, AT… |
 | `Adresa` | rozliší firmy stejného jména, ověří nalezený web |
-| `Částka` | přenese se do sloupce Objem ze vstupu jako kontext |
+| `Částka` | rozpozná se, ale do evidence nevstupuje — kritičnost se z objemu záměrně nepočítá |
 
 Samotná hlavička `Kreditor` je dvojznačná — bývá v ní jméno i číslo. Když je
 vedle ní sloupec `Název`, bere se `Kreditor` jako identifikátor; když ne, jako
@@ -78,9 +78,9 @@ práce a legendou barev.
 |---|---|
 | **Úvod** | košilka — k čemu sešit je, jak s ním pracovat, co znamenají barvy |
 | **Dodavatelé** | hlavní tabulka — jeden řádek na dodavatele |
-| **Číselník** | 74 kategorií v 11 skupinách + ICT příznak (zdroj pro vzorce) |
+| **Číselník** | 81 kategorií v 12 skupinách + ICT příznak (zdroj pro vzorce) |
 | **Souhrn** | kolik je ICT, kolik kritických, co ještě chybí vyplnit |
-| **Podklady** | co se o firmě našlo — dohledatelné, proč LLM rozhodl takhle |
+| **Podklady** | co se o firmě našlo a jak dohledávání dopadlo — proč LLM rozhodl takhle |
 | **Metodika** | co znamená který sloupec a jeho vazba na ISO/IEC 27001 |
 
 Excel je **živý dokument, ne jen export**. Kategorie, skupina a ICT relevance
@@ -95,15 +95,18 @@ nahradíte**. Obojí je rozbalovací seznam:
 
 | Přístup k datům/systémům | znamená |
 |---|---|
-| Žádný | nevidí naše data ani nechodí do prostor |
-| Fyzický (vstup do prostor) | úklid, servis, ostraha, stěhování |
-| Virtuální (data a rozhraní) | zpracovává nebo přenáší naše data — API, cloud, SaaS |
-| Virtuální (správa systémů) | administrátorský či privilegovaný přístup, vzdálená správa |
-| Fyzický i virtuální | obojí zároveň |
+| Žádný přístup k aktivům | nevidí naše informace a nechodí do prostor |
+| Fyzický vstup do prostor | úklid, servis, ostraha, stěhování (A.7.2) |
+| Předávání informací mimo systémy | posíláme mu naše data — exporty, mzdy, výkresy, osobní údaje — ale do systémů nechodí (A.5.14) |
+| Zpracování dat u dodavatele | naše data leží a zpracovávají se v jeho prostředí — cloud, SaaS, hosting, outsourcovaná agenda (A.5.23) |
+| Uživatelský přístup do systémů | pracuje v našich aplikacích s běžnými právy |
+| Privilegovaný přístup a správa | administrátorská práva, vzdálená správa našich systémů (A.8.2) |
+| Fyzický i logický přístup | do prostor i do systémů zároveň |
 
-Rozdíl mezi oběma „virtuálními“ řádky je záměrný: dodavatel, který od nás čte
-data přes API, je něco jiného než dodavatel, který nám spravuje servery. První
-je rizikový jen u ICT dodávky, druhý vždycky.
+Stupnice je rozepsaná schválně: dodavatel, kterému posíláme export, je něco
+jiného než dodavatel, který nám spravuje servery. Privilegovaný přístup je
+kritický vždycky, ostatní formy přístupu k informacím zvednou kritičnost na
+`KRITICKÝ` až u ICT dodávky. Když sedí víc voleb, vybírá se ta rizikovější.
 
 | Nahraditelnost | znamená |
 |---|---|
@@ -118,14 +121,15 @@ vyjde jako `KRITICKÝ`, se chybějící vlastník nebo datum posouzení podbarv�
 
 ### Co z toho spočítají vzorce
 
-**Kritičnost** — `KRITICKÝ`, když má dodavatel přístup ke správě systémů, nebo
-je na něm kritická závislost, nebo jde o ICT dodávku s přístupem k datům.
-`VÝZNAMNÝ` při ICT vazbě, přístupu k datům a rozhraním nebo obtížné
-nahraditelnosti. Jinak `BĚŽNÝ`.
+**Kritičnost** — `KRITICKÝ`, když má dodavatel privilegovaný přístup nebo nám
+spravuje systémy, nebo je na něm kritická závislost, nebo jde o ICT dodávku
+a dodavatel se přitom dostane k našim informacím či do systémů. `VÝZNAMNÝ` při
+ICT vazbě, jakémkoli přístupu k informacím nebo obtížné nahraditelnosti.
+Jinak `BĚŽNÝ`.
 
 Rozhoduje tedy **přístup a závislost, ne cena** — levný dodavatel se vzdálenou
 správou serverů je rizikovější než drahý dodavatel kancelářských potřeb. Objem
-fakturace ze vstupu je v sešitu jen jako kontext a do výpočtu nevstupuje.
+fakturace ze vstupu se proto do evidence vůbec nepřenáší.
 
 **Režim dle ISO 27001** — co je u dodavatele potřeba (prověření, bezpečnostní
 požadavky ve smlouvě, DPA, právo auditu, monitoring). Přepočítá se s každou

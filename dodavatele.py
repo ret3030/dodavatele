@@ -52,6 +52,8 @@ _SLOUPCE = {
     "dic": ("dic", "dič", "vat", "vat id", "dph", "ustid", "ust id", "ust-idnr",
             "vat number", "tax id", "dic dph"),
     "zeme": ("zeme", "země", "country", "stat", "stát", "kod zeme", "kód země", "land"),
+    # Objem se do evidence nepremita - kriticnost se z nej zamerne nepocita.
+    # Rozpoznavat ho ale musime, aby "Castka" nesezrala jiny sloupec.
     "objem": ("objem", "obrat", "castka", "částka", "suma", "celkem", "amount",
               "hodnota", "umsatz", "abc"),
 }
@@ -150,8 +152,8 @@ def nacti_vstup(cesta):
             continue
         videno.add(klic)
         out.append({"kod": bunka("kod"), "nazev": nazev, "adresa": bunka("adresa"),
-                    "ico": bunka("ico"), "dic": bunka("dic"), "zeme": bunka("zeme"),
-                    "objem": bunka("objem")})
+                    "ico": bunka("ico"), "dic": bunka("dic"),
+                    "zeme": bunka("zeme")})
     return out
 
 

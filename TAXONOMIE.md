@@ -1,6 +1,6 @@
 # Revidovaná taxonomie kategorií dodavatelů (v2)
 
-**74 kategorií v 11 skupinách** (původní kolegova taxonomie: 83 / 11).
+**81 kategorií v 12 skupinách** (původní kolegova taxonomie: 83 / 11).
 Sjednoceno v `../taxonomie_data.json` – čte ji modul `kategorizace/` i hlavní
 `dodavatele.py` (včetně číselníku v promptu pro LLM krok). `MAPA_ZE_STARE`
 v témže souboru = úplný převod starý kód → nový.
@@ -20,7 +20,7 @@ v témže souboru = úplný převod starý kód → nový.
 4. **Zrušené odpadkové koše** – „Firemní a ostatní", „Ostatní / k ověření"
    i XXX-00 dělaly totéž; zůstává jen XXX-00.
 
-## Skupiny (11)
+## Skupiny (12)
 
 | skupina | ICT relevance | kategorií |
 |---|---|---|
@@ -31,9 +31,10 @@ v témže souboru = úplný převod starý kód → nový.
 | Výroba dílů a zpracování materiálů | ne | 9 |
 | Materiál, nářadí a provozní zásobování | ne | 7 |
 | Stavby, energie a facility | ne (FAC-08/09 hraniční) | 9 |
-| Doprava, logistika a vozidla | ne | 4 |
+| Doprava, logistika a vozidla | ne | 6 |
 | Profesní a poradenské služby | ne (PRO-01/02/05/06 hraniční) | 7 |
-| Marketing, tisk, vzdělávání a firemní služby | ne (FIR-08 hraniční) | 9 |
+| Marketing, tisk, vzdělávání a firemní služby | ne (FIR-08/10 hraniční) | 10 |
+| Obchod a ostatní odvětví | ne (OBH-03 hraniční) | 4 |
 | Nezařazeno | hraniční | 1 |
 
 `ano` = dodavatel typicky zpracovává/uchovává naše informace nebo se
@@ -57,6 +58,24 @@ Vestavné systémy a IoT, Rozvaděče a napájecí technika, Fyzická ostraha,
 Odpadové hospodářství (od energií), Nemovitosti (od facility managementu).
 
 **Přeřazeno do IT**: identifikace/čárové kódy, síťová infrastruktura.
+
+## Doplněno po prvním ostrém běhu (v2.1)
+
+Na reálném seznamu kreditorů se ukázalo, že sedm typů dodavatelů nemělo kam
+spadnout a končily jako `XXX-00`. Přibyly proto:
+
+| kód | kategorie | ICT | proč |
+|---|---|---|---|
+| LOG-05 | Letecká a dopravní technika | ne | technika, ne přepravní služba — do LOG-01 nepatří |
+| LOG-06 | Paliva a PHM | ne | komoditní nákup pro vozový park, ne utilita jako FAC-05 |
+| FIR-10 | Cestovní služby | hraniční | cestovka drží osobní údaje zaměstnanců (pasy, itineráře) |
+| OBH-01 | Nespecializovaný obchod a zprostředkování | ne | obchodník bez oborové specializace — dřív nutně `XXX-00` |
+| OBH-02 | Spotřební a drogistické zboží | ne | vedle PROV-07 (potraviny) chyběla drogerie a spotřební zboží |
+| OBH-03 | Zdravotnická technika a služby | hraniční | pracovnělékařská služba zpracovává zdravotní údaje zaměstnanců |
+| OBH-04 | Zemědělství, lesnictví a péče o zeleň | ne | údržba zeleně je běžný dodavatel, spadala mimo FAC i PROV |
+
+`XXX-00` tím zůstává jen pro firmy, o kterých se opravdu nic neví — ne pro
+obory, na které v číselníku nebylo místo.
 
 `MAPA_ZE_STARE` v JSONu = úplný převod starý kód → nový (pro migraci už
 zařazených výstupů; `taxonomie.prevod_ze_stare()`).

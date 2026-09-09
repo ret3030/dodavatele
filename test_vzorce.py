@@ -13,21 +13,23 @@ import vystup
 from taxonomie import KATEGORIE, ict_relevance
 
 
-ZADNY, FYZICKY, DATA, SPRAVA, OBOJI = vystup.PRISTUP
+ZADNY, FYZICKY, PREDANI, ZPRACOVANI, UZIVATEL, SPRAVA, OBOJI = vystup.PRISTUP
 BEZNE, OBTIZNE, ZAVISLOST = vystup.NAHRADITELNOST
 
 
 def kriticnost(ict, pristup, nahraditelnost, kod="ICT-01"):
     """Tataz pravidla jako _vzorec_kriticnost - drzet synchronne."""
+    # volby, u kterych se dodavatel dostane k informacim nebo do systemu
+    K_INFORMACIM = (PREDANI, ZPRACOVANI, UZIVATEL, SPRAVA, OBOJI)
     if not kod:
         return "nezařazeno"
     if not pristup:
         return "⟵ doplňte přístup"
     if (pristup == SPRAVA
             or nahraditelnost == ZAVISLOST
-            or (ict == "ano" and pristup in (DATA, OBOJI))):
+            or (ict == "ano" and pristup in K_INFORMACIM)):
         return "KRITICKÝ"
-    if ict == "ano" or pristup in (DATA, OBOJI) or nahraditelnost == OBTIZNE:
+    if ict == "ano" or pristup in K_INFORMACIM or nahraditelnost == OBTIZNE:
         return "VÝZNAMNÝ"
     return "BĚŽNÝ"
 
@@ -36,14 +38,19 @@ PRIPADY = [
     # (ICT relevance, přístup, nahraditelnost) -> očekáváno
     (("ano", SPRAVA, BEZNE), "KRITICKÝ"),
     (("ne", SPRAVA, BEZNE), "KRITICKÝ"),      # správa systémů rozhoduje i mimo ICT
-    (("ano", DATA, BEZNE), "KRITICKÝ"),       # ICT dodávka + naše data
-    (("ne", DATA, BEZNE), "VÝZNAMNÝ"),        # API u neICT dodavatele ještě není kritika
+    (("ano", ZPRACOVANI, BEZNE), "KRITICKÝ"),  # ICT dodávka + naše data u něj
+    (("ne", ZPRACOVANI, BEZNE), "VÝZNAMNÝ"),   # cloud u neICT dodavatele ještě ne
+    (("ano", UZIVATEL, BEZNE), "KRITICKÝ"),    # ICT dodávka + účet v našich systémech
+    (("ne", UZIVATEL, BEZNE), "VÝZNAMNÝ"),
+    (("ano", PREDANI, BEZNE), "KRITICKÝ"),     # ICT dodavatel, kterému posíláme data
+    (("ne", PREDANI, BEZNE), "VÝZNAMNÝ"),      # samotné předání dat = významný
     (("ano", OBOJI, BEZNE), "KRITICKÝ"),
     (("ne", OBOJI, BEZNE), "VÝZNAMNÝ"),
     (("ne", ZADNY, ZAVISLOST), "KRITICKÝ"),   # single point of failure
     (("ano", ZADNY, BEZNE), "VÝZNAMNÝ"),
     (("ne", ZADNY, OBTIZNE), "VÝZNAMNÝ"),
     (("ne", FYZICKY, BEZNE), "BĚŽNÝ"),
+    (("ano", FYZICKY, BEZNE), "VÝZNAMNÝ"),    # ICT dodávka bez přístupu k datům
     (("ne", FYZICKY, OBTIZNE), "VÝZNAMNÝ"),
     (("ne", ZADNY, BEZNE), "BĚŽNÝ"),
     (("ano", "", BEZNE), "⟵ doplňte přístup"),  # bez ručního vstupu nepočítá
@@ -130,8 +137,11 @@ def _test_sesit():
     except ImportError:
         return ["openpyxl chybí – kontrola sešitu se nespustila"]
 
+    # druha firma nema podklady, jen poznamku - prave u ni se musi ukazat,
+    # ze se poznamka na Podklady dostane i bez jedineho nalezeneho zdroje
     firmy = [Firma(vstup_kod="D001", vstup_nazev="Alza.cz a.s."),
-             Firma(vstup_nazev="Firma bez kódu kreditora")]
+             Firma(vstup_nazev="Firma bez kódu kreditora",
+                   poznamky=["web nenalezen"])]
     with tempfile.TemporaryDirectory() as d:
         cesta = os.path.join(d, "t.xlsx")
         vystup.zapis_excel(firmy, {1: {"kod": "ICT-01", "popis": "HW",
@@ -162,6 +172,41 @@ def _test_sesit():
         # karta nesmi zasahovat do zahlavi ani prepsat data
         if ws.cell(zahlavi - 1, 1).value:
             chyby.append("mezi kartou a záhlavím chybí prázdný řádek")
+
+        # poznamky nastroje patri k dohledavani, ne do evidence dodavatele -
+        # maji byt na Podkladech, a to i u firmy, o ktere se nic nenaslo
+        hlavicky = [vystup.SLOUPCE[i][0] for i in range(len(vystup.SLOUPCE))]
+        for nechtene in ("Poznámky nástroje", "Objem ze vstupu"):
+            if nechtene in hlavicky:
+                chyby.append("sloupec %r má být z listu Dodavatelé pryč" % nechtene)
+        ws_p = wb["Podklady"]
+        zahlavi_p = next((r for r in range(1, 40)
+                          if ws_p.cell(r, 1).value == "Kreditor"), None)
+        if zahlavi_p is None:
+            chyby.append("v listu Podklady se nenašlo záhlaví")
+        else:
+            posledni_sl = ws_p.max_column
+            if ws_p.cell(zahlavi_p, posledni_sl).value != "Poznámky nástroje":
+                chyby.append("Poznámky nástroje nejsou posledním sloupcem Podkladů")
+            texty = [ws_p.cell(r, posledni_sl).value
+                     for r in range(zahlavi_p + 1, ws_p.max_row + 1)]
+            if not any(t and "web" in t.lower() for t in texty):
+                chyby.append("poznámka nástroje se na Podklady nepřenesla: %r" % texty)
+
+        # datum vygenerovani na kosilce byt nema - sesit se pouziva dlouhodobe
+        ws_u = wb["Úvod"]
+        for radek in ws_u.iter_rows(max_row=12, max_col=2):
+            for bunka in radek:
+                if isinstance(bunka.value, str) and "vygenerováno" in bunka.value:
+                    chyby.append("na Úvodu zůstalo datum vygenerování")
+        # text kosilky se slucuje pres A:B - co se tam nevejde, Excel oreze
+        sirka = sum(ws_u.column_dimensions[sl].width for sl in ("A", "B"))
+        for r in range(1, ws_u.max_row + 1):
+            text = ws_u.cell(r, 1).value
+            if (isinstance(text, str) and not ws_u.cell(r, 2).value
+                    and len(text) > sirka):
+                chyby.append("řádek %d Úvodu (%d znaků) se do %d nevejde: %r"
+                             % (r, len(text), sirka, text[:40]))
     return chyby
 
 

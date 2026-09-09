@@ -1,5 +1,5 @@
 {
- "_popis": "Taxonomie kategorií dodavatelů (v2, sjednocená). 74 kategorií v 11 skupinách. Používá ji dodavatele.py i modul kategorizace/. Historie a odůvodnění revize: kategorizace/TAXONOMIE_V2.md. MAPA_ZE_STARE = převod z původního číselníku.",
+ "_popis": "Taxonomie kategorií dodavatelů (v2, sjednocená). 81 kategorií v 12 skupinách. Používá ji dodavatele.py i modul kategorizace/. Historie a odůvodnění revize: kategorizace/TAXONOMIE_V2.md. MAPA_ZE_STARE = převod z původního číselníku.",
  "VYCHOZI_KOD": "XXX-00",
  "SKUPINY": [
   "IT, telekomunikace a kyberbezpečnost",
@@ -12,6 +12,7 @@
   "Doprava, logistika a vozidla",
   "Profesní a poradenské služby",
   "Marketing, tisk, vzdělávání a firemní služby",
+  "Obchod a ostatní odvětví",
   "Nezařazeno"
  ],
  "KATEGORIE": {
@@ -243,6 +244,14 @@
    "Doprava, logistika a vozidla",
    "Správa vozového parku a mobilita"
   ],
+  "LOG-05": [
+   "Doprava, logistika a vozidla",
+   "Letecká a dopravní technika"
+  ],
+  "LOG-06": [
+   "Doprava, logistika a vozidla",
+   "Paliva a PHM"
+  ],
   "PRO-01": [
    "Profesní a poradenské služby",
    "Poradenství, audit a daně"
@@ -307,6 +316,26 @@
    "Marketing, tisk, vzdělávání a firemní služby",
    "Veřejný sektor, instituce a nezisková sféra"
   ],
+  "FIR-10": [
+   "Marketing, tisk, vzdělávání a firemní služby",
+   "Cestovní služby"
+  ],
+  "OBH-01": [
+   "Obchod a ostatní odvětví",
+   "Nespecializovaný obchod a zprostředkování"
+  ],
+  "OBH-02": [
+   "Obchod a ostatní odvětví",
+   "Spotřební a drogistické zboží"
+  ],
+  "OBH-03": [
+   "Obchod a ostatní odvětví",
+   "Zdravotnická technika a služby"
+  ],
+  "OBH-04": [
+   "Obchod a ostatní odvětví",
+   "Zemědělství, lesnictví a péče o zeleň"
+  ],
   "XXX-00": [
    "Nezařazeno",
    "Nezařazeno – nutné ruční doplnění"
@@ -334,6 +363,8 @@
    "PRO-05",
    "PRO-06",
    "FIR-08",
+   "FIR-10",
+   "OBH-03",
    "XXX-00"
   ],
   "ne": [
@@ -382,6 +413,8 @@
    "LOG-02",
    "LOG-03",
    "LOG-04",
+   "LOG-05",
+   "LOG-06",
    "PRO-03",
    "PRO-04",
    "PRO-07",
@@ -392,7 +425,10 @@
    "FIR-05",
    "FIR-06",
    "FIR-07",
-   "FIR-09"
+   "FIR-09",
+   "OBH-01",
+   "OBH-02",
+   "OBH-04"
   ]
  },
  "MAPA_ZE_STARE": {

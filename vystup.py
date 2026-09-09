@@ -22,16 +22,20 @@ _KOD_RE = re.compile(r"\b[A-Z]{2,4}-\d{2}\b")
 
 # Hodnoty rucne vyplnovanych sloupcu. Musi presne sedet na vzorce nize.
 #
-# Pristup je zamerne rozdeleny na dve urovne "virtualniho" pristupu. Samotne
-# "virtualne" nic nerika - dodavatel, ktery od nas cte data pres API, je neco
-# jineho nez dodavatel, ktery nam spravuje servery. Prvni je rizikovy jen
-# tehdy, kdyz jde o ICT dodavku, druhy vzdycky.
+# Stupnice pristupu kopiruje to, co ISO/IEC 27001 u dodavatele rozlisuje:
+# fyzicky vstup do prostor (A.7.2), predani informaci mimo systemy (A.5.14),
+# zpracovani dat na infrastrukture dodavatele (A.5.23) a logicky pristup do
+# nasich systemu, zvlast pak privilegovany (A.8.2). Zamerne se nesloucuje -
+# dodavatel, kteremu posilame export, je neco jineho nez dodavatel, ktery nam
+# spravuje servery. Prvni je rizikovy hlavne u ICT dodavky, druhy vzdycky.
 PRISTUP = [
-    "Žádný",                        # nevidí naše data ani nechodí do prostor
-    "Fyzický (vstup do prostor)",   # úklid, servis, ostraha, stěhování
-    "Virtuální (data a rozhraní)",  # zpracovává naše data, API, cloud, SaaS
-    "Virtuální (správa systémů)",   # administrátorský/privilegovaný přístup
-    "Fyzický i virtuální",          # obojí zároveň
+    "Žádný přístup k aktivům",        # nevidí naše informace ani do prostor
+    "Fyzický vstup do prostor",       # úklid, servis, ostraha, stěhování
+    "Předávání informací mimo systémy",   # dostává naše data, ale nepřipojuje se
+    "Zpracování dat u dodavatele",    # data leží v jeho prostředí (cloud, SaaS)
+    "Uživatelský přístup do systémů",  # pracuje v našich aplikacích, běžná práva
+    "Privilegovaný přístup a správa",  # administrátor, vzdálená správa
+    "Fyzický i logický přístup",      # obojí zároveň
 ]
 NAHRADITELNOST = [
     "Běžně nahraditelný",           # na trhu je víc alternativ, přechod v týdnech
@@ -43,22 +47,21 @@ SLOUPCE = [
     ("Kreditor", 12),
     ("Název ze vstupu", 34), ("Ověřený název", 34), ("Jistota identity", 15),
     ("IČO", 11), ("DIČ", 14), ("Země", 6), ("Město", 18), ("Web", 26),
-    ("NACE", 14), ("Objem ze vstupu", 14),
+    ("NACE", 14),
     ("Kód kategorie", 13), ("Kategorie", 34), ("Skupina", 30), ("ICT relevance", 13),
     ("Co dodává (LLM)", 44), ("Jistota zařazení", 14),
     ("Přístup k datům/systémům", 26), ("Nahraditelnost", 22),
     ("Kritičnost", 16), ("Režim dle ISO 27001", 52),
-    ("Poznámky nástroje", 40),
     # revizni blok - vyplnuje klient u kritickych a vyznamnych dodavatelu
     ("Vlastník vztahu", 22), ("Datum posouzení", 16),
     ("Datum příštího přezkoumání", 22), ("Poznámka", 44),
 ]
 # indexy (1-based) klicovych sloupcu - at se vzorce nerozbiji pri zmene poradi
-S_KREDITOR, S_POPIS = 1, 16
-S_KOD, S_KATEG, S_SKUP, S_ICT = 12, 13, 14, 15
-S_PRISTUP, S_NAHRAD = 18, 19
-S_KRIT, S_ISO = 20, 21
-S_VLASTNIK, S_POSOUZENI, S_PREZKOUM, S_POZNAMKA = 23, 24, 25, 26
+S_KREDITOR, S_IDENTITA, S_POPIS = 1, 4, 15
+S_KOD, S_KATEG, S_SKUP, S_ICT = 11, 12, 13, 14
+S_PRISTUP, S_NAHRAD = 17, 18
+S_KRIT, S_ISO = 19, 20
+S_VLASTNIK, S_POSOUZENI, S_PREZKOUM, S_POZNAMKA = 21, 22, 23, 24
 RUCNI = (S_PRISTUP, S_NAHRAD, S_VLASTNIK, S_POSOUZENI, S_PREZKOUM, S_POZNAMKA)
 
 # Popis kazdeho sloupce listu Dodavatele a jeho vazba na ISO/IEC 27001, pro
@@ -85,8 +88,6 @@ METODIKA = [
     ("Web", "Ověřený web dodavatele – ne jen odhad z názvu.", ""),
     ("NACE", "Úředně zapsaný obor podnikání. Jen vodítko pro kategorizaci, "
      "ne finální zařazení – bývá zastaralý nebo obecný.", ""),
-    ("Objem ze vstupu", "Obrat nebo částka, pokud byla ve vstupním souboru. "
-     "Jen informace pro kontext – do kritičnosti záměrně nevstupuje.", ""),
     ("Kód kategorie", "Kód z Číselníku, který LLM přiřadil podle toho, čím "
      "se dodavatel reálně zabývá.", "A.5.19 – podklad pro posouzení druhu "
      "dodávky"),
@@ -100,14 +101,20 @@ METODIKA = [
      "kategorie sedí.", ""),
     ("Jistota zařazení", "vysoká / střední / nízká – jak jistý si LLM byl "
      "při zařazení do kategorie.", ""),
-    ("Přístup k datům/systémům", "RUČNĚ. Žádný = nevidí naše data ani nechodí "
-     "do prostor. Fyzický = vstup do prostor (úklid, servis, ostraha). "
-     "Virtuální (data a rozhraní) = zpracovává nebo přenáší naše data, včetně "
-     "přístupu přes API, cloud nebo SaaS – sám o sobě to kritického dodavatele "
-     "nedělá. Virtuální (správa systémů) = administrátorský či privilegovaný "
-     "přístup do našich systémů, vzdálená správa. Fyzický i virtuální = obojí "
-     "zároveň. Rozhoduje skutečný stav, ne to, co je ve smlouvě.",
-     "A.5.19, A.5.20; A.8.2 (privilegovaná přístupová práva)"),
+    ("Přístup k datům/systémům", "RUČNĚ. Žádný přístup k aktivům = nevidí "
+     "naše informace a nechodí do prostor. Fyzický vstup do prostor = úklid, "
+     "servis, ostraha, stěhování. Předávání informací mimo systémy = "
+     "dostává nebo mu posíláme naše data (exporty, mzdy, výkresy, osobní "
+     "údaje), ale do našich systémů se nepřipojuje. Zpracování dat "
+     "u dodavatele = naše data leží a zpracovávají se v jeho prostředí – "
+     "cloud, SaaS, hosting, outsourcovaná agenda. Uživatelský přístup do "
+     "systémů = pracuje v našich aplikacích s běžnými právy. Privilegovaný "
+     "přístup a správa = administrátorská práva nebo vzdálená správa našich "
+     "systémů. Fyzický i logický přístup = do prostor i do systémů zároveň. "
+     "Když sedí víc voleb, vyberte tu rizikovější. Rozhoduje skutečný stav, "
+     "ne to, co je ve smlouvě.",
+     "A.5.19, A.5.20; A.5.14 (přenos informací); A.5.23 (cloudové služby); "
+     "A.7.2 (fyzický vstup); A.8.2 (privilegovaná přístupová práva)"),
     ("Nahraditelnost", "RUČNĚ. Běžně nahraditelný = na trhu je víc alternativ, "
      "přechod je otázka týdnů. Obtížně nahraditelný = náhrada existuje, ale "
      "znamená migraci dat, integrace nebo měsíce práce. Kritická závislost = "
@@ -119,8 +126,6 @@ METODIKA = [
     ("Režim dle ISO 27001", "Doporučená opatření podle Kritičnosti a ICT "
      "relevance – prověření, bezpečnostní požadavky ve smlouvě, DPA, právo "
      "auditu, monitoring.", "A.5.19–A.5.22"),
-    ("Poznámky nástroje", "Technické poznámky z dohledávání (např. web "
-     "nenalezen) – informace o procesu, ne o dodavateli samotném.", ""),
     ("Vlastník vztahu", "RUČNĚ: jméno člověka u nás, který za vztah "
      "s dodavatelem odpovídá. U kritického dodavatele nesmí zůstat prázdné – "
      "bez konkrétní osoby se opatření nikdy nevymáhají.",
@@ -335,6 +340,8 @@ def _nazev_sedi(firmy, cislo, nazev):
 
 BARVA_TMAVA = "1F3864"      # zahlavi tabulek
 BARVA_KARTA = "DDEBF7"      # karta nad tabulkou
+BARVA_BANNER = "EEF3FA"     # hlavicka listu Uvod
+BARVA_LINKA = "8EA9DB"      # delici linka pod nadpisy
 BARVA_RUCNI = "FFF2CC"      # bunky, ktere vyplnuje clovek
 BARVA_RUCNI_HLAVA = "BF8F00"
 BARVA_VYSTRAHA = "FFC7CE"   # chybejici udaj u kritickeho dodavatele
@@ -396,23 +403,26 @@ def _vzorec_kriticnost(r):
     typ smlouvy do vypoctu nevstupuji - levny dodavatel se vzdalenou spravou
     serveru je rizikovejsi nez drahy dodavatel kancelarskych potreb.
 
-    Pristup pres API nebo do cloudu ("data a rozhrani") sam o sobe kritickeho
-    dodavatele nedela - zvedne se na KRITICKY az u ICT dodavky. Spravu systemu
-    (privilegovany pristup) bereme jako kritickou vzdycky.
+    Privilegovany pristup (sprava systemu) je kriticky vzdycky. Ostatni formy
+    pristupu k informacim - predani dat, zpracovani u dodavatele, uzivatelsky
+    pristup - zvedaji na VYZNAMNY a na KRITICKY az u ICT dodavky. Zadny pristup
+    a pouhy fyzicky vstup do prostor kriticnost samy o sobe nezvedaji.
     """
     kod, ict = "$%s%d" % (_pismeno(S_KOD), r), "$%s%d" % (_pismeno(S_ICT), r)
     pri, nah = "$%s%d" % (_pismeno(S_PRISTUP), r), "$%s%d" % (_pismeno(S_NAHRAD), r)
+    # volby, u kterych se dodavatel dostane k nasim informacim nebo systemum
+    k_informacim = ",".join('%s="%s"' % (pri, v) for v in PRISTUP[2:])
     return (
         '=IF({kod}="","nezařazeno",'
         'IF({pri}="","⟵ doplňte přístup",'
-        'IF(OR({pri}="Virtuální (správa systémů)",'
-        '{nah}="Kritická závislost",'
-        'AND({ict}="ano",OR({pri}="Virtuální (data a rozhraní)",'
-        '{pri}="Fyzický i virtuální"))),"KRITICKÝ",'
-        'IF(OR({ict}="ano",{pri}="Virtuální (data a rozhraní)",'
-        '{pri}="Fyzický i virtuální",{nah}="Obtížně nahraditelný"),'
+        'IF(OR({pri}="{sprava}",'
+        '{nah}="{zavislost}",'
+        'AND({ict}="ano",OR({info}))),"KRITICKÝ",'
+        'IF(OR({ict}="ano",{info},{nah}="{obtizne}"),'
         '"VÝZNAMNÝ","BĚŽNÝ"))))'
-    ).format(kod=kod, ict=ict, pri=pri, nah=nah)
+    ).format(kod=kod, ict=ict, pri=pri, nah=nah, info=k_informacim,
+             sprava=PRISTUP[5], zavislost=NAHRADITELNOST[2],
+             obtizne=NAHRADITELNOST[1])
 
 
 def _vzorec_iso(r):
@@ -436,22 +446,26 @@ def _vlookup(r, sloupec):
 
 def _list_uvod(wb, firmy):
     """Kosilka: co sesit je, jak se s nim pracuje a co znamenaji barvy."""
-    from openpyxl.styles import Alignment, Font, PatternFill
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
     ws = wb.active
     ws.title = "Úvod"
     ws.sheet_view.showGridLines = False
-    ws.column_dimensions["A"].width = 34
-    ws.column_dimensions["B"].width = 106
+    # sirka musi pobrat nejdelsi radek textu: ten se slucuje pres A:B a ve
+    # sloucene bunce se nepretece do sousedni ani nezvedne vysku radku,
+    # takze prilis uzky list by delsi vety tise orizl (test_vzorce to hlida)
+    ws.column_dimensions["A"].width = 32
+    ws.column_dimensions["B"].width = 112
     stav = [0]
 
-    def _pis(a="", b="", tucne=False, vypln=None, vyska=None):
+    def _pis(a="", b="", tucne=False, vypln=None, vyska=None, odsazeni=0):
         stav[0] += 1
         r = stav[0]
         bunka_a = ws.cell(r, 1, a)
         bunka_a.font = Font(bold=tucne, size=11,
                             color=BARVA_TMAVA if tucne else "000000")
-        bunka_a.alignment = Alignment(vertical="center", wrap_text=True)
+        bunka_a.alignment = Alignment(vertical="center", wrap_text=True,
+                                      indent=odsazeni)
         if vypln:
             bunka_a.fill = PatternFill("solid", fgColor=vypln)
         if b:
@@ -463,18 +477,39 @@ def _list_uvod(wb, firmy):
             ws.row_dimensions[r].height = vyska
         return r
 
-    def _nadpis(text):
-        _pis()
-        r = _pis(text, tucne=True, vyska=22)
-        ws.cell(r, 1).font = Font(bold=True, size=12, color=BARVA_TMAVA)
+    def _banner(nadpis, podnadpis, shrnuti):
+        """Hlavicka listu: nadpis v lehkem odstinu, pod nim tenka linka."""
+        vypln = PatternFill("solid", fgColor=BARVA_BANNER)
+        prvni = _pis(vyska=6)                   # horni vzduch uvnitr banneru
+        r = _pis(nadpis, vyska=30)
+        ws.cell(r, 1).font = Font(bold=True, size=18, color=BARVA_TMAVA)
+        r = _pis(podnadpis, vyska=18)
+        ws.cell(r, 1).font = Font(size=11, color=BARVA_TMAVA)
+        r = _pis(shrnuti, vyska=18)
+        ws.cell(r, 1).font = Font(size=11, color=BARVA_TMAVA)
+        posledni = _pis(vyska=6)                # dolni vzduch
+        for radek in range(prvni, posledni + 1):
+            for sl in (1, 2):
+                ws.cell(radek, sl).fill = vypln
+        # linka misto silneho pruhu - banner tak drzi pohromade, ale nekrici
+        r = _pis(vyska=4)
+        for sl in (1, 2):
+            ws.cell(r, sl).border = Border(
+                top=Side(style="medium", color=BARVA_LINKA))
 
-    r = _pis("Evidence dodavatelů – audit dodavatelských vztahů dle ISO/IEC 27001",
-               vyska=30)
-    ws.cell(r, 1).font = Font(bold=True, size=16, color=BARVA_TMAVA)
-    _pis("Podklad pro řízení dodavatelských vztahů (ISO/IEC 27001, příloha A, "
-           "A.5.19–A.5.22)")
-    _pis("Dodavatelů v sešitu: %d    ·    vygenerováno %s"
-           % (len(firmy), _dnes()))
+    def _nadpis(text):
+        _pis(vyska=10)
+        r = _pis(text, tucne=True, vyska=20)
+        ws.cell(r, 1).font = Font(bold=True, size=12, color=BARVA_TMAVA)
+        for sl in (1, 2):
+            ws.cell(r, sl).border = Border(
+                bottom=Side(style="thin", color=BARVA_LINKA))
+        _pis(vyska=4)
+
+    _banner("Evidence dodavatelů",
+            "Audit dodavatelských vztahů dle ISO/IEC 27001 (příloha A, "
+            "A.5.19–A.5.22)",
+            "Dodavatelů v sešitu: %d" % len(firmy))
 
     _nadpis("K čemu sešit je")
     for text in (
@@ -512,8 +547,8 @@ def _list_uvod(wb, firmy):
 
     _nadpis("Co je na kterém listu")
     for nazev, popis in LISTY:
-        r = _pis(nazev, popis)
-        ws.cell(r, 1).font = Font(bold=True, size=11)
+        r = _pis(nazev, popis, odsazeni=1)
+        ws.cell(r, 1).font = Font(bold=True, size=11, color=BARVA_TMAVA)
 
     _nadpis("Barvy a značky")
     for barva, popis, vysvetleni in (
@@ -524,24 +559,9 @@ def _list_uvod(wb, firmy):
         (BARVA_VYSTRAHA, "červené podbarvení", "u kritického dodavatele chybí "
          "vlastník nebo datum posouzení, nebo je přezkoumání po termínu"),
     ):
-        r = _pis(popis, vysvetleni, vypln=barva)
+        r = _pis(popis, vysvetleni, vypln=barva, odsazeni=1)
         ws.cell(r, 1).font = Font(bold=True, size=11,
                                   color="FFFFFF" if barva == BARVA_TMAVA else "000000")
-
-    _nadpis("Na co si dát pozor")
-    for text in (
-        "·  Kritičnost počítá z přístupu a nahraditelnosti, ne z objemu "
-        "fakturace. Levný dodavatel se vzdálenou správou serverů je rizikovější",
-        "   než drahý dodavatel kancelářských potřeb. Sloupec Objem ze vstupu "
-        "je jen kontext.",
-        "·  Řádek s Jistotou identity „neověřeno“ stojí jen na názvu ze vstupu "
-        "a na webu – ověřte ho, než na něm postavíte rozhodnutí.",
-        "·  Zařazení do kategorie navrhl jazykový model. U „nízké“ jistoty "
-        "zařazení je omyl pravděpodobný; podklady jsou na listu Podklady.",
-        "·  Prázdný Přístup k datům/systémům znamená, že Kritičnost není "
-        "spočítaná – v buňce je „⟵ doplňte přístup“, ne BĚŽNÝ.",
-    ):
-        _pis(text)
     return ws
 
 
@@ -550,15 +570,10 @@ LISTY = [
     ("Číselník", "kategorie ve skupinách + ICT příznak; zdroj pro vzorce "
      "a rozbalovací seznamy"),
     ("Souhrn", "kolik dodavatelů je ICT, kolik kritických, co ještě chybí vyplnit"),
-    ("Podklady", "co se o firmě našlo ve veřejných zdrojích – pro zpětnou kontrolu "
-     "zařazení"),
+    ("Podklady", "co se o firmě našlo ve veřejných zdrojích a jak dohledávání "
+     "dopadlo – pro zpětnou kontrolu zařazení"),
     ("Metodika", "co znamená který sloupec a na které řízení ISO/IEC 27001 se váže"),
 ]
-
-
-def _dnes():
-    from datetime import date
-    return date.today().strftime("%d.%m.%Y")
 
 
 def zapis_excel(firmy, odpovedi, cesta):
@@ -603,13 +618,11 @@ def zapis_excel(firmy, odpovedi, cesta):
             f.identita,
             f.ico, f.dic, f.zeme, f.mesto, f.web,
             ", ".join(f.nace[:6]),
-            f.vstup_objem,
             odp.get("kod", ""),
             _vlookup(r, 2), _vlookup(r, 3), _vlookup(r, 4),
             odp.get("popis", ""), odp.get("jistota", ""),
             "", "",
             _vzorec_kriticnost(r), _vzorec_iso(r),
-            "; ".join(f.poznamky),
             "", "", "", "",
         ])
 
@@ -708,7 +721,7 @@ def zapis_excel(firmy, odpovedi, cesta):
         return "'Dodavatelé'!$%s$%d:$%s$%d" % (pis, prvni, pis, max(posledni, prvni))
 
     kr, ic, kod = _rozsah(S_KRIT), _rozsah(S_ICT), _rozsah(S_KOD)
-    ident = _rozsah(4)
+    ident = _rozsah(S_IDENTITA)
     vlastnik, posouzeni = _rozsah(S_VLASTNIK), _rozsah(S_POSOUZENI)
     prezkoum = _rozsah(S_PREZKOUM)
 
@@ -755,13 +768,15 @@ def zapis_excel(firmy, odpovedi, cesta):
 
     # -- list Podklady (proc to LLM zaradilo takhle) ----------------------
     ws_p = wb.create_sheet("Podklady")
-    for i, sirka in enumerate((12, 34, 14, 120), 1):
+    for i, sirka in enumerate((12, 34, 14, 104, 34), 1):
         ws_p.column_dimensions[get_column_letter(i)].width = sirka
     zahlavi_p = _karta(ws_p, "Podklady k zařazení", [
         "Co se o firmě našlo ve veřejných zdrojích – zapsané obory, NACE, "
         "Wikidata, Wikipedie a text z webu.",
         "Slouží ke kontrole: když u dodavatele pochybujete o kategorii, "
         "najděte si ho tu podle Kreditora a přečtěte, z čeho se vycházelo.",
+        "Poslední sloupec je záznam o průběhu dohledávání (např. web "
+        "nenalezen) – vypovídá o procesu, ne o dodavateli.",
         "Firma bez řádků tady neměla dohledatelné podklady – zařazení stojí "
         "jen na názvu a znalostech modelu.",
     ])
@@ -769,13 +784,25 @@ def zapis_excel(firmy, odpovedi, cesta):
     ws_p.cell(zahlavi_p, 2, "Název")
     ws_p.cell(zahlavi_p, 3, "Zdroj")
     ws_p.cell(zahlavi_p, 4, "Text")
+    ws_p.cell(zahlavi_p, 5, "Poznámky nástroje")
     for cislo, f in enumerate(firmy, 1):
-        for stitek, text in f.podklady():
-            _radek(ws_p, [f.vstup_kod or cislo, f.nazev or f.vstup_nazev,
-                          stitek, text])
+        kreditor, jmeno = f.vstup_kod or cislo, f.nazev or f.vstup_nazev
+        # poznamky patri k firme, ne k jednotlivemu zdroji - proto jen na
+        # prvni radek. Firma, o ktere se nic nenaslo, zadny radek nema, ale
+        # poznamku mit muze - a prave u ni je nejdulezitejsi, at nezmizi.
+        poznamky = "; ".join(f.poznamky)
+        radky = list(f.podklady())
+        if not radky and poznamky:
+            radky = [("", "")]
+        for i, (stitek, text) in enumerate(radky):
+            _radek(ws_p, [kreditor, jmeno, stitek, text,
+                          poznamky if i == 0 else ""])
     for b in ws_p[zahlavi_p]:
         b.font = Font(bold=True, color="FFFFFF")
         b.fill = vypln
+    for radek in ws_p.iter_rows(min_row=zahlavi_p + 1, min_col=4, max_col=5):
+        for bunka in radek:
+            bunka.alignment = Alignment(wrap_text=True, vertical="top")
     ws_p.freeze_panes = "A%d" % (zahlavi_p + 1)
 
     # -- list Metodika (co který sloupec znamená a vazba na ISO 27001) ----
@@ -799,11 +826,12 @@ def zapis_excel(firmy, odpovedi, cesta):
     r = _radek(ws_m, ["Jak se počítá Kritičnost", "", ""])
     ws_m.cell(r, 1).font = Font(bold=True, size=12, color=BARVA_TMAVA)
     for nazev, popis in (
-        ("KRITICKÝ", "dodavatel má přístup ke správě systémů, nebo je na něm "
-         "kritická závislost, nebo jde o ICT dodávku s přístupem k datům "
-         "či do prostor a systémů zároveň"),
-        ("VÝZNAMNÝ", "ICT dodávka, nebo přístup k datům a rozhraním, nebo "
-         "obtížná nahraditelnost"),
+        ("KRITICKÝ", "dodavatel má privilegovaný přístup nebo nám spravuje "
+         "systémy, nebo je na něm kritická závislost, nebo jde o ICT dodávku "
+         "a dodavatel se přitom dostane k našim informacím či do systémů"),
+        ("VÝZNAMNÝ", "ICT dodávka, nebo se dodavatel dostane k našim "
+         "informacím či do systémů (předání dat, zpracování u dodavatele, "
+         "uživatelský přístup), nebo je obtížně nahraditelný"),
         ("BĚŽNÝ", "vše ostatní – žádný nebo pouze fyzický přístup u běžně "
          "nahraditelného dodavatele mimo ICT"),
         ("⟵ doplňte přístup", "není vyplněný Přístup k datům/systémům; "
