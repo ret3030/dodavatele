@@ -1,6 +1,6 @@
-Název;Adresa;IČO;DIČ;Země;Částka
-Alza.cz a.s.;Jankovcova 1522/53, 170 00 Praha 7;27082440;CZ27082440;CZ;1250000
-GABEN, spol. s r. o.;Hájkova 558/1, 702 00 Ostrava;19012021;;CZ;89000
-WAGO Kontakttechnik GmbH & Co. KG;Hansastr. 27, 32423 Minden;;DE811150595;DE;2100000
-ESET, spol. s r.o.;Einsteinova 24, 851 01 Bratislava;31333532;;SK;95000
-Cloudflare, Inc.;101 Townsend St, San Francisco CA;;;US;78000
+Kreditor;Název;Adresa;IČO;DIČ;Země;Částka
+D0001;Alza.cz a.s.;Jankovcova 1522/53, 170 00 Praha 7;27082440;CZ27082440;CZ;1250000
+D0002;GABEN, spol. s r. o.;Hájkova 558/1, 702 00 Ostrava;19012021;;CZ;89000
+D0003;WAGO Kontakttechnik GmbH & Co. KG;Hansastr. 27, 32423 Minden;;DE811150595;DE;2100000
+D0004;ESET, spol. s r.o.;Einsteinova 24, 851 01 Bratislava;31333532;;SK;95000
+D0005;Cloudflare, Inc.;101 Townsend St, San Francisco CA;;;US;78000

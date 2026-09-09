@@ -13,34 +13,41 @@ import vystup
 from taxonomie import KATEGORIE, ict_relevance
 
 
-def kriticnost(ict, pristup, nahraditelnost, objem, kod="ICT-01"):
+ZADNY, FYZICKY, DATA, SPRAVA, OBOJI = vystup.PRISTUP
+BEZNE, OBTIZNE, ZAVISLOST = vystup.NAHRADITELNOST
+
+
+def kriticnost(ict, pristup, nahraditelnost, kod="ICT-01"):
     """Tataz pravidla jako _vzorec_kriticnost - drzet synchronne."""
     if not kod:
         return "nezařazeno"
     if not pristup:
         return "⟵ doplňte přístup"
-    if (pristup == "privilegovaný"
-            or (ict == "ano" and pristup == "omezený")
-            or nahraditelnost == "prakticky žádná"):
+    if (pristup == SPRAVA
+            or nahraditelnost == ZAVISLOST
+            or (ict == "ano" and pristup in (DATA, OBOJI))):
         return "KRITICKÝ"
-    if ict == "ano" or pristup == "omezený" or nahraditelnost == "obtížná" or objem == "A":
+    if ict == "ano" or pristup in (DATA, OBOJI) or nahraditelnost == OBTIZNE:
         return "VÝZNAMNÝ"
     return "BĚŽNÝ"
 
 
 PRIPADY = [
-    # (ICT, přístup, nahraditelnost, objem) -> očekáváno
-    (("ano", "privilegovaný", "snadná", "C"), "KRITICKÝ"),
-    (("ne", "privilegovaný", "snadná", "C"), "KRITICKÝ"),   # přístup rozhoduje i bez ICT
-    (("ano", "omezený", "snadná", "C"), "KRITICKÝ"),        # ICT + přístup k datům
-    (("ne", "omezený", "snadná", "C"), "VÝZNAMNÝ"),
-    (("ne", "žádný", "prakticky žádná", "C"), "KRITICKÝ"),  # single point of failure
-    (("ano", "žádný", "snadná", "C"), "VÝZNAMNÝ"),
-    (("ne", "žádný", "obtížná", "C"), "VÝZNAMNÝ"),
-    (("ne", "fyzický", "snadná", "A"), "VÝZNAMNÝ"),         # velký objem
-    (("ne", "fyzický", "snadná", "C"), "BĚŽNÝ"),
-    (("ne", "žádný", "snadná", "B"), "BĚŽNÝ"),
-    (("ano", "", "snadná", "A"), "⟵ doplňte přístup"),      # bez ručního vstupu nepočítá
+    # (ICT relevance, přístup, nahraditelnost) -> očekáváno
+    (("ano", SPRAVA, BEZNE), "KRITICKÝ"),
+    (("ne", SPRAVA, BEZNE), "KRITICKÝ"),      # správa systémů rozhoduje i mimo ICT
+    (("ano", DATA, BEZNE), "KRITICKÝ"),       # ICT dodávka + naše data
+    (("ne", DATA, BEZNE), "VÝZNAMNÝ"),        # API u neICT dodavatele ještě není kritika
+    (("ano", OBOJI, BEZNE), "KRITICKÝ"),
+    (("ne", OBOJI, BEZNE), "VÝZNAMNÝ"),
+    (("ne", ZADNY, ZAVISLOST), "KRITICKÝ"),   # single point of failure
+    (("ano", ZADNY, BEZNE), "VÝZNAMNÝ"),
+    (("ne", ZADNY, OBTIZNE), "VÝZNAMNÝ"),
+    (("ne", FYZICKY, BEZNE), "BĚŽNÝ"),
+    (("ne", FYZICKY, OBTIZNE), "VÝZNAMNÝ"),
+    (("ne", ZADNY, BEZNE), "BĚŽNÝ"),
+    (("ano", "", BEZNE), "⟵ doplňte přístup"),  # bez ručního vstupu nepočítá
+    (("ne", ZADNY, BEZNE, ""), "nezařazeno"),   # bez kódu kategorie taky ne
 ]
 
 
@@ -106,8 +113,60 @@ def _test_nacitani_odpovedi():
     return chyby
 
 
+def _test_sesit():
+    """
+    Vygeneruje sesit z par firem a overi, ze vzorce ukazuji na radek, na
+    kterem opravdu jsou. Kvuli kartam nad tabulkou data nezacinaji na radku 2
+    a posun by se jinak projevil az u klienta v Excelu.
+    """
+    import os
+    import tempfile
+
+    from zdroje import Firma
+
+    chyby = []
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        return ["openpyxl chybí – kontrola sešitu se nespustila"]
+
+    firmy = [Firma(vstup_kod="D001", vstup_nazev="Alza.cz a.s."),
+             Firma(vstup_nazev="Firma bez kódu kreditora")]
+    with tempfile.TemporaryDirectory() as d:
+        cesta = os.path.join(d, "t.xlsx")
+        vystup.zapis_excel(firmy, {1: {"kod": "ICT-01", "popis": "HW",
+                                       "jistota": "vysoká"}}, cesta)
+        wb = load_workbook(cesta)
+        if wb.sheetnames[0] != "Úvod":
+            chyby.append("první list je %r, čekán Úvod" % wb.sheetnames[0])
+        for jmeno in ("Dodavatelé", "Číselník", "Souhrn", "Podklady", "Metodika"):
+            if jmeno not in wb.sheetnames:
+                chyby.append("v sešitu chybí list %s" % jmeno)
+        ws = wb["Dodavatelé"]
+        zahlavi = next((r for r in range(1, 40)
+                        if ws.cell(r, 1).value == "Kreditor"), None)
+        if zahlavi is None:
+            return chyby + ["v listu Dodavatelé se nenašlo záhlaví"]
+        if zahlavi < 2:
+            chyby.append("nad tabulkou chybí karta (záhlaví je na řádku %d)" % zahlavi)
+        for i in range(1, len(firmy) + 1):
+            r = zahlavi + i
+            vzorec = ws.cell(r, vystup.S_KRIT).value or ""
+            if "%d" % r not in vzorec or not vzorec.startswith("="):
+                chyby.append("kritičnost na řádku %d neodkazuje na svůj řádek: %r"
+                             % (r, vzorec[:60]))
+        if ws.cell(zahlavi + 1, vystup.S_KREDITOR).value != "D001":
+            chyby.append("kód kreditora ze vstupu se nedostal do prvního sloupce")
+        if ws.cell(zahlavi + 2, vystup.S_KREDITOR).value != 2:
+            chyby.append("bez kódu kreditora se nedoplnilo pořadové číslo")
+        # karta nesmi zasahovat do zahlavi ani prepsat data
+        if ws.cell(zahlavi - 1, 1).value:
+            chyby.append("mezi kartou a záhlavím chybí prázdný řádek")
+    return chyby
+
+
 def main():
-    chyby = _test_nacitani_odpovedi()
+    chyby = _test_nacitani_odpovedi() + _test_sesit()
 
     # 1) logika kritičnosti
     for vstup, cekano in PRIPADY:
@@ -123,19 +182,28 @@ def main():
 
     # 3) vzorce musí odkazovat na sloupce, které opravdu existují
     pocet = len(vystup.SLOUPCE)
-    for jmeno, sl in (("KÓD", vystup.S_KOD), ("KATEGORIE", vystup.S_KATEG),
-                      ("SKUPINA", vystup.S_SKUP), ("ICT", vystup.S_ICT),
+    for jmeno, sl in (("KREDITOR", vystup.S_KREDITOR), ("KÓD", vystup.S_KOD),
+                      ("KATEGORIE", vystup.S_KATEG), ("SKUPINA", vystup.S_SKUP),
+                      ("ICT", vystup.S_ICT), ("POPIS", vystup.S_POPIS),
                       ("PŘÍSTUP", vystup.S_PRISTUP), ("NAHRADITELNOST", vystup.S_NAHRAD),
-                      ("OBJEM", vystup.S_OBJEM), ("VZTAH", vystup.S_VZTAH),
-                      ("KRITIČNOST", vystup.S_KRIT), ("ISO", vystup.S_ISO)):
+                      ("KRITIČNOST", vystup.S_KRIT), ("ISO", vystup.S_ISO),
+                      ("VLASTNÍK", vystup.S_VLASTNIK),
+                      ("POSOUZENÍ", vystup.S_POSOUZENI),
+                      ("PŘEZKOUMÁNÍ", vystup.S_PREZKOUM),
+                      ("POZNÁMKA", vystup.S_POZNAMKA)):
         if not 1 <= sl <= pocet:
             chyby.append("index sloupce %s (%d) je mimo rozsah 1..%d" % (jmeno, sl, pocet))
 
-    ocekavane = {vystup.S_KOD: "Kód kategorie", vystup.S_ICT: "ICT relevance",
+    ocekavane = {vystup.S_KREDITOR: "Kreditor", vystup.S_KOD: "Kód kategorie",
+                 vystup.S_KATEG: "Kategorie", vystup.S_SKUP: "Skupina",
+                 vystup.S_ICT: "ICT relevance", vystup.S_POPIS: "Co dodává (LLM)",
                  vystup.S_PRISTUP: "Přístup k datům/systémům",
-                 vystup.S_NAHRAD: "Nahraditelnost", vystup.S_OBJEM: "Objem (ABC)",
-                 vystup.S_VZTAH: "Typ vztahu", vystup.S_KRIT: "Kritičnost",
-                 vystup.S_ISO: "Režim dle ISO 27001"}
+                 vystup.S_NAHRAD: "Nahraditelnost", vystup.S_KRIT: "Kritičnost",
+                 vystup.S_ISO: "Režim dle ISO 27001",
+                 vystup.S_VLASTNIK: "Vlastník vztahu",
+                 vystup.S_POSOUZENI: "Datum posouzení",
+                 vystup.S_PREZKOUM: "Datum příštího přezkoumání",
+                 vystup.S_POZNAMKA: "Poznámka"}
     for sl, nazev in ocekavane.items():
         skutecny = vystup.SLOUPCE[sl - 1][0]
         if skutecny != nazev:
@@ -143,18 +211,24 @@ def main():
 
     # 4) hodnoty v rozbalovacích seznamech musí odpovídat vzorcům
     vzorec = vystup._vzorec_kriticnost(2)
-    for hodnota in ("privilegovaný", "omezený"):
-        if hodnota not in vystup.PRISTUP:
-            chyby.append("vzorec zná přístup %r, ale není v nabídce" % hodnota)
-    for hodnota in ("prakticky žádná", "obtížná"):
-        if hodnota not in vystup.NAHRADITELNOST:
-            chyby.append("vzorec zná nahraditelnost %r, ale není v nabídce" % hodnota)
     # jen hodnoty, se kterymi se doopravdy POROVNAVA (za '='), ne navratove texty
     for hodnota in re.findall(r'=\s*"([^"]*)"', vzorec):
         if hodnota in ("", "ano"):
             continue
-        if hodnota not in vystup.PRISTUP + vystup.NAHRADITELNOST + vystup.OBJEM:
+        if hodnota not in vystup.PRISTUP + vystup.NAHRADITELNOST:
             chyby.append("vzorec porovnává s %r, což není v žádné nabídce" % hodnota)
+    # Volby, ktere kriticnost zvedaji, musi byt ve vzorci jmenovite. ZADNY,
+    # FYZICKY a BEZNE ve vzorci nejsou zamerne - jsou to "nic se nedeje" vetve,
+    # ktere propadnou do BEZNY.
+    for hodnota in vystup.PRISTUP + vystup.NAHRADITELNOST:
+        if hodnota not in (ZADNY, FYZICKY, BEZNE) and '"%s"' % hodnota not in vzorec:
+            chyby.append("nabídka obsahuje %r, ale vzorec s tím nepočítá" % hodnota)
+    # Excel bere seznam v datove validaci jen do 255 znaku vcetne uvozovek
+    for jmeno, hodnoty in (("PRISTUP", vystup.PRISTUP),
+                           ("NAHRADITELNOST", vystup.NAHRADITELNOST)):
+        delka = len(",".join(hodnoty)) + 2
+        if delka > 255:
+            chyby.append("nabídka %s má %d znaků, Excel bere 255" % (jmeno, delka))
 
     # 5) řídicí znaky z webů a rejstříků nesmí projít do buňky - XLSX je
     #    nedovoluje a openpyxl na nich padal až při ukládání, po celém běhu
@@ -181,8 +255,8 @@ def main():
             print("  ✗ %s" % c)
         return 1
     print("OK: %d případů kritičnosti, syntaxe vzorců, indexy sloupců, "
-          "číselník (%d kategorií), čtení odpovědí z chatu, čištění buněk"
-          % (len(PRIPADY), len(KATEGORIE)))
+          "číselník (%d kategorií), čtení odpovědí z chatu, čištění buněk, "
+          "sazba sešitu" % (len(PRIPADY), len(KATEGORIE)))
     return 0
 
 

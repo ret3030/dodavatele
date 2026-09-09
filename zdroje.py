@@ -344,6 +344,7 @@ class Klient:
 @dataclass
 class Firma:
     # ze vstupu
+    vstup_kod: str = ""          # identifikator kreditora z uctenictvi
     vstup_nazev: str = ""
     vstup_adresa: str = ""
     vstup_ico: str = ""
@@ -936,11 +937,12 @@ def _dohad_domeny(f):
 
 def dohledej(klient, radek):
     """
-    radek = {"nazev","adresa","ico","dic","zeme","objem"} ze vstupu.
+    radek = {"kod","nazev","adresa","ico","dic","zeme","objem"} ze vstupu.
     Vraci Firmu se vsim, co se podarilo zjistit. Nikdy nevyhodi vyjimku -
     neuspech se pozna podle pole `identita`.
     """
     f = Firma(
+        vstup_kod=str(radek.get("kod") or "").strip(),
         vstup_nazev=radek.get("nazev", "").strip(),
         vstup_adresa=radek.get("adresa", "").strip(),
         vstup_ico=_ico(radek.get("ico")),

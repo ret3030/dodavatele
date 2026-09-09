@@ -1,14 +1,32 @@
 """
-Kontrola dohledavani - normalizace nazvu, odhad domeny a rozhodovani, jestli
-nalezena stranka firme opravdu patri. Bezi bez site.
+Kontrola vstupu a dohledavani - rozpoznani sloupcu ve vstupnim souboru,
+normalizace nazvu, odhad domeny a rozhodovani, jestli nalezena stranka firme
+opravdu patri. Bezi bez site.
 
     python3 test_zdroje.py
 """
 
 import sys
 
+import dodavatele
 import zdroje
 from zdroje import Firma, _dohad_domeny, _stranka_sedi, _tokeny_nazvu, skore_shody
+
+
+# Hlavicky ze skutecnych vypisu z ucetnictvi -> co z nich ma nastroj vycist.
+# "Kreditor" je zradne: samo o sobe to byva nazev firmy, ale vedle sloupce
+# "Nazev" je to jeji cislo. Zamena by tise prohodila jmeno a identifikator.
+HLAVICKY = [
+    (["Název", "Adresa", "IČO", "DIČ", "Země", "Částka"],
+     {"nazev": 0, "adresa": 1, "ico": 2, "dic": 3, "zeme": 4, "objem": 5}),
+    (["Kreditor", "Název", "IČO", "Částka"],
+     {"kod": 0, "nazev": 1, "ico": 2, "objem": 3}),
+    (["Kód kreditora", "Kreditor", "IČO"], {"kod": 0, "nazev": 1, "ico": 2}),
+    (["Kreditor ID", "Kreditor name", "Land", "Umsatz"],
+     {"kod": 0, "nazev": 1, "zeme": 2, "objem": 3}),
+    (["Dodavatel"], {"nazev": 0}),
+    (["IČO dodavatele", "Obchodní jméno"], {"ico": 0, "nazev": 1}),
+]
 
 
 def _firma(nazev, zeme="CZ", ico=""):
@@ -93,6 +111,13 @@ def main():
         if nesmi in _tokeny_nazvu(nazev):
             chyby.append("token %r zůstal v názvu %r" % (nesmi, nazev))
 
+    # rozpoznání sloupců ve vstupu
+    for hlavicka, cekano in HLAVICKY:
+        skutecnost = dodavatele._mapa_sloupcu(hlavicka)
+        if skutecnost != cekano:
+            chyby.append("hlavička %s -> %s, čekáno %s"
+                         % (hlavicka, skutecnost, cekano))
+
     # zkracování podkladů nesmí useknout uprostřed slova
     dlouhy = "První věta o firmě. Druhá věta pokračuje dál a je delší než limit."
     kratky = zdroje._zkrat(dlouhy, 30)
@@ -104,8 +129,9 @@ def main():
         for c in chyby:
             print("  ✗ %s" % c)
         return 1
-    print("OK: %d domén, %d stránek, %d skóre shody, výplňová slova, zkracování"
-          % (len(DOMENY), len(STRANKY), len(SHODY)))
+    print("OK: %d domén, %d stránek, %d skóre shody, %d hlaviček vstupu, "
+          "výplňová slova, zkracování"
+          % (len(DOMENY), len(STRANKY), len(SHODY), len(HLAVICKY)))
     return 0
 
 

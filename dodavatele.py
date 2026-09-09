@@ -11,9 +11,12 @@ dál se s ním pracuje ručně.
     python3 dodavatele.py odpovedi/          2. běh – doplní odpovědi z chatu
 
 Žádné přepínače. Vzniká:
-    dodavatele.xlsx        výsledek (listy Dodavatelé / Číselník / Souhrn / Podklady)
+    dodavatele.xlsx        výsledek (Úvod / Dodavatelé / Číselník / Souhrn /
+                           Podklady / Metodika)
     davky/davka_01.txt     texty k vložení do ChatGPT / Copilotu
     .dodavatele-stav.json  co se dohledalo, aby druhý běh nemusel znovu na síť
+
+Podobu sešitu bez sítě a bez reálných dat ukáže:  python3 nahled.py
 """
 
 import csv
@@ -34,6 +37,11 @@ VLAKEN = 8
 
 # Rozpoznani sloupcu ve vstupu. Klic = nase pole, hodnoty = varianty hlavicky.
 _SLOUPCE = {
+    "kod": ("kod", "kód", "cislo", "číslo", "id", "kod kreditora", "kód kreditora",
+            "cislo kreditora", "číslo kreditora", "id kreditora", "kreditor id",
+            "ucet", "účet", "konto", "cislo uctu", "číslo účtu", "partner",
+            "vendor", "vendor id", "supplier id", "lifnr", "kod dodavatele",
+            "kód dodavatele", "cislo dodavatele", "číslo dodavatele"),
     "nazev": ("nazev", "název", "name", "jmeno", "jméno", "firma", "dodavatel",
               "kreditor", "spolecnost", "společnost", "supplier", "creditor",
               "obchodni jmeno", "obchodní jméno", "lieferant", "kreditor name"),
@@ -54,16 +62,42 @@ def _kanon(h):
     return " ".join(h.replace("_", " ").split())
 
 
+# Hlavicky, ktere samy o sobe znamenaji "dodavatel" a nerikaji, jestli je
+# v nich nazev nebo cislo. Berou se jako identifikator az tehdy, kdyz nazev
+# uz drzi jiny sloupec - typicka sestava "Kreditor | Název | IČO | Částka".
+_ZALOZNI_KOD = ("kreditor", "dodavatel", "partner", "konto")
+
+
 def _mapa_sloupcu(hlavicka):
-    varianty = {c: {_kanon(v) for v in vs} for c, vs in _SLOUPCE.items()}
-    mapa = {}
-    for i, h in enumerate(hlavicka):
-        k = _kanon(h)
-        if not k:
+    varianty = {c: {_kanon(v): i for i, v in enumerate(vs)}
+                for c, vs in _SLOUPCE.items()}
+    klice = [(i, _kanon(h)) for i, h in enumerate(hlavicka) if _kanon(h)]
+    mapa, obsazene = {}, set()
+
+    # 1) presne shody. Kdyz na jedno pole sedi vic sloupcu, vyhrava ten, ktery
+    #    je v seznamu variant driv - "Název" je jistejsi nez "Kreditor".
+    for cil, vs in varianty.items():
+        kandidati = [(vs[k], i) for i, k in klice if k in vs and i not in obsazene]
+        if kandidati:
+            _, i = min(kandidati)
+            mapa[cil] = i
+            obsazene.add(i)
+
+    # 2) zbytek podle zacatku hlavicky ("IČO dodavatele", "Částka celkem")
+    for i, k in klice:
+        if i in obsazene:
             continue
         for cil, vs in varianty.items():
-            if cil not in mapa and (k in vs or any(k.startswith(v + " ") for v in vs)):
+            if cil not in mapa and any(k.startswith(v + " ") for v in vs):
                 mapa[cil] = i
+                obsazene.add(i)
+                break
+
+    # 3) "Kreditor" vedle "Název" uz nemuze byt nazev - je to identifikator
+    if "kod" not in mapa and "nazev" in mapa:
+        for i, k in klice:
+            if i not in obsazene and k in _ZALOZNI_KOD:
+                mapa["kod"] = i
                 break
     return mapa
 
@@ -115,8 +149,9 @@ def nacti_vstup(cesta):
         if klic in videno:
             continue
         videno.add(klic)
-        out.append({"nazev": nazev, "adresa": bunka("adresa"), "ico": bunka("ico"),
-                    "dic": bunka("dic"), "zeme": bunka("zeme"), "objem": bunka("objem")})
+        out.append({"kod": bunka("kod"), "nazev": nazev, "adresa": bunka("adresa"),
+                    "ico": bunka("ico"), "dic": bunka("dic"), "zeme": bunka("zeme"),
+                    "objem": bunka("objem")})
     return out
 
 
