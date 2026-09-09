@@ -1,5 +1,5 @@
 {
- "_popis": "Taxonomie kategorií dodavatelů (v2, sjednocená). 81 kategorií v 12 skupinách. Používá ji dodavatele.py i modul kategorizace/. Historie a odůvodnění revize: kategorizace/TAXONOMIE_V2.md. MAPA_ZE_STARE = převod z původního číselníku.",
+ "_popis": "Taxonomie kategorií dodavatelů (v2, sjednocená). 82 kategorií v 12 skupinách. Používá ji dodavatele.py i modul kategorizace/. Historie a odůvodnění revize: kategorizace/TAXONOMIE_V2.md. MAPA_ZE_STARE = převod z původního číselníku.",
  "VYCHOZI_KOD": "XXX-00",
  "SKUPINY": [
   "IT, telekomunikace a kyberbezpečnost",
@@ -339,6 +339,10 @@
   "XXX-00": [
    "Nezařazeno",
    "Nezařazeno – nutné ruční doplnění"
+  ],
+  "XXX-01": [
+   "Nezařazeno",
+   "OSVČ – obor nezjištěn"
   ]
  },
  "ICT_RELEVANCE": {
@@ -365,7 +369,8 @@
    "FIR-08",
    "FIR-10",
    "OBH-03",
-   "XXX-00"
+   "XXX-00",
+   "XXX-01"
   ],
   "ne": [
    "ELE-01",

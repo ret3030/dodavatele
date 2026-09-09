@@ -410,6 +410,30 @@ _ARES_POLE = ("ico", "obchodniJmeno", "sidlo", "dic", "czNace", "pravniForma",
               "datumVzniku", "datumZaniku")
 
 
+# Pravni formy 100-109 jsou fyzicke osoby (101 = OSVC dle zivnostenskeho
+# zakona), od 110 vyse jsou pravnicke osoby (112 = s.r.o., 121 = a.s.).
+def je_fyzicka_osoba(f):
+    """
+    Je dodavatel fyzicka osoba? Pozna se podle pravni formy z ARES.
+
+    Ma to dusledky: fyzicka osoba neni v obchodnim rejstriku, takze u ni
+    neexistuje zapsany predmet podnikani - a to byva jediny konkretni podklad
+    k tomu, cim se dodavatel zabyva. Jeji jmeno je jmeno cloveka, ne obor.
+    """
+    kod = re.sub(r"\D", "", f.pravni_forma or "")
+    return len(kod) == 3 and 100 <= int(kod) <= 109
+
+
+def bez_zarazeni(f):
+    """
+    Fyzicka osoba, ke ktere se nenaslo nic, z ceho by sel urcit obor.
+
+    Takovou firmu nema smysl posilat modelu - dostal by jen jmeno cloveka
+    a vratil by dohad. Radsi ji rovnou oznacime jako nezjistenou.
+    """
+    return je_fyzicka_osoba(f) and not f.podklady()
+
+
 def _ares_ocisti(d):
     if "ekonomickeSubjekty" in d:
         return {"ekonomickeSubjekty": [{k: v for k, v in s.items() if k in _ARES_POLE}
@@ -428,6 +452,7 @@ def _ares_do_firmy(f, d):
     f.psc = re.sub(r"\D", "", str(sidlo.get("psc") or ""))
     f.mesto = _text(sidlo.get("nazevObce"))
     f.zeme = "CZ"
+    f.pravni_forma = _text(d.get("pravniForma")) or f.pravni_forma
     f.datum_vzniku = _text(d.get("datumVzniku"))
     f.aktivni = not d.get("datumZaniku")
     if d.get("datumZaniku"):
@@ -507,8 +532,12 @@ def ares_predmet_podnikani(klient, f):
             texty.append(t)
     if texty:
         f.obory = list(dict.fromkeys(texty))[:8]
-    if d.get("pravniForma") and not f.pravni_forma:
-        f.pravni_forma = _text(d["pravniForma"])
+    if not f.pravni_forma:
+        forma = d.get("pravniForma")
+        if isinstance(forma, list):     # VR ji vede jako historii zapisu
+            forma = (forma or [{}])[-1].get("hodnota")
+        if forma:
+            f.pravni_forma = _text(forma)
 
 
 # ---------------------------------------------------------------------------
@@ -981,6 +1010,9 @@ def dohledej(klient, radek):
     except Exception as e:
         f.poznamky.append("chyba dohledání: %s" % e)
 
+    if bez_zarazeni(f):
+        f.poznamky.append("fyzická osoba – v obchodním rejstříku není, "
+                          "žádný podklad k oboru se nenašel")
     if not f.nazev:
         f.nazev = nazev
     if not f.mesto and mesto:

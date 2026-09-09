@@ -120,6 +120,68 @@ def _test_nacitani_odpovedi():
     return chyby
 
 
+def _test_osvc():
+    """
+    Fyzicka osoba, ke ktere se nenaslo nic: nesmi jit do davky pro chat
+    (model by z holeho jmena vyrobil dohad) a v sesitu ma mit znacku XXX-01,
+    ne prazdno ani kategorii od modelu.
+    """
+    import os
+    import tempfile
+
+    from zdroje import Firma, bez_zarazeni
+
+    chyby = []
+    osvc = Firma(vstup_kod="D001", vstup_nazev="Jan Novák", nazev="Jan Novák",
+                 pravni_forma="101")
+    osvc_s_nace = Firma(vstup_kod="D002", vstup_nazev="Petr Malý",
+                        nazev="Petr Malý", pravni_forma="101", nace=["4779"])
+    firma = Firma(vstup_kod="D003", vstup_nazev="ACME s.r.o.", nazev="ACME s.r.o.",
+                  pravni_forma="112")
+    firmy = [osvc, osvc_s_nace, firma]
+
+    if not bez_zarazeni(osvc):
+        chyby.append("OSVČ bez podkladů se nepoznala")
+    for f in (osvc_s_nace, firma):
+        if bez_zarazeni(f):
+            chyby.append("%r se označila jako nezařaditelná" % f.vstup_nazev)
+
+    with tempfile.TemporaryDirectory() as d:
+        vystup.zapis_davky(firmy, d)
+        text = "".join(open(os.path.join(d, j), encoding="utf-8").read()
+                       for j in os.listdir(d))
+    if "Jan Novák" in text:
+        chyby.append("OSVČ bez podkladů se poslala do dávky pro chat")
+    for jmeno in ("Petr Malý", "ACME s.r.o."):
+        if jmeno not in text:
+            chyby.append("%r z dávky vypadl, i když podklad má" % jmeno)
+    # znacka nastroje nepatri do nabidky pro model - zacal by ji pouzivat sam
+    if vystup.KOD_OSVC in text:
+        chyby.append("%s se nabízí modelu v číselníku" % vystup.KOD_OSVC)
+    # cislovani firem musi zustat na indexu, jinak se odpovedi sparuji spatne
+    if "\n2 | Petr Malý" not in text or "\n3 | ACME s.r.o." not in text:
+        chyby.append("vynechaná firma posunula číslování ostatních")
+
+    try:
+        from openpyxl import load_workbook
+    except ImportError:
+        return chyby
+    with tempfile.TemporaryDirectory() as d:
+        cesta = os.path.join(d, "t.xlsx")
+        # model o firme 1 nic nevratil, u firmy 3 vratil kategorii
+        vystup.zapis_excel(firmy, {3: {"kod": "PRO-01", "popis": "audit",
+                                       "jistota": "vysoká"}}, cesta)
+        ws = load_workbook(cesta)["Dodavatelé"]
+        zahlavi = next(r for r in range(1, 40) if ws.cell(r, 1).value == "Kreditor")
+        kody = [ws.cell(zahlavi + i, vystup.S_KOD).value for i in (1, 2, 3)]
+    if kody[0] != vystup.KOD_OSVC:
+        chyby.append("OSVČ bez podkladů nedostala %s, ale %r"
+                     % (vystup.KOD_OSVC, kody[0]))
+    if kody[2] != "PRO-01":
+        chyby.append("firmě se přepsal kód od modelu: %r" % kody[2])
+    return chyby
+
+
 def _test_sesit():
     """
     Vygeneruje sesit z par firem a overi, ze vzorce ukazuji na radek, na
@@ -211,7 +273,7 @@ def _test_sesit():
 
 
 def main():
-    chyby = _test_nacitani_odpovedi() + _test_sesit()
+    chyby = _test_nacitani_odpovedi() + _test_sesit() + _test_osvc()
 
     # 1) logika kritičnosti
     for vstup, cekano in PRIPADY:
@@ -300,8 +362,8 @@ def main():
             print("  ✗ %s" % c)
         return 1
     print("OK: %d případů kritičnosti, syntaxe vzorců, indexy sloupců, "
-          "číselník (%d kategorií), čtení odpovědí z chatu, čištění buněk, "
-          "sazba sešitu" % (len(PRIPADY), len(KATEGORIE)))
+          "číselník (%d kategorií), čtení odpovědí z chatu, značení OSVČ, "
+          "čištění buněk, sazba sešitu" % (len(PRIPADY), len(KATEGORIE)))
     return 0
 
 

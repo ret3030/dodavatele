@@ -1,6 +1,6 @@
 # Revidovaná taxonomie kategorií dodavatelů (v2)
 
-**81 kategorií v 12 skupinách** (původní kolegova taxonomie: 83 / 11).
+**82 kategorií v 12 skupinách** (původní kolegova taxonomie: 83 / 11).
 Sjednoceno v `../taxonomie_data.json` – čte ji modul `kategorizace/` i hlavní
 `dodavatele.py` (včetně číselníku v promptu pro LLM krok). `MAPA_ZE_STARE`
 v témže souboru = úplný převod starý kód → nový.
@@ -35,7 +35,7 @@ v témže souboru = úplný převod starý kód → nový.
 | Profesní a poradenské služby | ne (PRO-01/02/05/06 hraniční) | 7 |
 | Marketing, tisk, vzdělávání a firemní služby | ne (FIR-08/10 hraniční) | 10 |
 | Obchod a ostatní odvětví | ne (OBH-03 hraniční) | 4 |
-| Nezařazeno | hraniční | 1 |
+| Nezařazeno | hraniční | 2 |
 
 `ano` = dodavatel typicky zpracovává/uchovává naše informace nebo se
 připojuje do našich systémů. `hraniční` = přístup k datům nebo do prostor
@@ -76,6 +76,18 @@ spadnout a končily jako `XXX-00`. Přibyly proto:
 
 `XXX-00` tím zůstává jen pro firmy, o kterých se opravdu nic neví — ne pro
 obory, na které v číselníku nebylo místo.
+
+## XXX-01: OSVČ, u které není z čeho vyjít
+
+Jediný kód, který nepřiděluje model, ale nástroj — podle právní formy z ARES
+(100–109 = fyzická osoba). Fyzická osoba není v obchodním rejstříku, takže
+u ní neexistuje zapsaný předmět podnikání; když se nenajde ani NACE, web nebo
+Wikidata, zbyde jméno člověka a to obor neprozradí. Taková firma se modelu
+vůbec neposílá a `XXX-01` říká „tady se nedohledalo nic, zařaďte ručně“ —
+na rozdíl od `XXX-00`, které znamená „model to nedokázal zařadit“.
+
+Do číselníku v promptu se `XXX-01` záměrně nedává, jinak by ho model začal
+přidělovat sám a značka by přestala znamenat, co znamená.
 
 `MAPA_ZE_STARE` v JSONu = úplný převod starý kód → nový (pro migraci už
 zařazených výstupů; `taxonomie.prevod_ze_stare()`).

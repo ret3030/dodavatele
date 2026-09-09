@@ -78,10 +78,28 @@ práce a legendou barev.
 |---|---|
 | **Úvod** | košilka — k čemu sešit je, jak s ním pracovat, co znamenají barvy |
 | **Dodavatelé** | hlavní tabulka — jeden řádek na dodavatele |
-| **Číselník** | 81 kategorií v 12 skupinách + ICT příznak (zdroj pro vzorce) |
+| **Číselník** | 82 kategorií v 12 skupinách + ICT příznak (zdroj pro vzorce) |
 | **Souhrn** | kolik je ICT, kolik kritických, co ještě chybí vyplnit |
 | **Podklady** | co se o firmě našlo a jak dohledávání dopadlo — proč LLM rozhodl takhle |
 | **Metodika** | co znamená který sloupec a jeho vazba na ISO/IEC 27001 |
+
+### OSVČ, u kterých není z čeho vyjít
+
+Fyzická osoba není v obchodním rejstříku, takže u ní neexistuje zapsaný
+předmět podnikání — a to bývá jediný konkrétní podklad k tomu, čím se
+dodavatel zabývá. Když k ní nástroj nenajde ani NACE, web nebo Wikidata,
+zbyde jméno člověka. To o oboru neříká nic a jazykový model by z něj vyrobil
+dohad, který v sešitu vypadá jako zjištěný obor.
+
+Takový dodavatel se proto **do dávky pro chat vůbec neposílá** a v sešitu
+dostane od nástroje kód `XXX-01` — *OSVČ – obor nezjištěn*. Na listu Podklady
+je u něj poznámka proč a Souhrn takové řádky počítá zvlášť, aby bylo vidět,
+kolik jich čeká na ruční doplnění. Zařadit ho musíte podle toho, co pro vás
+opravdu dělá.
+
+Pozná se to podle právní formy z ARES (kódy 100–109). U slovenských
+dodavatelů z RPO se právní forma vrací textem, takže se tahle značka
+neuplatní — ti skončí jako `XXX-00`.
 
 Excel je **živý dokument, ne jen export**. Kategorie, skupina a ICT relevance
 nejsou zapsané hodnoty, ale `VLOOKUP` do Číselníku — když opravíte kód

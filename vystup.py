@@ -17,6 +17,11 @@ import re
 
 from taxonomie import KATEGORIE, VYCHOZI_KOD, ict_relevance
 
+# Znacka pro fyzickou osobu, ke ktere se nenaslo nic o oboru. Neprideluje
+# ji model, ale nastroj - podle pravni formy z rejstriku. Do ciselniku
+# v promptu proto nepatri, model by ji jinak zacal hadat sam.
+KOD_OSVC = "XXX-01"
+
 DAVKA = 250            # firem na jeden soubor pro chat
 _KOD_RE = re.compile(r"\b[A-Z]{2,4}-\d{2}\b")
 
@@ -89,8 +94,10 @@ METODIKA = [
     ("NACE", "Úředně zapsaný obor podnikání. Jen vodítko pro kategorizaci, "
      "ne finální zařazení – bývá zastaralý nebo obecný.", ""),
     ("Kód kategorie", "Kód z Číselníku, který LLM přiřadil podle toho, čím "
-     "se dodavatel reálně zabývá.", "A.5.19 – podklad pro posouzení druhu "
-     "dodávky"),
+     "se dodavatel reálně zabývá. Kód XXX-01 nedal model, ale nástroj: jde "
+     "o fyzickou osobu (OSVČ), která není v obchodním rejstříku, takže "
+     "k oboru nebyl žádný podklad – zařaďte ji ručně podle toho, co pro vás "
+     "opravdu dělá.", "A.5.19 – podklad pro posouzení druhu dodávky"),
     ("Kategorie", "Název kategorie – VLOOKUP do listu Číselník podle kódu.", ""),
     ("Skupina", "Nadřazená skupina kategorie – VLOOKUP do listu Číselník.", ""),
     ("ICT relevance", "ano / hraniční / ne – jestli dodavatel typicky "
@@ -180,7 +187,8 @@ def _radek(ws, hodnoty):
 def _ciselnik_radky():
     radky, predchozi = [], None
     for kod, skupina, nazev in sorted(
-            (k, v[0], v[1]) for k, v in KATEGORIE.items() if k != VYCHOZI_KOD):
+            (k, v[0], v[1]) for k, v in KATEGORIE.items()
+            if k not in (VYCHOZI_KOD, KOD_OSVC)):
         if skupina != predchozi:
             radky.append("  [%s]" % skupina)
             predchozi = skupina
@@ -239,21 +247,30 @@ def zapis_davky(firmy, adresar):
         if re.match(r"^davka_\d+\.txt$", star):
             os.remove(os.path.join(adresar, star))
 
+    from zdroje import bez_zarazeni
+
     ciselnik = "\n".join(_ciselnik_radky())
     davky = [firmy[i:i + DAVKA] for i in range(0, len(firmy), DAVKA)] or [[]]
     cesty = []
     for i, davka in enumerate(davky, 1):
         cislo_od = (i - 1) * DAVKA + 1
+        # Fyzicka osoba bez jedineho podkladu se modelu neposila. Dostal by
+        # hole jmeno cloveka a vratil dohad, ktery by v sesitu vypadal jako
+        # zjisteny obor. Cislovani se tim neposune - to jde z indexu.
+        bloky = [_blok_firmy(cislo_od + j, f) for j, f in enumerate(davka)
+                 if not bez_zarazeni(f)]
+        if not bloky:
+            continue
         obsah = "\n".join([
             ZADANI,
             "ČÍSELNÍK KATEGORIÍ:",
             ciselnik,
             "",
-            "FIRMY (%d, dávka %d z %d):" % (len(davka), i, len(davky)),
+            "FIRMY (%d, dávka %d z %d):" % (len(bloky), i, len(davky)),
             "",
-            "\n\n".join(_blok_firmy(cislo_od + j, f) for j, f in enumerate(davka)),
+            "\n\n".join(bloky),
             "",
-            FORMAT % len(davka),
+            FORMAT % len(bloky),
         ])
         cesta = os.path.join(adresar, "davka_%02d.txt" % i)
         with open(cesta, "w", encoding="utf-8") as fh:
@@ -608,9 +625,12 @@ def zapis_excel(firmy, odpovedi, cesta):
     for i, (nazev, _) in enumerate(SLOUPCE, 1):
         ws.cell(zahlavi, i, nazev)
 
+    from zdroje import bez_zarazeni
+
     for cislo, f in enumerate(firmy, 1):
         odp = odpovedi.get(cislo) or {}
         r = zahlavi + cislo
+        kod = KOD_OSVC if bez_zarazeni(f) else odp.get("kod", "")
         _radek(ws, [
             f.vstup_kod or cislo,
             f.vstup_nazev,
@@ -618,7 +638,7 @@ def zapis_excel(firmy, odpovedi, cesta):
             f.identita,
             f.ico, f.dic, f.zeme, f.mesto, f.web,
             ", ".join(f.nace[:6]),
-            odp.get("kod", ""),
+            kod,
             _vlookup(r, 2), _vlookup(r, 3), _vlookup(r, 4),
             odp.get("popis", ""), odp.get("jistota", ""),
             "", "",
@@ -728,8 +748,11 @@ def zapis_excel(firmy, odpovedi, cesta):
     radky_souhrnu = [
         ("Přehled", ""),
         ("Dodavatelů celkem", len(firmy)),
-        ("Zařazeno LLM", '=COUNTIF(%s,"<>")' % kod),
+        ("Zařazeno LLM", '=COUNTIF({k},"<>")-COUNTIF({k},"XXX-00")'
+         '-COUNTIF({k},"{osvc}")'.format(k=kod, osvc=KOD_OSVC)),
         ("Nezařazeno (XXX-00)", '=COUNTIF(%s,"XXX-00")' % kod),
+        ("OSVČ – obor nezjištěn (%s)" % KOD_OSVC,
+         '=COUNTIF(%s,"%s")' % (kod, KOD_OSVC)),
         (None, None),
         ("Identita", ""),
         ("rejstřík", '=COUNTIF(%s,"rejstřík")' % ident),

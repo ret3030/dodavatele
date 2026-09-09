@@ -19,6 +19,7 @@ import sys
 from datetime import date, timedelta
 
 import vystup
+import zdroje
 from zdroje import (IDENT_NAZEV, IDENT_NEOVERENO, IDENT_REJSTRIK, IDENT_VIES,
                     Firma)
 
@@ -79,7 +80,15 @@ UKAZKA = [
     ("D0014", "Testovací dodavatel bez zařazení", IDENT_NEOVERENO, "", "", "",
      "", "", [],
      "", "", "", [], ["ke kategorizaci nedorazila odpověď z chatu"]),
+    ("D0015", "Jan Novák", IDENT_REJSTRIK, "00719331", "", "CZ",
+     "Ostrožská Lhota", "", [],
+     "", "", "", [], []),
 ]
+
+# Kdo je fyzicka osoba (pravni forma z ARES). U D0015 na tom stoji ukazka
+# znacky XXX-01: OSVC neni v obchodnim rejstriku, takze zadny zapsany
+# predmet podnikani neexistuje a jmeno cloveka obor neprozradi.
+FORMY = {"D0015": "101"}
 
 # Indexy do vystup.PRISTUP a vystup.NAHRADITELNOST - psat je cislem by
 # znamenalo, ze se ukazka tise rozejde s poradim v nabidce.
@@ -123,7 +132,11 @@ def _firmy():
         f.nazev, f.ico, f.dic = nazev, ico, dic
         f.zeme, f.mesto, f.web = zeme, mesto, web
         f.nace, f.obory, f.identita = list(nace), list(obory), identita
+        f.pravni_forma = FORMY.get(kod, "112")
         f.poznamky = list(poznamky)
+        if zdroje.bez_zarazeni(f):
+            f.poznamky.append("fyzická osoba – v obchodním rejstříku není, "
+                              "žádný podklad k oboru se nenašel")
         if web:
             f.web_text = ("Oficiální web dodavatele – ukázkový text, "
                           "v ostrém běhu je tu úvodní odstavec ze stránky.")
