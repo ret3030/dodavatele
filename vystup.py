@@ -135,10 +135,14 @@ METODIKA = [
      "skutečný stav, ne to, co je ve smlouvě.",
      "A.5.19, A.5.20; A.5.14 (přenos informací); A.5.23 (cloudové služby); "
      "A.7.2 (fyzický vstup); A.8.2 (privilegovaná přístupová práva)"),
-    ("Nahraditelnost", "RUČNĚ. Běžně nahraditelný = na trhu je víc alternativ, "
-     "přechod je otázka týdnů. Obtížně nahraditelný = náhrada existuje, ale "
-     "znamená migraci dat, integrace nebo měsíce práce. Kritická závislost = "
-     "prakticky nenahraditelný, jeho výpadek zastaví provoz.",
+    ("Nahraditelnost", "RUČNĚ. Stupnice od nejmenší závislosti po největší, "
+     "ale na rozdíl od Přístupu se nevybírá nejvyšší stupeň – vybírá se ten, "
+     "který sedí; jsou to tři vzájemně se vylučující stavy. "
+     "1) Běžně nahraditelný = na trhu je víc alternativ, přechod je otázka "
+     "týdnů. 2) Obtížně nahraditelný = náhrada existuje, ale znamená migraci "
+     "dat, integrace nebo měsíce práce. 3) Kritická závislost = prakticky "
+     "nenahraditelný, jeho výpadek zastaví provoz. Ptejte se, co by se stalo, "
+     "kdyby dodavatel ze dne na den skončil – ne jak jste s ním spokojení.",
      "A.5.21; A.5.29/A.5.30 (kontinuita provozu)"),
     ("Kritičnost", "KRITICKÝ / VÝZNAMNÝ / BĚŽNÝ – vzorec z ICT relevance, "
      "Přístupu a Nahraditelnosti. Rozhoduje přístup a závislost, ne cena ani "
@@ -574,8 +578,10 @@ def _list_uvod(wb, firmy):
         "Kategorie, Skupina i ICT relevance se dopočítají samy.",
         "3.  U každého dodavatele vyplňte dva žluté sloupce: Přístup "
         "k datům/systémům a Nahraditelnost. Z nich vyjde Kritičnost.",
-        "     Přístup je žebříček od „Žádný“ po „Privilegovaná správa“ – "
-        "vyberte nejvyšší stupeň, který platí, ne ten nejlépe sedící.",
+        "     Přístup je žebříček od „%s“ po „%s“ – vyberte nejvyšší stupeň, "
+        "který platí." % (PRISTUP[0], PRISTUP[-1]),
+        "     Nahraditelnost jsou naopak tři vylučující se stavy – vyberte "
+        "ten, který sedí, ne nejvyšší.",
         "4.  U dodavatelů, kteří vyjdou jako KRITICKÝ (a podle uvážení "
         "i VÝZNAMNÝ), doplňte revizní blok na konci řádku:",
         "     Vlastník vztahu, Datum posouzení, Datum příštího přezkoumání "

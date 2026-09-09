@@ -363,6 +363,17 @@ def main():
         chyby.append("kritičnost zvedají %r, čekán zbytek žebříčku %r"
                      % (eskaluje, vystup.PRISTUP[len(NEESKALUJI):]))
 
+    # Metodika popisuje jednotlive volby slovy. Kdyz se nabidka zmeni a popis
+    # ne, klient cte v sesitu stupne, ktere v rozbalovacim seznamu nejsou -
+    # presne to se stalo pri prepsani Pristupu na zebricek.
+    popisy = {nazev: popis for nazev, popis, _ in vystup.METODIKA}
+    for sloupec, hodnoty in (("Přístup k datům/systémům", vystup.PRISTUP),
+                             ("Nahraditelnost", vystup.NAHRADITELNOST)):
+        popis = popisy.get(sloupec, "")
+        chybi = [h for h in hodnoty if h not in popis]
+        if chybi:
+            chyby.append("Metodika u %r nepopisuje volby %r" % (sloupec, chybi))
+
     # Excel bere seznam v datove validaci jen do 255 znaku vcetne uvozovek
     for jmeno, hodnoty in (("PRISTUP", vystup.PRISTUP),
                            ("NAHRADITELNOST", vystup.NAHRADITELNOST)):
