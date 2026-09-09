@@ -100,10 +100,14 @@ METODIKA = [
      "opravdu dělá.", "A.5.19 – podklad pro posouzení druhu dodávky"),
     ("Kategorie", "Název kategorie – VLOOKUP do listu Číselník podle kódu.", ""),
     ("Skupina", "Nadřazená skupina kategorie – VLOOKUP do listu Číselník.", ""),
-    ("ICT relevance", "ano / hraniční / ne – jestli dodavatel typicky "
+    ("ICT relevance", "ano / podmíněná / ne – jestli dodavatel typicky "
      "zpracovává informace firmy nebo se připojuje do jejích systémů. "
-     "VLOOKUP do Číselníku.", "A.5.21 – řízení bezpečnosti v ICT "
-     "dodavatelském řetězci"),
+     "VLOOKUP do Číselníku. „Podmíněná“ není něco mezi: znamená, že o "
+     "přístupu nerozhoduje obor, ale konkrétní smlouva – advokát na jednu "
+     "žalobu a advokát s celou personální agendou mají stejnou kategorii. "
+     "U těchto řádků neproklikávejte Přístup automaticky, rozhoduje jen "
+     "vaše odpověď.", "A.5.21 – řízení bezpečnosti v ICT dodavatelském "
+     "řetězci"),
     ("Co dodává (LLM)", "Stručný popis od LLM, aby šlo zkontrolovat, že kód "
      "kategorie sedí.", ""),
     ("Jistota zařazení", "vysoká / střední / nízká – jak jistý si LLM byl "
@@ -413,6 +417,17 @@ def _karta(ws, nadpis, radky):
     return r + 3          # jeden prazdny radek mezi kartou a zahlavim
 
 
+def _souhrn_ict(rozsah="ICT"):
+    """
+    Radky Souhrnu za ICT relevanci. Urovne se berou z ciselniku, ne z ruky -
+    prejmenovana hodnota by jinak zustala v COUNTIF a Souhrn by ukazoval nuly.
+    """
+    urovne = sorted({ict_relevance(k) for k in KATEGORIE} - {""},
+                    key=lambda u: ("ano", "podmíněná", "ne").index(u)
+                    if u in ("ano", "podmíněná", "ne") else 9)
+    return [(u, '=COUNTIF(%s,"%s")' % (rozsah, u)) for u in urovne]
+
+
 def _vzorec_kriticnost(r):
     """
     Kriticnost dodavatele. Rozhoduji dve veci: jaky ma dodavatel pristup
@@ -712,7 +727,8 @@ def zapis_excel(firmy, odpovedi, cesta):
         "Když chcete dodavatele přeřadit, najděte tu správný kód a přepište "
         "ho v listu Dodavatelé. Tady nic přepisovat nemusíte.",
         "ICT relevance říká, jestli kategorie typicky znamená přístup "
-        "k informacím firmy nebo do jejích systémů (A.5.21).",
+        "k informacím firmy nebo do jejích systémů (A.5.21). „Podmíněná“ = "
+        "rozhoduje smlouva, ne obor.",
     ])
     ws_c.cell(zahlavi_c, 1, "Kód")
     ws_c.cell(zahlavi_c, 2, "Kategorie")
@@ -761,9 +777,7 @@ def zapis_excel(firmy, odpovedi, cesta):
         ("neověřeno", '=COUNTIF(%s,"neověřeno")' % ident),
         (None, None),
         ("ICT relevance", ""),
-        ("ano", '=COUNTIF(%s,"ano")' % ic),
-        ("hraniční", '=COUNTIF(%s,"hraniční")' % ic),
-        ("ne", '=COUNTIF(%s,"ne")' % ic),
+    ] + _souhrn_ict(ic) + [
         (None, None),
         ("Kritičnost", ""),
         ("KRITICKÝ", '=COUNTIF(%s,"KRITICKÝ")' % kr),

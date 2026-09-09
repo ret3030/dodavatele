@@ -14,7 +14,7 @@ v témže souboru = úplný převod starý kód → nový.
    do ICT a jak je kritický. Proto je skupina IT vyčleněná, vyčištěná
    a rozšířená o **cloud/hosting** a **kybernetickou bezpečnost** (samostatné
    kategorie), a každá kategorie má příznak **ICT relevance** (`ano` /
-   `hraniční` / `ne`).
+   `podmíněná` / `ne`).
 3. **Chybějící typy dodavatelů** – přidána **Fyzická ostraha a bezpečnostní
    služby** (Securitas, G4S…), **Odpadové hospodářství** vyčleněné od energií.
 4. **Zrušené odpadkové koše** – „Firemní a ostatní", „Ostatní / k ověření"
@@ -25,22 +25,25 @@ v témže souboru = úplný převod starý kód → nový.
 | skupina | ICT relevance | kategorií |
 |---|---|---|
 | IT, telekomunikace a kyberbezpečnost | **ano** (celá) | 8 |
-| Elektronika a elektrotechnika | hraniční (ELE-05 ano) | 9 |
+| Elektronika a elektrotechnika | podmíněná (ELE-05 ano) | 9 |
 | Měření, metrologie a laboratoře | ne | 3 |
-| Stroje, automatizace a výrobní technologie | ne (STR-01 hraniční) | 8 |
+| Stroje, automatizace a výrobní technologie | ne (STR-01 podmíněná) | 8 |
 | Výroba dílů a zpracování materiálů | ne | 9 |
 | Materiál, nářadí a provozní zásobování | ne | 7 |
-| Stavby, energie a facility | ne (FAC-08/09 hraniční) | 9 |
+| Stavby, energie a facility | ne (FAC-08/09 podmíněná) | 9 |
 | Doprava, logistika a vozidla | ne | 6 |
-| Profesní a poradenské služby | ne (PRO-01/02/05/06 hraniční) | 7 |
-| Marketing, tisk, vzdělávání a firemní služby | ne (FIR-08/10 hraniční) | 10 |
-| Obchod a ostatní odvětví | ne (OBH-03 hraniční) | 4 |
-| Nezařazeno | hraniční | 2 |
+| Profesní a poradenské služby | ne (PRO-01/02/05/06 podmíněná) | 7 |
+| Marketing, tisk, vzdělávání a firemní služby | ne (FIR-08/10 podmíněná) | 10 |
+| Obchod a ostatní odvětví | ne (OBH-03 podmíněná) | 4 |
+| Nezařazeno | podmíněná | 2 |
 
 `ano` = dodavatel typicky zpracovává/uchovává naše informace nebo se
-připojuje do našich systémů. `hraniční` = přístup k datům nebo do prostor
-podle konkrétní smlouvy (auditor, advokát, personální agentura, ostraha,
-poskytovatel benefitů, průmyslová automatizace/OT). `ne` = zboží/služby bez
+připojuje do našich systémů. `podmíněná` = není to stupeň mezi ano a ne, ale podmínka: o přístupu
+nerozhoduje obor, ale konkrétní smlouva (auditor, advokát, personální
+agentura, ostraha, poskytovatel benefitů, průmyslová automatizace/OT).
+Advokát na jednu žalobu a advokát s celou personální agendou mají stejnou
+kategorii. Proto taková kategorie kritičnost sama nezvedá — rozhodne až
+ručně vyplněný Přístup k datům/systémům. `ne` = zboží/služby bez
 přístupu k informačním aktivům.
 
 ## Hlavní změny oproti kolegově verzi
@@ -68,10 +71,10 @@ spadnout a končily jako `XXX-00`. Přibyly proto:
 |---|---|---|---|
 | LOG-05 | Letecká a dopravní technika | ne | technika, ne přepravní služba — do LOG-01 nepatří |
 | LOG-06 | Paliva a PHM | ne | komoditní nákup pro vozový park, ne utilita jako FAC-05 |
-| FIR-10 | Cestovní služby | hraniční | cestovka drží osobní údaje zaměstnanců (pasy, itineráře) |
+| FIR-10 | Cestovní služby | podmíněná | cestovka drží osobní údaje zaměstnanců (pasy, itineráře) |
 | OBH-01 | Nespecializovaný obchod a zprostředkování | ne | obchodník bez oborové specializace — dřív nutně `XXX-00` |
 | OBH-02 | Spotřební a drogistické zboží | ne | vedle PROV-07 (potraviny) chyběla drogerie a spotřební zboží |
-| OBH-03 | Zdravotnická technika a služby | hraniční | pracovnělékařská služba zpracovává zdravotní údaje zaměstnanců |
+| OBH-03 | Zdravotnická technika a služby | podmíněná | pracovnělékařská služba zpracovává zdravotní údaje zaměstnanců |
 | OBH-04 | Zemědělství, lesnictví a péče o zeleň | ne | údržba zeleně je běžný dodavatel, spadala mimo FAC i PROV |
 
 `XXX-00` tím zůstává jen pro firmy, o kterých se opravdu nic neví — ne pro

@@ -346,7 +346,7 @@
   ]
  },
  "ICT_RELEVANCE": {
-  "_popis": "Vstup pro navazující krok (ISO 27001). ano = dodavatel typicky zpracovává/uchovává naše informace nebo se připojuje do našich systémů; hranicni = může mít přístup k datům nebo do prostor podle konkrétní smlouvy; ne = dodává zboží/služby bez přístupu k informačním aktivům.",
+  "_popis": "Vstup pro navazujici krok (ISO 27001). ano = dodavatel typicky zpracovava/uchovava nase informace nebo se pripojuje do nasich systemu; podminena = relevance zavisi na konkretni smlouve, ne na oboru - podle ni muze mit pristup k datum nebo do prostor; ne = dodava zbozi/sluzby bez pristupu k informacnim aktivum.",
   "ano": [
    "ICT-01",
    "ICT-02",
@@ -358,7 +358,7 @@
    "ICT-08",
    "ELE-05"
   ],
-  "hranicni": [
+  "podminena": [
    "STR-01",
    "FAC-08",
    "FAC-09",

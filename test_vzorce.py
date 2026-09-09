@@ -255,6 +255,16 @@ def _test_sesit():
             if not any(t and "web" in t.lower() for t in texty):
                 chyby.append("poznámka nástroje se na Podklady nepřenesla: %r" % texty)
 
+        # Souhrn scita ICT relevanci pres COUNTIF s textem hodnoty. Kdyby se
+        # hodnota prejmenovala a Souhrn zustal, tise by ukazoval nuly.
+        ws_s = wb["Souhrn"]
+        vzorce = " ".join(str(ws_s.cell(r, 2).value or "")
+                          for r in range(1, ws_s.max_row + 1))
+        scitane = set(re.findall(r'COUNTIF\([^,]+,"([^"<>*]+)"\)', vzorce))
+        for uroven in {ict_relevance(k) for k in KATEGORIE} - {""}:
+            if uroven not in scitane:
+                chyby.append("Souhrn nepočítá úroveň ICT relevance %r" % uroven)
+
         # datum vygenerovani na kosilce byt nema - sesit se pouziva dlouhodobe
         ws_u = wb["Úvod"]
         for radek in ws_u.iter_rows(max_row=12, max_col=2):

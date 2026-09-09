@@ -17,13 +17,20 @@ VYCHOZI_KOD = _D.get("VYCHOZI_KOD", "XXX-00")
 SKUPINY = _D.get("SKUPINY", [])
 
 _ICT = {}
-for _uroven in ("ano", "hranicni", "ne"):
+# klice v JSONu jsou bez diakritiky, sesit ukazuje "podmíněná"
+for _uroven in ("ano", "podminena", "ne"):
     for _kod in _D.get("ICT_RELEVANCE", {}).get(_uroven, []):
-        _ICT[_kod] = "hraniční" if _uroven == "hranicni" else _uroven
+        _ICT[_kod] = "podmíněná" if _uroven == "podminena" else _uroven
 
 
 def ict_relevance(kod):
-    """'ano' / 'hraniční' / 'ne' / '' - vstup pro posouzení dle ISO 27001."""
+    """
+    'ano' / 'podmíněná' / 'ne' / '' - vstup pro posouzeni dle ISO 27001.
+
+    "podminena" neni stupen mezi ano a ne, ale podminka: o pristupu
+    nerozhoduje obor, ale konkretni smlouva. Proto takova kategorie sama
+    kriticnost nezvedne - rozhodne az rucne vyplneny Pristup k datum/systemum.
+    """
     return _ICT.get(kod, "")
 
 
