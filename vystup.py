@@ -27,20 +27,19 @@ _KOD_RE = re.compile(r"\b[A-Z]{2,4}-\d{2}\b")
 
 # Hodnoty rucne vyplnovanych sloupcu. Musi presne sedet na vzorce nize.
 #
-# Stupnice pristupu kopiruje to, co ISO/IEC 27001 u dodavatele rozlisuje:
-# fyzicky vstup do prostor (A.7.2), predani informaci mimo systemy (A.5.14),
-# zpracovani dat na infrastrukture dodavatele (A.5.23) a logicky pristup do
-# nasich systemu, zvlast pak privilegovany (A.8.2). Zamerne se nesloucuje -
-# dodavatel, kteremu posilame export, je neco jineho nez dodavatel, ktery nam
-# spravuje servery. Prvni je rizikovy hlavne u ICT dodavky, druhy vzdycky.
+# Pristup je zebricek, ne vycet: kazdy stupen v sobe obsahuje nizsi, takze se
+# vybira nejvyssi, ktery plati. Diky tomu se stupne neprekryvaji a nikdo nemusi
+# resit, do ktere skatulky dodavatel patri - jen kam az dohledne.
+#
+# Poradi je proto soucast logiky, ne kosmetika. _vzorec_kriticnost bere
+# PRISTUP[2:] jako "dostane se k nasim informacim" a PRISTUP[-1] jako
+# privilegovany pristup; prehazenim radku by se rozesel vypocet.
 PRISTUP = [
-    "Žádný přístup k aktivům",        # nevidí naše informace ani do prostor
-    "Fyzický vstup do prostor",       # úklid, servis, ostraha, stěhování
-    "Předávání informací mimo systémy",   # dostává naše data, ale nepřipojuje se
-    "Zpracování dat u dodavatele",    # data leží v jeho prostředí (cloud, SaaS)
-    "Uživatelský přístup do systémů",  # pracuje v našich aplikacích, běžná práva
-    "Privilegovaný přístup a správa",  # administrátor, vzdálená správa
-    "Fyzický i logický přístup",      # obojí zároveň
+    "Žádný přístup",                # nevidí naše informace ani do prostor
+    "Fyzický vstup do prostor",     # úklid, servis, ostraha, stěhování
+    "Má naše data u sebe",          # dostane exporty, nebo je zpracovává u sebe
+    "Přístup do našich systémů",    # účet v našich aplikacích, API, cloud
+    "Privilegovaná správa systémů",  # administrátor, vzdálená správa
 ]
 NAHRADITELNOST = [
     "Běžně nahraditelný",           # na trhu je víc alternativ, přechod v týdnech
@@ -112,18 +111,21 @@ METODIKA = [
      "kategorie sedí.", ""),
     ("Jistota zařazení", "vysoká / střední / nízká – jak jistý si LLM byl "
      "při zařazení do kategorie.", ""),
-    ("Přístup k datům/systémům", "RUČNĚ. Žádný přístup k aktivům = nevidí "
-     "naše informace a nechodí do prostor. Fyzický vstup do prostor = úklid, "
-     "servis, ostraha, stěhování. Předávání informací mimo systémy = "
-     "dostává nebo mu posíláme naše data (exporty, mzdy, výkresy, osobní "
-     "údaje), ale do našich systémů se nepřipojuje. Zpracování dat "
-     "u dodavatele = naše data leží a zpracovávají se v jeho prostředí – "
-     "cloud, SaaS, hosting, outsourcovaná agenda. Uživatelský přístup do "
-     "systémů = pracuje v našich aplikacích s běžnými právy. Privilegovaný "
-     "přístup a správa = administrátorská práva nebo vzdálená správa našich "
-     "systémů. Fyzický i logický přístup = do prostor i do systémů zároveň. "
-     "Když sedí víc voleb, vyberte tu rizikovější. Rozhoduje skutečný stav, "
-     "ne to, co je ve smlouvě.",
+    ("Přístup k datům/systémům", "RUČNĚ. Žebříček, ne výčet – vyberte "
+     "NEJVYŠŠÍ stupeň, který platí; vyšší v sobě obsahuje nižší, takže se "
+     "nemusíte rozhodovat mezi překrývajícími se možnostmi. "
+     "1) Žádný přístup = nevidí naše informace a nechodí do prostor. "
+     "2) Fyzický vstup do prostor = úklid, servis, ostraha, stěhování. "
+     "3) Má naše data u sebe = dostane od nás exporty, dokumenty nebo osobní "
+     "údaje, nebo je pro nás zpracovává ve svém prostředí (účetní, advokát, "
+     "mzdová kancelář, cloud či SaaS, kde data leží u něj). "
+     "4) Přístup do našich systémů = má účet v našich aplikacích nebo se do "
+     "nich připojuje přes API či vzdálený přístup. "
+     "5) Privilegovaná správa systémů = administrátorská práva nebo vzdálená "
+     "správa – spravuje nám je, ne v nich jen pracuje. "
+     "Dodavatel, který chodí do prostor a zároveň nám spravuje servery, patří "
+     "na stupeň 5; fyzický vstup je u něj to menší z obojího. Rozhoduje "
+     "skutečný stav, ne to, co je ve smlouvě.",
      "A.5.19, A.5.20; A.5.14 (přenos informací); A.5.23 (cloudové služby); "
      "A.7.2 (fyzický vstup); A.8.2 (privilegovaná přístupová práva)"),
     ("Nahraditelnost", "RUČNĚ. Běžně nahraditelný = na trhu je víc alternativ, "
@@ -435,10 +437,10 @@ def _vzorec_kriticnost(r):
     typ smlouvy do vypoctu nevstupuji - levny dodavatel se vzdalenou spravou
     serveru je rizikovejsi nez drahy dodavatel kancelarskych potreb.
 
-    Privilegovany pristup (sprava systemu) je kriticky vzdycky. Ostatni formy
-    pristupu k informacim - predani dat, zpracovani u dodavatele, uzivatelsky
-    pristup - zvedaji na VYZNAMNY a na KRITICKY az u ICT dodavky. Zadny pristup
-    a pouhy fyzicky vstup do prostor kriticnost samy o sobe nezvedaji.
+    Nejvyssi pricka zebricku (privilegovana sprava) je kriticka vzdycky. Nizsi
+    pricky, na kterych uz se dodavatel dostane k nasim informacim - ma nase data
+    u sebe, chodi do nasich systemu - zvedaji na VYZNAMNY a na KRITICKY az
+    u ICT dodavky. Zadny pristup a pouhy fyzicky vstup kriticnost nezvedaji.
     """
     kod, ict = "$%s%d" % (_pismeno(S_KOD), r), "$%s%d" % (_pismeno(S_ICT), r)
     pri, nah = "$%s%d" % (_pismeno(S_PRISTUP), r), "$%s%d" % (_pismeno(S_NAHRAD), r)
@@ -453,7 +455,7 @@ def _vzorec_kriticnost(r):
         'IF(OR({ict}="ano",{info},{nah}="{obtizne}"),'
         '"VÝZNAMNÝ","BĚŽNÝ"))))'
     ).format(kod=kod, ict=ict, pri=pri, nah=nah, info=k_informacim,
-             sprava=PRISTUP[5], zavislost=NAHRADITELNOST[2],
+             sprava=PRISTUP[-1], zavislost=NAHRADITELNOST[2],
              obtizne=NAHRADITELNOST[1])
 
 
@@ -565,6 +567,8 @@ def _list_uvod(wb, firmy):
         "Kategorie, Skupina i ICT relevance se dopočítají samy.",
         "3.  U každého dodavatele vyplňte dva žluté sloupce: Přístup "
         "k datům/systémům a Nahraditelnost. Z nich vyjde Kritičnost.",
+        "     Přístup je žebříček od „Žádný“ po „Privilegovaná správa“ – "
+        "vyberte nejvyšší stupeň, který platí, ne ten nejlépe sedící.",
         "4.  U dodavatelů, kteří vyjdou jako KRITICKÝ (a podle uvážení "
         "i VÝZNAMNÝ), doplňte revizní blok na konci řádku:",
         "     Vlastník vztahu, Datum posouzení, Datum příštího přezkoumání "
@@ -630,8 +634,8 @@ def zapis_excel(firmy, odpovedi, cesta):
         "Jeden řádek na dodavatele. Bílé sloupce dohledal nástroj, žluté "
         "vyplňujete vy, Kritičnost a Režim dle ISO 27001 se počítají vzorcem.",
         "Vyplňte Přístup k datům/systémům a Nahraditelnost – bez nich se "
-        "kritičnost nespočítá. U kritických dodavatelů pak revizní blok "
-        "na konci řádku.",
+        "kritičnost nespočítá. Přístup je žebříček: vyberte nejvyšší stupeň, "
+        "který platí. U kritických dodavatelů pak revizní blok na konci řádku.",
         "Kategorii opravíte přepsáním Kódu kategorie (nabídka je na listu "
         "Číselník); název, skupina i ICT relevance se dopočítají.",
     ])
@@ -863,12 +867,12 @@ def zapis_excel(firmy, odpovedi, cesta):
     r = _radek(ws_m, ["Jak se počítá Kritičnost", "", ""])
     ws_m.cell(r, 1).font = Font(bold=True, size=12, color=BARVA_TMAVA)
     for nazev, popis in (
-        ("KRITICKÝ", "dodavatel má privilegovaný přístup nebo nám spravuje "
-         "systémy, nebo je na něm kritická závislost, nebo jde o ICT dodávku "
-         "a dodavatel se přitom dostane k našim informacím či do systémů"),
-        ("VÝZNAMNÝ", "ICT dodávka, nebo se dodavatel dostane k našim "
-         "informacím či do systémů (předání dat, zpracování u dodavatele, "
-         "uživatelský přístup), nebo je obtížně nahraditelný"),
+        ("KRITICKÝ", "dodavatel nám spravuje systémy (stupeň 5), nebo je na "
+         "něm kritická závislost, nebo jde o ICT dodávku a dodavatel je "
+         "přitom aspoň na stupni 3 – má naše data nebo chodí do systémů"),
+        ("VÝZNAMNÝ", "ICT dodávka, nebo je dodavatel aspoň na stupni 3 "
+         "(má naše data u sebe, přístup do systémů), nebo je obtížně "
+         "nahraditelný"),
         ("BĚŽNÝ", "vše ostatní – žádný nebo pouze fyzický přístup u běžně "
          "nahraditelného dodavatele mimo ICT"),
         ("⟵ doplňte přístup", "není vyplněný Přístup k datům/systémům; "

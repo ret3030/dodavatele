@@ -13,14 +13,14 @@ import vystup
 from taxonomie import KATEGORIE, ict_relevance
 
 
-ZADNY, FYZICKY, PREDANI, ZPRACOVANI, UZIVATEL, SPRAVA, OBOJI = vystup.PRISTUP
+ZADNY, FYZICKY, DATA, SYSTEMY, SPRAVA = vystup.PRISTUP
 BEZNE, OBTIZNE, ZAVISLOST = vystup.NAHRADITELNOST
 
 
 def kriticnost(ict, pristup, nahraditelnost, kod="ICT-01"):
     """Tataz pravidla jako _vzorec_kriticnost - drzet synchronne."""
-    # volby, u kterych se dodavatel dostane k informacim nebo do systemu
-    K_INFORMACIM = (PREDANI, ZPRACOVANI, UZIVATEL, SPRAVA, OBOJI)
+    # pricky zebricku, na kterych uz se dodavatel dostane k nasim informacim
+    K_INFORMACIM = (DATA, SYSTEMY, SPRAVA)
     if not kod:
         return "nezařazeno"
     if not pristup:
@@ -38,14 +38,10 @@ PRIPADY = [
     # (ICT relevance, přístup, nahraditelnost) -> očekáváno
     (("ano", SPRAVA, BEZNE), "KRITICKÝ"),
     (("ne", SPRAVA, BEZNE), "KRITICKÝ"),      # správa systémů rozhoduje i mimo ICT
-    (("ano", ZPRACOVANI, BEZNE), "KRITICKÝ"),  # ICT dodávka + naše data u něj
-    (("ne", ZPRACOVANI, BEZNE), "VÝZNAMNÝ"),   # cloud u neICT dodavatele ještě ne
-    (("ano", UZIVATEL, BEZNE), "KRITICKÝ"),    # ICT dodávka + účet v našich systémech
-    (("ne", UZIVATEL, BEZNE), "VÝZNAMNÝ"),
-    (("ano", PREDANI, BEZNE), "KRITICKÝ"),     # ICT dodavatel, kterému posíláme data
-    (("ne", PREDANI, BEZNE), "VÝZNAMNÝ"),      # samotné předání dat = významný
-    (("ano", OBOJI, BEZNE), "KRITICKÝ"),
-    (("ne", OBOJI, BEZNE), "VÝZNAMNÝ"),
+    (("ano", SYSTEMY, BEZNE), "KRITICKÝ"),    # ICT dodávka + účet v našich systémech
+    (("ne", SYSTEMY, BEZNE), "VÝZNAMNÝ"),     # účet u neICT dodavatele ještě není kritika
+    (("ano", DATA, BEZNE), "KRITICKÝ"),       # ICT dodavatel, který drží naše data
+    (("ne", DATA, BEZNE), "VÝZNAMNÝ"),        # účetní s exportem = významný
     (("ne", ZADNY, ZAVISLOST), "KRITICKÝ"),   # single point of failure
     (("ano", ZADNY, BEZNE), "VÝZNAMNÝ"),
     (("ne", ZADNY, OBTIZNE), "VÝZNAMNÝ"),
@@ -340,6 +336,24 @@ def main():
     for hodnota in vystup.PRISTUP + vystup.NAHRADITELNOST:
         if hodnota not in (ZADNY, FYZICKY, BEZNE) and '"%s"' % hodnota not in vzorec:
             chyby.append("nabídka obsahuje %r, ale vzorec s tím nepočítá" % hodnota)
+    # Pristup je zebricek a poradi je soucast logiky: vzorec bere PRISTUP[2:]
+    # jako "dostane se k nasim informacim". Nic to nepripina - vzorec i tenhle
+    # test si indexy berou ze stejneho seznamu, takze prehozeni radku by proslo
+    # obema. Hranice se proto kontroluje jmenovite.
+    NEESKALUJI = ("Žádný přístup", "Fyzický vstup do prostor")
+    NEJVYSSI = "Privilegovaná správa systémů"
+    if tuple(vystup.PRISTUP[:len(NEESKALUJI)]) != NEESKALUJI:
+        chyby.append("na spodku žebříčku má být %r, je tam %r"
+                     % (list(NEESKALUJI), vystup.PRISTUP[:len(NEESKALUJI)]))
+    if vystup.PRISTUP[-1] != NEJVYSSI:
+        chyby.append("nejvyšší příčka žebříčku má být %r, je %r"
+                     % (NEJVYSSI, vystup.PRISTUP[-1]))
+    # a vzorec musi eskalovat presne na zbytku zebricku
+    eskaluje = [p for p in vystup.PRISTUP if '"%s"' % p in vzorec]
+    if eskaluje != vystup.PRISTUP[len(NEESKALUJI):]:
+        chyby.append("kritičnost zvedají %r, čekán zbytek žebříčku %r"
+                     % (eskaluje, vystup.PRISTUP[len(NEESKALUJI):]))
+
     # Excel bere seznam v datove validaci jen do 255 znaku vcetne uvozovek
     for jmeno, hodnoty in (("PRISTUP", vystup.PRISTUP),
                            ("NAHRADITELNOST", vystup.NAHRADITELNOST)):

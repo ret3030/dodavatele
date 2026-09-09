@@ -113,18 +113,19 @@ nahradíte**. Obojí je rozbalovací seznam:
 
 | Přístup k datům/systémům | znamená |
 |---|---|
-| Žádný přístup k aktivům | nevidí naše informace a nechodí do prostor |
-| Fyzický vstup do prostor | úklid, servis, ostraha, stěhování (A.7.2) |
-| Předávání informací mimo systémy | posíláme mu naše data — exporty, mzdy, výkresy, osobní údaje — ale do systémů nechodí (A.5.14) |
-| Zpracování dat u dodavatele | naše data leží a zpracovávají se v jeho prostředí — cloud, SaaS, hosting, outsourcovaná agenda (A.5.23) |
-| Uživatelský přístup do systémů | pracuje v našich aplikacích s běžnými právy |
-| Privilegovaný přístup a správa | administrátorská práva, vzdálená správa našich systémů (A.8.2) |
-| Fyzický i logický přístup | do prostor i do systémů zároveň |
+| 1. Žádný přístup | nevidí naše informace a nechodí do prostor |
+| 2. Fyzický vstup do prostor | úklid, servis, ostraha, stěhování (A.7.2) |
+| 3. Má naše data u sebe | dostane od nás exporty, dokumenty nebo osobní údaje, nebo je pro nás zpracovává ve svém prostředí — účetní, advokát, mzdová kancelář, cloud či SaaS (A.5.14, A.5.23) |
+| 4. Přístup do našich systémů | má účet v našich aplikacích nebo se do nich připojuje přes API či vzdálený přístup |
+| 5. Privilegovaná správa systémů | administrátorská práva, vzdálená správa — spravuje nám je, ne v nich jen pracuje (A.8.2) |
 
-Stupnice je rozepsaná schválně: dodavatel, kterému posíláme export, je něco
-jiného než dodavatel, který nám spravuje servery. Privilegovaný přístup je
-kritický vždycky, ostatní formy přístupu k informacím zvednou kritičnost na
-`KRITICKÝ` až u ICT dodávky. Když sedí víc voleb, vybírá se ta rizikovější.
+Je to **žebříček, ne výčet: vybírá se nejvyšší stupeň, který platí.** Vyšší
+v sobě obsahuje nižší, takže se nikdo nemusí rozhodovat mezi překrývajícími se
+možnostmi — jen kam až dodavatel dohlédne. Kdo chodí do prostor a zároveň nám
+spravuje servery, patří na stupeň 5; fyzický vstup je u něj to menší z obojího.
+
+Kritičnost zvedají stupně 3 a výš. Stupeň 5 je kritický vždycky, stupně 3–4
+až u ICT dodávky.
 
 | Nahraditelnost | znamená |
 |---|---|
@@ -139,11 +140,10 @@ vyjde jako `KRITICKÝ`, se chybějící vlastník nebo datum posouzení podbarv�
 
 ### Co z toho spočítají vzorce
 
-**Kritičnost** — `KRITICKÝ`, když má dodavatel privilegovaný přístup nebo nám
-spravuje systémy, nebo je na něm kritická závislost, nebo jde o ICT dodávku
-a dodavatel se přitom dostane k našim informacím či do systémů. `VÝZNAMNÝ` při
-ICT vazbě, jakémkoli přístupu k informacím nebo obtížné nahraditelnosti.
-Jinak `BĚŽNÝ`.
+**Kritičnost** — `KRITICKÝ`, když nám dodavatel spravuje systémy (stupeň 5),
+nebo je na něm kritická závislost, nebo jde o ICT dodávku a dodavatel je přitom
+aspoň na stupni 3. `VÝZNAMNÝ` při ICT vazbě, stupni 3 a výš nebo obtížné
+nahraditelnosti. Jinak `BĚŽNÝ`.
 
 Rozhoduje tedy **přístup a závislost, ne cena** — levný dodavatel se vzdálenou
 správou serverů je rizikovější než drahý dodavatel kancelářských potřeb. Objem

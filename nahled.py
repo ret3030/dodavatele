@@ -92,28 +92,27 @@ FORMY = {"D0015": "101"}
 
 # Indexy do vystup.PRISTUP a vystup.NAHRADITELNOST - psat je cislem by
 # znamenalo, ze se ukazka tise rozejde s poradim v nabidce.
-(BEZ_PRISTUPU, FYZICKY, PREDANI, ZPRACOVANI,
- UZIVATEL, SPRAVA, OBOJI) = range(len(vystup.PRISTUP))
+BEZ_PRISTUPU, FYZICKY, DATA, SYSTEMY, SPRAVA = range(len(vystup.PRISTUP))
 BEZNE, OBTIZNE, ZAVISLOST = range(len(vystup.NAHRADITELNOST))
 
 # Ukazkove hodnoty rucnich sloupcu pro druhy soubor. Klic = kod kreditora,
 # hodnota = (pristup, nahraditelnost, vlastnik, posouzeni, prezkoumani, pozn.)
 VYPLNENO = {
     "D0001": (BEZ_PRISTUPU, BEZNE, "J. Dvořák (nákup)", -120, 610, ""),
-    "D0002": (UZIVATEL, OBTIZNE, "M. Horák (výroba)", -60, 300,
+    "D0002": (SYSTEMY, OBTIZNE, "M. Horák (výroba)", -60, 300,
               "Přístup do skladového systému přes API."),
     "D0003": (BEZ_PRISTUPU, OBTIZNE, "M. Horák (výroba)", -200, 530, ""),
-    "D0004": (ZPRACOVANI, BEZNE, "P. Nový (IT)", -30, 335,
+    "D0004": (DATA, BEZNE, "P. Nový (IT)", -30, 335,
               "DPA podepsáno, telemetrie mimo EU."),
-    "D0005": (ZPRACOVANI, ZAVISLOST, "P. Nový (IT)", -30, 335,
+    "D0005": (DATA, ZAVISLOST, "P. Nový (IT)", -30, 335,
               "Provoz webu stojí a padá s nimi, migrace by trvala týdny."),
-    "D0006": (ZPRACOVANI, OBTIZNE, "P. Nový (IT)", -400, -30,
+    "D0006": (DATA, OBTIZNE, "P. Nový (IT)", -400, -30,
               "Přezkoumání propadlo, řeší se."),
     "D0007": (BEZ_PRISTUPU, OBTIZNE, "", None, None, ""),
     "D0008": (FYZICKY, BEZNE, "L. Marek (provoz)", -90, 275, ""),
     "D0009": (FYZICKY, BEZNE, "", None, None,
               "Vstup do prostor mimo pracovní dobu."),
-    "D0010": (PREDANI, OBTIZNE, "K. Beránková (právní)", -150, 580,
+    "D0010": (DATA, OBTIZNE, "K. Beránková (právní)", -150, 580,
               "Dostává smluvní a personální dokumenty, do systémů nechodí."),
     "D0011": (SPRAVA, ZAVISLOST, "", None, None,
               "Vzdálená správa ERP včetně přístupu do databáze – chybí vlastník."),
