@@ -102,6 +102,11 @@ PRAVNI_FORMY = {
 _ICO_RE = re.compile(r"\b\d{6,8}\b")
 _TAG = re.compile(r"<[^>]+>")
 _WS = re.compile(r"\s+")
+# Ridici znaky, ktere se tahnou z rozbitych webu a rejstriku. Do XLSX
+# se zapsat nedaji (openpyxl pada na IllegalCharacterError) a v podkladech
+# pro chat jen tristi text. \s je nepokryva cele, tak je mazeme zvlast.
+_RIDICI = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f"
+                     "\ud800-\udfff\ufdd0-\ufdef\ufffe\uffff]")
 
 
 # ---------------------------------------------------------------------------
@@ -148,7 +153,8 @@ def skore_shody(a, b):
 
 
 def _text(s, limit=None):
-    t = _WS.sub(" ", html.unescape(_TAG.sub(" ", str(s or "")))).strip()
+    t = _RIDICI.sub(" ", html.unescape(_TAG.sub(" ", str(s or ""))))
+    t = _WS.sub(" ", t).strip()
     return t[:limit] if limit else t
 
 

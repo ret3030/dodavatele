@@ -48,6 +48,26 @@ def _pismeno(i):
     return s
 
 
+# XLSX v bunce nedovoluje ridici znaky. Lezou sem z rozbitych webu, z rejstriku
+# i ze vstupniho CSV a openpyxl na nich spadne az pri wb.save(), tedy po celem
+# behu - proto se sem sahne u kazde hodnoty, ne jen u tech z internetu.
+_RIDICI = re.compile("[\x00-\x08\x0b\x0c\x0e-\x1f\x7f-\x9f"
+                     "\ud800-\udfff\ufdd0-\ufdef\ufffe\uffff]")
+LIMIT_BUNKY = 32000   # tvrdy strop Excelu je 32767 znaku
+
+
+def _bunka(h):
+    if not isinstance(h, str):
+        return h
+    h = _RIDICI.sub(" ", h)
+    return h[:LIMIT_BUNKY - 1] + "…" if len(h) > LIMIT_BUNKY else h
+
+
+def _radek(ws, hodnoty):
+    """append() s ocistenim - jediny vstup dat do sesitu."""
+    ws.append([_bunka(h) for h in hodnoty])
+
+
 # ---------------------------------------------------------------------------
 # Davky pro LLM chat
 # ---------------------------------------------------------------------------
@@ -267,22 +287,22 @@ def zapis_excel(firmy, odpovedi, cesta):
     # -- list Číselník (zdroj pro VLOOKUP i rozbalovací seznamy) -----------
     ws_c = wb.active
     ws_c.title = "Číselník"
-    ws_c.append(["Kód", "Kategorie", "Skupina", "ICT relevance"])
+    _radek(ws_c, ["Kód", "Kategorie", "Skupina", "ICT relevance"])
     for kod, (skupina, nazev) in sorted(KATEGORIE.items()):
-        ws_c.append([kod, nazev, skupina, ict_relevance(kod)])
+        _radek(ws_c, [kod, nazev, skupina, ict_relevance(kod)])
     for i, sirka in enumerate((14, 44, 34, 14), 1):
         ws_c.column_dimensions[get_column_letter(i)].width = sirka
 
     # -- list Dodavatelé --------------------------------------------------
     ws = wb.create_sheet("Dodavatelé", 0)
-    ws.append([n for n, _ in SLOUPCE])
+    _radek(ws, [n for n, _ in SLOUPCE])
     for i, (_, sirka) in enumerate(SLOUPCE, 1):
         ws.column_dimensions[get_column_letter(i)].width = sirka
 
     for cislo, f in enumerate(firmy, 1):
         odp = odpovedi.get(cislo) or {}
         r = cislo + 1
-        ws.append([
+        _radek(ws, [
             f.vstup_nazev,
             f.nazev if f.nazev != f.vstup_nazev else "",
             f.identita,
@@ -338,26 +358,26 @@ def zapis_excel(firmy, odpovedi, cesta):
     kr, ic, kod = _rozsah(S_KRIT), _rozsah(S_ICT), _rozsah(S_KOD)
     ident = "'Dodavatelé'!$C$2:$C$%d" % posledni
 
-    ws_s.append(["Přehled", ""])
-    ws_s.append(["Dodavatelů celkem", len(firmy)])
-    ws_s.append(["Zařazeno LLM", '=COUNTIF(%s,"<>")' % kod])
-    ws_s.append(["Nezařazeno (XXX-00)", '=COUNTIF(%s,"XXX-00")' % kod])
-    ws_s.append([])
-    ws_s.append(["Identita", ""])
+    _radek(ws_s, ["Přehled", ""])
+    _radek(ws_s, ["Dodavatelů celkem", len(firmy)])
+    _radek(ws_s, ["Zařazeno LLM", '=COUNTIF(%s,"<>")' % kod])
+    _radek(ws_s, ["Nezařazeno (XXX-00)", '=COUNTIF(%s,"XXX-00")' % kod])
+    _radek(ws_s, [])
+    _radek(ws_s, ["Identita", ""])
     for h in ("rejstřík", "VIES (DIČ)", "podle názvu", "neověřeno"):
-        ws_s.append([h, '=COUNTIF(%s,"%s")' % (ident, h)])
-    ws_s.append([])
-    ws_s.append(["ICT relevance", ""])
+        _radek(ws_s, [h, '=COUNTIF(%s,"%s")' % (ident, h)])
+    _radek(ws_s, [])
+    _radek(ws_s, ["ICT relevance", ""])
     for h in ("ano", "hraniční", "ne"):
-        ws_s.append([h, '=COUNTIF(%s,"%s")' % (ic, h)])
-    ws_s.append([])
-    ws_s.append(["Kritičnost", ""])
+        _radek(ws_s, [h, '=COUNTIF(%s,"%s")' % (ic, h)])
+    _radek(ws_s, [])
+    _radek(ws_s, ["Kritičnost", ""])
     for h in ("KRITICKÝ", "VÝZNAMNÝ", "BĚŽNÝ"):
-        ws_s.append([h, '=COUNTIF(%s,"%s")' % (kr, h)])
-    ws_s.append(["nevyplněno", '=COUNTIF(%s,"⟵*")' % kr])
-    ws_s.append([])
-    ws_s.append(["Kritických s ICT vazbou",
-                 '=COUNTIFS(%s,"KRITICKÝ",%s,"ano")' % (kr, ic)])
+        _radek(ws_s, [h, '=COUNTIF(%s,"%s")' % (kr, h)])
+    _radek(ws_s, ["nevyplněno", '=COUNTIF(%s,"⟵*")' % kr])
+    _radek(ws_s, [])
+    _radek(ws_s, ["Kritických s ICT vazbou",
+                  '=COUNTIFS(%s,"KRITICKÝ",%s,"ano")' % (kr, ic)])
     for radek in ws_s.iter_rows():
         if radek[0].value and not str(radek[0].value).startswith("="):
             if radek[1].value in (None, ""):
@@ -367,10 +387,10 @@ def zapis_excel(firmy, odpovedi, cesta):
 
     # -- list Podklady (proc to LLM zaradilo takhle) ----------------------
     ws_p = wb.create_sheet("Podklady")
-    ws_p.append(["#", "Název", "Zdroj", "Text"])
+    _radek(ws_p, ["#", "Název", "Zdroj", "Text"])
     for cislo, f in enumerate(firmy, 1):
         for stitek, text in f.podklady():
-            ws_p.append([cislo, f.nazev or f.vstup_nazev, stitek, text])
+            _radek(ws_p, [cislo, f.nazev or f.vstup_nazev, stitek, text])
     for b in ws_p[1]:
         b.font = Font(bold=True)
     for i, sirka in enumerate((6, 34, 14, 120), 1):

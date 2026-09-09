@@ -156,7 +156,21 @@ def main():
         if hodnota not in vystup.PRISTUP + vystup.NAHRADITELNOST + vystup.OBJEM:
             chyby.append("vzorec porovnává s %r, což není v žádné nabídce" % hodnota)
 
-    # 5) ICT relevance musí mít každá kategorie z číselníku
+    # 5) řídicí znaky z webů a rejstříků nesmí projít do buňky - XLSX je
+    #    nedovoluje a openpyxl na nich padal až při ukládání, po celém běhu
+    spinave = "ACME\x01 s.r.o.\x07\x1f test\x0b\x9d"
+    ciste = vystup._bunka(spinave)
+    if vystup._RIDICI.search(ciste):
+        chyby.append("_bunka nechala řídicí znak v %r" % ciste)
+    if "ACME" not in ciste or "test" not in ciste:
+        chyby.append("_bunka zahodila i čitelný text: %r" % ciste)
+    dlouhy = vystup._bunka("x" * 40000)
+    if len(dlouhy) > 32767:
+        chyby.append("_bunka nezkrátila text na limit Excelu (%d znaků)" % len(dlouhy))
+    if vystup._bunka(7) != 7 or vystup._bunka(None) is not None:
+        chyby.append("_bunka mrší nestringové hodnoty")
+
+    # 6) ICT relevance musí mít každá kategorie z číselníku
     bez_ict = [k for k in KATEGORIE if k != "XXX-00" and not ict_relevance(k)]
     if bez_ict:
         chyby.append("kategorie bez ICT příznaku: %s" % ", ".join(sorted(bez_ict)))
@@ -167,7 +181,7 @@ def main():
             print("  ✗ %s" % c)
         return 1
     print("OK: %d případů kritičnosti, syntaxe vzorců, indexy sloupců, "
-          "číselník (%d kategorií), čtení odpovědí z chatu"
+          "číselník (%d kategorií), čtení odpovědí z chatu, čištění buněk"
           % (len(PRIPADY), len(KATEGORIE)))
     return 0
 
