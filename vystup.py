@@ -41,6 +41,13 @@ PRISTUP = [
     "Přístup do našich systémů",    # účet v našich aplikacích, API, cloud
     "Privilegovaná správa systémů",  # administrátor, vzdálená správa
 ]
+# Nahraditelnost je taky stupnice, ale jineho druhu nez Pristup: nejsou to
+# pricky, ktere se scitaji, ale tri navzajem se vylucujici stavy. Vybira se
+# ten, ktery sedi - ne "nejvyssi, ktery plati", to by kazdeho tlacilo nahoru.
+#
+# Poradi presto nese logiku: _vzorec_kriticnost bere NAHRADITELNOST[-1] jako
+# kritickou zavislost a [-2] jako obtiznou nahraditelnost, takze prehozeni
+# radku by prohodilo i vysledek.
 NAHRADITELNOST = [
     "Běžně nahraditelný",           # na trhu je víc alternativ, přechod v týdnech
     "Obtížně nahraditelný",         # náhrada existuje, ale znamená migraci a měsíce
@@ -455,8 +462,8 @@ def _vzorec_kriticnost(r):
         'IF(OR({ict}="ano",{info},{nah}="{obtizne}"),'
         '"VÝZNAMNÝ","BĚŽNÝ"))))'
     ).format(kod=kod, ict=ict, pri=pri, nah=nah, info=k_informacim,
-             sprava=PRISTUP[-1], zavislost=NAHRADITELNOST[2],
-             obtizne=NAHRADITELNOST[1])
+             sprava=PRISTUP[-1], zavislost=NAHRADITELNOST[-1],
+             obtizne=NAHRADITELNOST[-2])
 
 
 def _vzorec_iso(r):

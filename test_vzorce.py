@@ -342,6 +342,15 @@ def main():
     # obema. Hranice se proto kontroluje jmenovite.
     NEESKALUJI = ("Žádný přístup", "Fyzický vstup do prostor")
     NEJVYSSI = "Privilegovaná správa systémů"
+    # Nahraditelnost ma stejnou past: vzorec i tenhle test si beru [-1] a [-2]
+    # ze stejneho seznamu, takze prehozeni dvou hodnot by zamenilo KRITICKY
+    # a VYZNAMNY a obema by proslo. Proto taky jmenovite.
+    if vystup.NAHRADITELNOST[-1] != "Kritická závislost":
+        chyby.append("nejvyšší stupeň závislosti má být 'Kritická závislost', "
+                     "je %r" % vystup.NAHRADITELNOST[-1])
+    if vystup.NAHRADITELNOST[0] != "Běžně nahraditelný":
+        chyby.append("nejnižší stupeň závislosti má být 'Běžně nahraditelný', "
+                     "je %r" % vystup.NAHRADITELNOST[0])
     if tuple(vystup.PRISTUP[:len(NEESKALUJI)]) != NEESKALUJI:
         chyby.append("na spodku žebříčku má být %r, je tam %r"
                      % (list(NEESKALUJI), vystup.PRISTUP[:len(NEESKALUJI)]))

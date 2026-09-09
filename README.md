@@ -129,9 +129,15 @@ až u ICT dodávky.
 
 | Nahraditelnost | znamená |
 |---|---|
-| Běžně nahraditelný | na trhu je víc alternativ, přechod je otázka týdnů |
-| Obtížně nahraditelný | náhrada existuje, ale znamená migraci dat a měsíce |
-| Kritická závislost | prakticky nenahraditelný, výpadek zastaví provoz |
+| 1. Běžně nahraditelný | na trhu je víc alternativ, přechod je otázka týdnů |
+| 2. Obtížně nahraditelný | náhrada existuje, ale znamená migraci dat a měsíce |
+| 3. Kritická závislost | prakticky nenahraditelný, výpadek zastaví provoz |
+
+Taky stupnice, ale **jiného druhu než Přístup**: nejsou to příčky, které se
+sčítají, ale tři vzájemně se vylučující stavy — vybírá se ten, který sedí, ne
+nejvyšší, který platí. Ptejte se, co by se stalo, kdyby dodavatel ze dne na den
+skončil, ne jak jste s ním spokojení. Stupeň 3 dělá dodavatele `KRITICKÝM` sám
+o sobě, i bez jakéhokoli přístupu k datům.
 
 Na konci řádku je revizní blok pro klienta — **Vlastník vztahu**, **Datum
 posouzení**, **Datum příštího přezkoumání** a **Poznámka**. U dodavatele, který
