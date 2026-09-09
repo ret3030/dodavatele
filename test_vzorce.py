@@ -251,6 +251,25 @@ def _test_sesit():
             if not any(t and "web" in t.lower() for t in texty):
                 chyby.append("poznámka nástroje se na Podklady nepřenesla: %r" % texty)
 
+        # Cervene podbarveni: v podminenem formatovani cte Excel barvu solid
+        # vyplne z bgColor. S pouhym fgColor se pravidlo ulozi a openpyxl ho
+        # precte zpatky, ale v Excelu se nevykresli nic - takze tuhle chybu
+        # nejde poznat jinak nez ctenim bgColor.
+        s_vyplni = 0
+        for rozsah in ws.conditional_formatting:
+            for pravidlo in rozsah.rules:
+                vypln = pravidlo.dxf.fill if pravidlo.dxf else None
+                if vypln is None:
+                    continue
+                s_vyplni += 1
+                barva = getattr(vypln.bgColor, "rgb", None) or ""
+                if vystup.BARVA_VYSTRAHA not in str(barva):
+                    chyby.append("podmíněné formátování %s nemá výplň v bgColor "
+                                 "(%r) – v Excelu se nezobrazí"
+                                 % (rozsah.sqref, barva))
+        if not s_vyplni:
+            chyby.append("v sešitu není žádné podbarvující pravidlo")
+
         # Souhrn scita ICT relevanci pres COUNTIF s textem hodnoty. Kdyby se
         # hodnota prejmenovala a Souhrn zustal, tise by ukazoval nuly.
         ws_s = wb["Souhrn"]

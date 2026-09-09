@@ -611,6 +611,10 @@ def _list_uvod(wb, firmy):
         r = _pis(popis, vysvetleni, vypln=barva, odsazeni=1)
         ws.cell(r, 1).font = Font(bold=True, size=11,
                                   color="FFFFFF" if barva == BARVA_TMAVA else "000000")
+    # Kriticnost se nepodbarvuje, ta se zvyrazni pismem - do legendy patri taky
+    r = _pis("KRITICKÝ tučně červeně", "spočítaná kritičnost dodavatele, "
+             "u kterého je potřeba doplnit revizní blok", odsazeni=1)
+    ws.cell(r, 1).font = Font(bold=True, size=11, color=BARVA_KRIT)
     return ws
 
 
@@ -715,7 +719,12 @@ def zapis_excel(firmy, odpovedi, cesta):
 
     # zvyrazneni - co u kritickeho dodavatele chybi a co je po termínu
     if posledni >= prvni:
-        cerveny = PatternFill("solid", fgColor=BARVA_VYSTRAHA)
+        # Pozor na fgColor: v podminenem formatovani (dxf) cte Excel barvu
+        # solid vyplne z bgColor, ne z fgColor jako u bezne bunky. S pouhym
+        # fgColor se pravidlo ulozi, openpyxl ho precte zpatky, ale v Excelu
+        # se nevykresli nic. start_color/end_color nastavi obe.
+        cerveny = PatternFill("solid", start_color=BARVA_VYSTRAHA,
+                              end_color=BARVA_VYSTRAHA)
         krit = "$%s%d" % (_pismeno(S_KRIT), prvni)
         for sl in (S_VLASTNIK, S_POSOUZENI):
             pis = _pismeno(sl)

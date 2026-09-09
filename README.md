@@ -142,7 +142,13 @@ o sobě, i bez jakéhokoli přístupu k datům.
 Na konci řádku je revizní blok pro klienta — **Vlastník vztahu**, **Datum
 posouzení**, **Datum příštího přezkoumání** a **Poznámka**. U dodavatele, který
 vyjde jako `KRITICKÝ`, se chybějící vlastník nebo datum posouzení podbarví
-červeně; červeně se ukáže i přezkoumání po termínu.
+červeně; červeně se ukáže i přezkoumání po termínu, a to u kohokoli, ne jen
+u kritických. Samotná `KRITICKÝ` v Kritičnosti se vypíše tučně červeně.
+
+Dokud není vyplněný Přístup, nezčervená nic — Kritičnost tehdy vrací
+`⟵ doplňte přístup`, takže sešit nepeskuje dřív, než dostane vstup. Podmínka
+na propadlé přezkoumání stojí na `TODAY()`, takže se přepočítá při každém
+otevření; termín zčervená sám, bez přegenerování sešitu.
 
 ### Co z toho spočítají vzorce
 
